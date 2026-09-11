@@ -1,0 +1,50 @@
+name: Flutter CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  flutter-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect initialized Flutter/Dart packages
+        id: detect
+        shell: bash
+        run: |
+          if find packages starters client-projects -name pubspec.yaml -print -quit 2>/dev/null | grep -q .; then
+            echo "has_packages=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_packages=false" >> "$GITHUB_OUTPUT"
+            echo "No initialized Flutter/Dart packages yet; Step 1 intentionally skips Flutter analyze/test."
+          fi
+
+      - name: Set up Flutter
+        if: steps.detect.outputs.has_packages == 'true'
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Analyze and test initialized packages
+        if: steps.detect.outputs.has_packages == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r pubspec; do
+            dir="$(dirname "$pubspec")"
+            echo "Checking $dir"
+            (
+              cd "$dir"
+              flutter pub get || dart pub get
+              if grep -q '^  flutter:' pubspec.yaml || grep -q '^flutter:' pubspec.yaml; then
+                flutter analyze
+                if [ -d test ]; then flutter test; fi
+              else
+                dart analyze
+                if [ -d test ]; then dart test; fi
+              fi
+            )
+          done < <(find packages starters client-projects -name pubspec.yaml -print)
