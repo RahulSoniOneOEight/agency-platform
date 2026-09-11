@@ -1,0 +1,30 @@
+# OS/editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Dart / Flutter
+.dart_tool/
+.packages
+.pub-cache/
+build/
+coverage/
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# Melos
+.melos_tool/
+
+# Python validation caches
+__pycache__/
+*.py[cod]
+
+# Local env/secrets
+.env
+.env.*
+!.env.example
+
+# Temporary outputs
+*.log
+.tmp/
