@@ -8,6 +8,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 VALIDATOR_PATH = Path(__file__).with_name("validate_repo.py")
+STEP2_CONTROL_FILES = (
+    "REFERENCE_POLICY.md",
+    "DESIGN_SYSTEM.md",
+    "VISUAL_QA.md",
+    "PENPOT_MAPPING.md",
+)
 
 
 class ValidatorContractTests(unittest.TestCase):
@@ -29,6 +35,11 @@ class ValidatorContractTests(unittest.TestCase):
             missing = validator.missing_required_paths(Path(tmp))
         self.assertIn("AGENTS.md", missing)
         self.assertIn("design-contract/tokens", missing)
+
+    def test_step2_control_files_are_required(self):
+        validator = self.load_validator()
+        for path in STEP2_CONTROL_FILES:
+            self.assertIn(path, validator.REQUIRED_PATHS)
 
 
 if __name__ == "__main__":
