@@ -44,6 +44,10 @@ REQUIRED_PATHS = (
     "tooling/validation",
     "tooling/visual-review",
     "AGENTS.md",
+    "REFERENCE_POLICY.md",
+    "DESIGN_SYSTEM.md",
+    "VISUAL_QA.md",
+    "PENPOT_MAPPING.md",
     "README.md",
     "melos.yaml",
     ".gitignore",
@@ -51,7 +55,7 @@ REQUIRED_PATHS = (
 
 
 def missing_required_paths(root: Path) -> list[str]:
-    """Return required Step-1 paths that do not exist under *root*."""
+    """Return required platform-control paths that do not exist under *root*."""
     return [relative for relative in REQUIRED_PATHS if not (root / relative).exists()]
 
 
