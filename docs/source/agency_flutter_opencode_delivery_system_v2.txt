@@ -1,0 +1,485 @@
+AGENCY FLUTTER APP DELIVERY SYSTEM — OPENCODE-CENTRIC
+Updated with Penpot as an optional design/reference layer
+
+1. CORE OPERATING MODEL
+
+OpenCode is the main command center. It coordinates references, design-system reuse, Flutter implementation, visual QA, optional Penpot synchronization, production hardening, and GitHub delivery.
+
+CLIENT BRIEF
+    ↓
+PRODUCT / UX CONTRACT
+    ↓
+REFERENCE RESOURCE POOL
+GitHub • pub.dev • Penpot • icons • images • animations • UX examples
+    ↓
+CURATION + NORMALIZATION
+    ↓
+SHARED DESIGN CONTRACT
+tokens • components • patterns • variants
+    ↓
+┌───────────────────────────┬───────────────────────────┐
+│                           │                           │
+PENPOT LIBRARY              FLUTTER UI KIT             APP STARTERS
+visual reference            production components      reusable app shells
+│                           │                           │
+└───────────────────────────┴───────────────┬───────────┘
+                                            ↓
+                                      CLIENT APP
+                                            ↓
+                                      VISUAL QA LOOP
+                                            ↓
+                                      CLIENT REVIEW
+                                            ↓
+                                   PRODUCTIONIZATION
+                                            ↓
+                               GITHUB → CI/CD → RELEASE
+
+
+2. REFERENCE RESOURCE POOL
+
+Do not build everything from scratch. Maintain a curated pool that OpenCode can reuse.
+
+Sources:
+- GitHub: full Flutter apps, UI kits, patterns
+- pub.dev: Flutter packages
+- Penpot: visual layouts, components, UI kits, selected client designs
+- Icons: Lucide, Iconoir, Tabler
+- Stock images: Pexels, Unsplash
+- Placeholders: Picsum, placehold.co
+- Illustrations: unDraw
+- Animations: flutter_animate, Lottie, Rive
+- UX references: apps, screenshots, templates
+
+Suggested structure:
+
+agency-resources/
+├── incoming/
+├── approved/
+├── rejected/
+├── assets/
+└── registry/
+
+OpenCode should check:
+- license
+- Flutter compatibility
+- dependency quality
+- maintainability
+- visual usefulness
+- duplication with existing agency components
+
+
+3. CURATION + NORMALIZATION
+
+External references should not enter client apps directly.
+
+Normalization converts different sources into one agency design language.
+
+External reference
+      ↓
+Keep useful structure/idea
+      ↓
+Remove source-specific styling/dependencies
+      ↓
+Map colors → agency tokens
+Map spacing → agency spacing
+Map typography → agency typography
+Map icons → agency icon rules
+Map motion → agency motion rules
+Map imagery → agency ratios/cropping rules
+      ↓
+Generalize component API
+      ↓
+Add to approved agency system
+
+Example:
+
+External:
+#F5F5F5 + 18px radius + 14px padding
+
+Normalized:
+PIColors.surfaceSecondary
+PIRadius.lg
+PISpacing.md
+
+Purpose:
+Many external sources → one consistent design system.
+
+
+4. SHARED DESIGN CONTRACT
+
+The design contract is the bridge between Penpot and Flutter.
+
+design-contract/
+├── tokens/
+│   ├── colors.json
+│   ├── typography.json
+│   ├── spacing.json
+│   ├── radius.json
+│   └── motion.json
+├── components/
+│   ├── button.yaml
+│   ├── product-card.yaml
+│   └── filter-chip.yaml
+└── patterns/
+    ├── home.yaml
+    ├── plp.yaml
+    └── pdp.yaml
+
+Both Penpot and Flutter should use the same:
+- token names
+- component names
+- variants
+- pattern names
+- interaction rules
+
+Do NOT rely on perfect Penpot ↔ Flutter round-tripping.
+
+Recommended model:
+
+Shared Design Contract
+        /      \
+     Penpot    Flutter
+     visual    production code
+
+
+5. ONE AGENCY DESIGN SYSTEM
+
+Build one reusable Flutter package rather than a new design system for every client.
+
+agency_flutter_ui/
+├── foundation/
+│   ├── colors
+│   ├── typography
+│   ├── spacing
+│   ├── radius
+│   ├── elevation
+│   └── motion
+├── primitives/
+│   ├── buttons
+│   ├── inputs
+│   ├── chips
+│   ├── cards
+│   └── sheets
+├── domain-components/
+│   ├── ProductCard
+│   ├── CategoryTile
+│   ├── PromoTile
+│   ├── CartItem
+│   └── OrderCard
+├── patterns/
+│   ├── Home
+│   ├── PLP
+│   ├── PDP
+│   ├── Search
+│   ├── Cart
+│   └── Checkout
+└── themes/
+
+Keep roughly 70–85% shared.
+
+Client-specific changes usually include:
+- brand colors
+- fonts
+- imagery
+- radius/elevation personality
+- selected UX variants
+- unique workflows/components
+
+Model:
+
+Agency Design System
+       +
+Client Theme
+       +
+Selected UX Patterns
+       =
+Client App
+
+
+6. VARIANTS, NOT DUPLICATE COMPONENTS
+
+Keep controlled variants instead of separate implementations.
+
+ProductCard
+├── compact
+├── standard
+├── premium
+└── marketplace
+
+Home
+├── minimal
+├── editorial
+├── discovery-first
+└── promotion-heavy
+
+PDP
+├── standard
+├── premium
+├── marketplace
+└── specification-heavy
+
+OpenCode can quickly create Direction A/B/C using these variants.
+
+
+7. APP STARTERS
+
+Maintain reusable starter applications:
+
+agency-flutter-starters/
+├── ecommerce/
+├── marketplace/
+├── grocery/
+├── booking/
+├── loyalty/
+└── customer-portal/
+
+New project:
+
+Starter
+   +
+Agency Design System
+   +
+Reference / Asset Library
+   +
+Client Theme
+   ↓
+OpenCode customization
+
+Do not start every client app from flutter create.
+
+
+8. ROLE OF PENPOT
+
+Penpot is optional and useful for:
+- client-facing design files
+- manual layout exploration
+- visual design-system documentation
+- selected screen prototypes
+- importing external Penpot UI kits/components
+- maintaining representative approved screens
+
+Penpot is NOT the production source of truth.
+
+Recommended relationship:
+
+Penpot → Flutter
+- OpenCode reads approved visual structure/tokens/components
+- maps Penpot components to existing PI components
+- creates new reusable components only where needed
+
+Flutter → Penpot
+- do not attempt full automatic reconstruction
+- update important screens, components, and flows
+- use screenshots + shared component metadata as reference
+
+For a prepared app starter, maintain:
+
+commerce-starter/
+├── flutter/
+└── design/
+    └── commerce-starter.penpot
+
+Penpot should contain:
+- design system
+- core components
+- major screens
+- key flows
+- important variants
+
+Flutter remains the complete working implementation.
+
+
+9. OPENCODE LOOKUP RULE
+
+Before creating anything new, OpenCode should follow:
+
+1. Existing client component?
+2. Agency design-system component?
+3. Existing variant/pattern?
+4. Approved Penpot component/pattern?
+5. Approved GitHub reference?
+6. Approved pub.dev package?
+7. Only then create something new.
+
+This is the main rule for speed and reuse.
+
+
+10. VISUAL INSPECTION + AUTOMATIC CORRECTION
+
+OpenCode should inspect rendered Flutter UI, not infer visual quality from Dart code.
+
+OpenCode changes code
+        ↓
+Flutter run / Widgetbook
+        ↓
+Automatic screenshots
+        ↓
+Vision model inspection
+        ↓
+Find visual gaps/issues
+        ↓
+OpenCode corrects code
+        ↓
+Render again
+
+Visual checks:
+- spacing/alignment
+- clipping/overflow
+- text wrapping
+- visual hierarchy
+- inconsistent card sizes
+- image ratios
+- typography
+- icon consistency
+- responsiveness
+- design-system violations
+
+Typical screenshot sizes:
+- 360×800
+- 390×844
+- 430×932
+- tablet
+- desktop/web where relevant
+
+Use:
+- Widgetbook → component/variant review
+- Flutter run → complete screens and journeys
+- DevTools → technical layout debugging
+- AI vision → design critique
+- Golden tests → regression detection
+
+
+11. ROLE OF NOWA
+
+Nowa remains optional.
+
+Use it only when a human wants:
+- drag/drop rearrangement
+- quick visual adjustment
+- manual screen experimentation
+- visual inspection
+
+Recommended role:
+
+OpenCode → Flutter
+             ↓
+     Flutter / Widgetbook
+             +
+      Nowa optional
+             +
+     Penpot optional
+             ↓
+        OpenCode fixes
+             ↓
+           GitHub
+
+Neither Nowa nor Penpot should become mandatory for every project.
+
+
+12. TOOL RESPONSIBILITIES
+
+OpenCode
+- main command center
+- reference lookup
+- design-system reuse
+- app composition
+- code changes
+- visual-fix loop
+- Penpot/Flutter mapping
+
+Codex
+- complex implementation
+- refactoring
+- debugging
+- tests
+
+DeepSeek
+- lower-cost repetitive implementation
+
+ChatGPT
+- briefs
+- UX reasoning
+- architecture
+- visual critique
+
+Flutter
+- production consumer app
+
+Widgetbook
+- component visual catalog
+
+Penpot
+- optional design/reference/prototype layer
+- client-facing design file
+
+Nowa
+- optional visual/manual editing workspace
+
+GitHub
+- source of truth
+
+JSON fixtures
+- rapid demo data
+
+Supabase / APIs
+- production backend
+
+n8n
+- integrations and automation
+
+
+13. FINAL AGENCY ARCHITECTURE
+
+                         OPENCODE
+                            │
+                    PRODUCT / UX BRIEF
+                            │
+                            ▼
+              REFERENCES + ASSET LIBRARY
+ GitHub • pub.dev • Penpot • icons • images • motion
+                            │
+                            ▼
+                CURATION + NORMALIZATION
+                            │
+                            ▼
+                 SHARED DESIGN CONTRACT
+             tokens • components • patterns
+                   /             \
+                  /               \
+            PENPOT LIBRARY     FLUTTER UI KIT
+            visual reference   production code
+                  \               /
+                   \             /
+                  + APP STARTER
+                       │
+                       ▼
+                 CLIENT FLUTTER APP
+                       │
+                       ▼
+                  VISUAL QA LOOP
+ Flutter / Widgetbook → screenshot → AI vision → OpenCode fix
+                       │
+                       ▼
+                  CLIENT REVIEW
+                       │
+                       ▼
+                PRODUCTIONIZATION
+                       │
+                       ▼
+                    GITHUB
+               PR → CI → Release
+
+
+CORE PRINCIPLES
+
+1. OpenCode remains the anchor.
+2. GitHub remains the production source of truth.
+3. References provide breadth.
+4. Normalization creates consistency.
+5. The shared design contract keeps Penpot and Flutter aligned.
+6. The agency design system creates reuse.
+7. Penpot is optional for visual design/prototypes/client handoff.
+8. Flutter is the production implementation.
+9. Rendered screenshots provide visual feedback.
+10. AI vision helps identify visual gaps.
+11. Do not depend on perfect Flutter ↔ Penpot automatic conversion.

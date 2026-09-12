@@ -1,0 +1,6 @@
+name: agency_platform
+
+packages:
+  - packages/**
+  - starters/**
+  - client-projects/**
