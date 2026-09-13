@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["id", "reference_id", "extract", "normalization", "destination", "decision"],
+  "properties": {
+    "id": {"type": "string"},
+    "reference_id": {"type": "string"},
+    "extract": {"type": "object"},
+    "normalization": {"type": "object"},
+    "destination": {"type": "object"},
+    "decision": {
+      "type": "object",
+      "required": ["mode", "copy_source_code"],
+      "properties": {
+        "mode": {"enum": ["reuse", "extend", "variant", "reconstruct", "reference_only", "reject"]},
+        "copy_source_code": {"type": "boolean"}
+      }
+    }
+  },
+  "additionalProperties": true
+}

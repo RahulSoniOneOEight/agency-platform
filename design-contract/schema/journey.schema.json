@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["id", "name", "purpose", "status", "patterns"],
+  "properties": {
+    "id": {"type": "string"}, "name": {"type": "string"}, "purpose": {"type": "string"},
+    "status": {"enum": ["experimental", "approved", "deprecated"]},
+    "patterns": {"type": "array", "items": {"type": "string"}},
+    "business_models": {"type": "array", "items": {"type": "string"}},
+    "jobs": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

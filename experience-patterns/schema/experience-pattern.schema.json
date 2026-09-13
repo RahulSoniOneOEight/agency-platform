@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["id", "name", "strategy_family", "strategic_goal", "best_when", "business_models", "personas", "jobs", "primary_journey"],
+  "properties": {
+    "id": {"type": "string"}, "name": {"type": "string"}, "strategy_family": {"type": "string"}, "strategic_goal": {"type": "string"},
+    "best_when": {"type": "array", "items": {"type": "string"}}, "business_models": {"type": "array", "items": {"type": "string"}},
+    "personas": {"type": "array", "items": {"type": "string"}}, "jobs": {"type": "array", "items": {"type": "string"}},
+    "primary_journey": {"type": "array", "minItems": 2, "items": {"type": "string"}}, "tradeoffs": {"type": "object"}
+  },
+  "additionalProperties": true
+}

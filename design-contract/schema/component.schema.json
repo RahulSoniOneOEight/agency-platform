@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["id", "name", "category", "purpose", "business_models", "use_cases", "variants", "states", "status"],
+  "properties": {
+    "id": {"type": "string"}, "name": {"type": "string"}, "category": {"type": "string"}, "purpose": {"type": "string"},
+    "business_models": {"type": "array", "items": {"type": "string"}}, "industries": {"type": "array", "items": {"type": "string"}},
+    "use_cases": {"type": "array", "items": {"type": "string"}}, "variants": {"type": "array", "items": {"type": "string"}},
+    "states": {"type": "array", "items": {"type": "string"}}, "density": {"type": "array", "items": {"type": "string"}},
+    "responsive": {"type": "array", "items": {"type": "string"}}, "requires": {"type": "array", "items": {"type": "string"}},
+    "compatible_patterns": {"type": "array", "items": {"type": "string"}}, "avoid_when": {"type": "array", "items": {"type": "string"}},
+    "source_refs": {"type": "array", "items": {"type": "string"}}, "status": {"enum": ["experimental", "approved", "deprecated"]},
+    "tags": {"type": "array", "items": {"type": "string"}}, "selection_rules": {"type": "array"}
+  },
+  "additionalProperties": true
+}
