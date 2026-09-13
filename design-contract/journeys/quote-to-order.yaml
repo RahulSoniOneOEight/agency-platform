@@ -1,0 +1,7 @@
+id: commerce.quote-to-order
+name: Quote to Order
+purpose: Convert an RFQ or negotiated quote into an order.
+status: approved
+patterns: [commerce.rfq, commerce.pdp]
+business_models: [b2b, marketplace]
+jobs: [request-quote, review-quote, purchase]

@@ -1,0 +1,7 @@
+id: commerce.search-to-purchase
+name: Search to Purchase
+purpose: Support high-intent known-item purchasing.
+status: approved
+patterns: [commerce.search, commerce.pdp]
+business_models: [b2c, b2b, marketplace]
+jobs: [find-exact-product, compare, purchase]

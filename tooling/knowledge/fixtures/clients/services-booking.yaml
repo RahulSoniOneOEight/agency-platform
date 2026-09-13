@@ -1,0 +1,8 @@
+id: fixture-services-booking
+business_model: service
+industry: services-rental-appointment
+use_cases: [booking, consultation]
+objectives: [increase-booking-conversion, reduce-time-to-slot]
+personas: [service-customer]
+jobs: [find-service, check-availability, book]
+platforms: [mobile, web]

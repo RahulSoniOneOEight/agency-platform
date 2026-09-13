@@ -1,0 +1,17 @@
+id: commerce.filter-bar
+name: FilterBar
+category: commerce.discovery
+purpose: Refine product or service results using category-specific attributes.
+business_models: [b2c, b2b, marketplace]
+industries: [general]
+use_cases: [search, comparison, catalog]
+variants: [chips, drawer, sidebar, specification-heavy]
+states: [idle, applied, loading]
+density: [compact, normal]
+responsive: [mobile, tablet, desktop]
+requires: []
+compatible_patterns: [commerce.plp, commerce.search]
+avoid_when: [very-small-result-set]
+source_refs: []
+status: approved
+tags: [filters, search, plp]

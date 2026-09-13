@@ -1,0 +1,7 @@
+id: commerce.pdp
+name: Product Detail
+purpose: Build purchase confidence and support product-level actions.
+status: approved
+compatible_components: [commerce.product-image, commerce.price-display, commerce.rating-stars, commerce.product-card]
+business_models: [b2c, b2b, marketplace]
+use_cases: [purchase, comparison, bulk-procurement]

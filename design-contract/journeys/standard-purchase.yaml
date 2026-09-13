@@ -1,0 +1,7 @@
+id: commerce.standard-purchase
+name: Standard Purchase
+purpose: Support browse-to-cart consumer purchasing.
+status: approved
+patterns: [commerce.home, commerce.plp, commerce.pdp]
+business_models: [b2c, marketplace]
+jobs: [discover, compare, purchase]

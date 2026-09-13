@@ -1,0 +1,7 @@
+id: commerce.rfq
+name: RFQ
+purpose: Support multi-item request-for-quote and trade negotiation workflows.
+status: approved
+compatible_components: [commerce.quote-card, commerce.product-card, commerce.credit-summary]
+business_models: [b2b, marketplace]
+use_cases: [rfq, bulk-procurement]

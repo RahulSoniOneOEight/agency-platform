@@ -1,0 +1,20 @@
+id: normalize-robertodevs-flutter-ecommerce-template
+reference_id: github-robertodevs-flutter-ecommerce-template
+extract:
+  components: [product-card, rating, search, address-card, payment-card]
+  patterns: [product-discovery, product-detail, checkout]
+  journeys: [standard-purchase]
+normalization:
+  colors: map-to-agency-tokens
+  typography: map-to-agency-tokens
+  spacing: map-to-agency-tokens
+  radius: map-to-agency-tokens
+  icons: replace-with-agency-icon-rules
+  dependencies: review-do-not-inherit
+  architecture: do-not-copy-source-architecture
+destination:
+  components: design-contract/components
+  patterns: design-contract/patterns
+decision:
+  mode: reconstruct
+  copy_source_code: false

@@ -1,0 +1,18 @@
+id: github-manishdayma-flucommerce
+source_type: flutter_reference
+name: FluCommerce
+source_url: https://github.com/manishdayma/FluCommerce
+provider: github
+category: [ecommerce, flutter, architecture-reference]
+status: reference_only
+license:
+  type: unknown
+  status: unresolved
+compatibility:
+  dart: pre-dart-3
+  disposition: architecture-and-pattern-reference-only
+allowed_use: [architecture-reference, ux-reference, pattern-reference]
+blocked_use: [source-code-copy, direct-client-copy]
+normalization_required: true
+code_reuse_allowed: false
+tags: [commerce, plp, pdp, routing, architecture]

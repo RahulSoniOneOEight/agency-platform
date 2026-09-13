@@ -1,0 +1,17 @@
+id: commerce.quote-card
+name: QuoteCard
+category: commerce.trade
+purpose: Summarize a B2B quote, status, price, and next action.
+business_models: [b2b, marketplace]
+industries: [industrial-construction, electronics-appliances]
+use_cases: [rfq, bulk-procurement]
+variants: [summary, actionable]
+states: [draft, submitted, received, accepted, expired]
+density: [compact, normal]
+responsive: [mobile, tablet, desktop]
+requires: [commerce.price-display]
+compatible_patterns: [commerce.rfq]
+avoid_when: [consumer-checkout-only]
+source_refs: []
+status: approved
+tags: [quote, rfq, b2b]

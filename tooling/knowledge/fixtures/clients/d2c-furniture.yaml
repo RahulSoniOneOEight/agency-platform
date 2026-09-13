@@ -1,0 +1,8 @@
+id: fixture-d2c-furniture
+business_model: b2c
+industry: furniture-home
+use_cases: [discovery, comparison]
+objectives: [increase-conversion, improve-product-confidence]
+personas: [consumer]
+jobs: [discover, compare, purchase]
+platforms: [mobile, web]
