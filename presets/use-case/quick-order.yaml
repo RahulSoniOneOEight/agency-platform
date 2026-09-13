@@ -1,0 +1,6 @@
+id: quick-order
+type: use-case
+description: Fast known-item ordering with minimal navigation.
+candidate_archetypes: [quick-order, search-sku-first]
+important_jobs: [find-exact-product, quick-add, purchase]
+preferences: {speed: high, density: compact}

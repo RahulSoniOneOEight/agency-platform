@@ -1,0 +1,10 @@
+id: marketplace-first
+name: Marketplace-first
+strategy_family: marketplace
+strategic_goal: Make seller, offer, delivery, and marketplace context visible throughout discovery and purchase.
+best_when: [marketplace, evaluate-seller, compare-offers, seller-context]
+business_models: [marketplace]
+personas: [consumer, trade-buyer]
+jobs: [discover, compare, evaluate-seller]
+primary_journey: [marketplace-home, results, offers, seller, checkout]
+tradeoffs: {strength: offer-transparency, weakness: higher-information-density}

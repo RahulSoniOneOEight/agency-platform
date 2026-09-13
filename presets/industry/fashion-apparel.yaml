@@ -1,0 +1,6 @@
+id: fashion-apparel
+type: industry
+description: Visual, variant-heavy shopping shaped by style, fit, size, and collections.
+candidate_archetypes: [editorial-commerce, discovery-first, recommendation-led]
+important_jobs: [discover, browse-style, choose-variant, purchase]
+preferences: {visual_dependency: high, density: normal, merchandising: high}

@@ -1,0 +1,6 @@
+id: travel-hospitality
+type: industry
+description: Destination, date, availability, itinerary, and confidence-led planning.
+candidate_archetypes: [booking-first, discovery-first, availability-first]
+important_jobs: [explore, check-availability, compare, book]
+preferences: {availability: high, date_location_context: primary}

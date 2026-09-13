@@ -1,0 +1,6 @@
+id: furniture-home
+type: industry
+description: High-consideration visual shopping requiring dimensions, material, delivery, and confidence.
+candidate_archetypes: [room-use-case-led, editorial-commerce, comparison-first]
+important_jobs: [discover, browse-room, understand-dimensions, compare, purchase]
+preferences: {visual_dependency: high, density: spacious, product_confidence: high}

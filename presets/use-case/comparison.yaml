@@ -1,0 +1,6 @@
+id: comparison
+type: use-case
+description: Evaluate alternatives across important attributes.
+candidate_archetypes: [comparison-first, search-first]
+important_jobs: [compare, evaluate, purchase]
+preferences: {comparison: high}

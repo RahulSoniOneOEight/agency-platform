@@ -1,0 +1,10 @@
+id: room-use-case-led
+name: Room / use-case-led
+strategy_family: contextual
+strategic_goal: Organize discovery around the customer's context rather than product taxonomy.
+best_when: [browse-room, furniture-home, discover, high-visual-dependency]
+business_models: [b2c]
+personas: [consumer]
+jobs: [discover, browse-room, compare]
+primary_journey: [room-or-use-case, collection, product-set, pdp, checkout]
+tradeoffs: {strength: contextual-inspiration, weakness: taxonomy-seekers-need-search}

@@ -1,0 +1,6 @@
+id: marketplace-retail
+type: industry
+description: Multi-seller product discovery where price, seller, trust, and delivery vary.
+candidate_archetypes: [marketplace-first, comparison-first, seller-trust-led]
+important_jobs: [discover, compare, evaluate-seller, purchase]
+preferences: {seller_context: high, fulfillment_comparison: high}

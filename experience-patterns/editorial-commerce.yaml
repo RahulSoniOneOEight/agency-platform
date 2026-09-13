@@ -1,0 +1,10 @@
+id: editorial-commerce
+name: Editorial commerce
+strategy_family: editorial
+strategic_goal: Combine brand storytelling, inspiration, collections, and commerce.
+best_when: [discover, brand-story, lifestyle, high-visual-dependency]
+business_models: [b2c]
+personas: [consumer]
+jobs: [discover, browse, learn-brand]
+primary_journey: [story-home, collection, editorial-module, pdp, checkout]
+tradeoffs: {strength: brand-differentiation, weakness: lower-task-density}

@@ -1,0 +1,6 @@
+id: grocery-fmcg
+type: industry
+description: High-frequency basket building with repeat purchases, quick add, promotions, and fulfillment slots.
+candidate_archetypes: [reorder-first, quick-order, recommendation-led]
+important_jobs: [reorder, search, quick-add, build-basket]
+preferences: {frequency: high, density: compact, quick_add: true}

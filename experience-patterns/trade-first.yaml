@@ -1,0 +1,10 @@
+id: trade-first
+name: Trade-first
+strategy_family: trade
+strategic_goal: Center account, procurement, credit, repeat order, and trade tasks.
+best_when: [bulk-procurement, trade-growth, reorder, b2b]
+business_models: [b2b]
+personas: [procurement-manager, trade-buyer]
+jobs: [bulk-buy, reorder, purchase]
+primary_journey: [trade-dashboard, products, quantity, credit, order]
+tradeoffs: {strength: procurement-efficiency, weakness: less-consumer-friendly}

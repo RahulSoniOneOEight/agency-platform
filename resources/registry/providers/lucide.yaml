@@ -1,0 +1,13 @@
+id: provider-lucide
+source_type: icon-provider
+name: Lucide
+source_url: https://lucide.dev
+provider: lucide
+category: [icons]
+status: approved_with_rules
+license: {type: version-specific, status: not_applicable}
+allowed_use: [prototype-icons, production-icons-after-license-check]
+blocked_use: []
+normalization_required: true
+code_reuse_allowed: false
+tags: [icons, fallback-icon-family]

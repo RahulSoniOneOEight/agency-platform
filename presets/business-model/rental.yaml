@@ -1,0 +1,6 @@
+id: rental
+type: business-model
+description: Availability-driven commerce with date, suitability, and booking constraints.
+candidate_archetypes: [availability-first, booking-first, comparison-first]
+important_jobs: [check-availability, compare, book]
+preferences: {availability: primary, transaction_model: booking}

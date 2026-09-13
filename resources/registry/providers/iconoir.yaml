@@ -1,0 +1,13 @@
+id: provider-iconoir
+source_type: icon-provider
+name: Iconoir
+source_url: https://iconoir.com
+provider: iconoir
+category: [icons]
+status: approved_with_rules
+license: {type: version-specific, status: not_applicable}
+allowed_use: [prototype-icons, production-icons-after-license-check]
+blocked_use: []
+normalization_required: true
+code_reuse_allowed: false
+tags: [icons, primary-icon-family]

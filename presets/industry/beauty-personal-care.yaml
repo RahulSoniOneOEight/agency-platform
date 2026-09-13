@@ -1,0 +1,6 @@
+id: beauty-personal-care
+type: industry
+description: Concern, routine, education, trust, and replenishment-led shopping.
+candidate_archetypes: [guided-selling, recommendation-led, reorder-first]
+important_jobs: [identify-need, evaluate-ingredients, build-routine, replenish]
+preferences: {education: high, trust: high, replenishment: high}

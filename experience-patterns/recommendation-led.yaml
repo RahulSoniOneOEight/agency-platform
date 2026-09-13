@@ -1,0 +1,10 @@
+id: recommendation-led
+name: Recommendation-led
+strategy_family: personalization
+strategic_goal: Use relevance, bundles, and recommendations to reduce choice friction and grow basket value.
+best_when: [recommendations, cross-sell, personalization, increase-basket-size]
+business_models: [b2c, subscription, marketplace]
+personas: [consumer]
+jobs: [discover, cross-sell, replenish]
+primary_journey: [home, recommendations, pdp, bundle, checkout]
+tradeoffs: {strength: relevance, weakness: depends-on-good-signals}

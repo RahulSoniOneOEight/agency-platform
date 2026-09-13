@@ -1,0 +1,6 @@
+id: consultation
+type: use-case
+description: Assisted selection through guided or human consultation.
+candidate_archetypes: [consultation-led, guided-selling]
+important_jobs: [consult, evaluate, decide]
+preferences: {assistance: high}

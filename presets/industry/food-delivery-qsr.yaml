@@ -1,0 +1,6 @@
+id: food-delivery-qsr
+type: industry
+description: Immediate ordering with menu discovery, modifiers, combos, fulfillment mode, and reorder.
+candidate_archetypes: [quick-order, discovery-first, reorder-first]
+important_jobs: [choose-location, browse-menu, customize, order, reorder]
+preferences: {transaction_speed: high, fulfillment_context: prominent}

@@ -1,0 +1,6 @@
+id: service
+type: business-model
+description: Service discovery and appointment/consultation workflows.
+candidate_archetypes: [availability-first, consultation-led, booking-first]
+important_jobs: [find-service, check-availability, book, consult]
+preferences: {transaction_model: booking, service_context: prominent}

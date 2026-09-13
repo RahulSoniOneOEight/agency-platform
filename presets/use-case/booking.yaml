@@ -1,0 +1,6 @@
+id: booking
+type: use-case
+description: Date/time/location based reservation or booking.
+candidate_archetypes: [booking-first, availability-first]
+important_jobs: [check-availability, book]
+preferences: {transaction_model: booking}

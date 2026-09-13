@@ -1,0 +1,6 @@
+id: subscription
+type: use-case
+description: Start or manage recurring purchase behavior.
+candidate_archetypes: [reorder-first, recommendation-led]
+important_jobs: [subscribe, replenish, manage-subscription]
+preferences: {recurrence: high}

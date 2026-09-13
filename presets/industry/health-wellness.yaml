@@ -1,0 +1,6 @@
+id: health-wellness
+type: industry
+description: Need-led product/service discovery with elevated trust, information, accessibility, and replenishment requirements.
+candidate_archetypes: [guided-selling, search-first, reorder-first]
+important_jobs: [identify-need, search, evaluate-information, replenish]
+preferences: {trust: high, accessibility: high, education: high}

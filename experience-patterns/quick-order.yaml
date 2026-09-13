@@ -1,0 +1,10 @@
+id: quick-order
+name: Quick-order
+strategy_family: efficiency
+strategic_goal: Reduce repeated known-item ordering to the fewest actions possible.
+best_when: [quick-order, repeat-order, reorder, reduce-time-to-order]
+business_models: [b2b, b2c]
+personas: [trade-buyer, consumer]
+jobs: [reorder, find-exact-product]
+primary_journey: [quick-order, item-entry, quantity, cart, order]
+tradeoffs: {strength: speed, weakness: low-discovery}

@@ -1,0 +1,6 @@
+id: d2c-lifestyle
+type: industry
+description: Brand-led commerce balancing storytelling, campaigns, discovery, bundles, and loyalty.
+candidate_archetypes: [editorial-commerce, discovery-first, recommendation-led]
+important_jobs: [discover, learn-brand, browse-collection, purchase]
+preferences: {brand_story: high, merchandising: high}

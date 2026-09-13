@@ -1,0 +1,10 @@
+id: rfq-first
+name: RFQ-first
+strategy_family: procurement
+strategic_goal: Optimize multi-item quote creation, negotiation, and conversion to order.
+best_when: [rfq, grow-rfq, request-quote, bulk-procurement]
+business_models: [b2b, marketplace]
+personas: [procurement-manager, trade-buyer]
+jobs: [request-quote, review-quote]
+primary_journey: [search-or-category, multi-select, rfq, quote, approval, order]
+tradeoffs: {strength: negotiated-procurement, weakness: longer-transaction-cycle}

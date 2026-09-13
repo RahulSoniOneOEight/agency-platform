@@ -1,0 +1,6 @@
+id: b2c
+type: business-model
+description: Consumer commerce emphasizing discovery, search, confidence, and checkout.
+candidate_archetypes: [discovery-first, search-first, recommendation-led]
+important_jobs: [discover, search, compare, purchase]
+preferences: {transaction_model: checkout, merchandising: high}

@@ -1,0 +1,10 @@
+id: seller-trust-led
+name: Seller / trust-led
+strategy_family: trust
+strategic_goal: Prioritize seller credibility, fulfillment reliability, ratings, and policy confidence.
+best_when: [evaluate-seller, trust, marketplace, high-risk-purchase]
+business_models: [marketplace]
+personas: [consumer, trade-buyer]
+jobs: [evaluate-seller, compare, purchase]
+primary_journey: [results, seller-context, offer-detail, trust-check, checkout]
+tradeoffs: {strength: confidence, weakness: extra-comparison-friction}

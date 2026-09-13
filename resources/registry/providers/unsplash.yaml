@@ -1,0 +1,13 @@
+id: provider-unsplash
+source_type: stock-image-provider
+name: Unsplash
+source_url: https://unsplash.com
+provider: unsplash
+category: [images]
+status: approved_with_rules
+license: {type: provider-specific, status: not_applicable}
+allowed_use: [prototype-search, demo-assets]
+blocked_use: [unreviewed-redistribution]
+normalization_required: false
+code_reuse_allowed: false
+tags: [stock, imagery]

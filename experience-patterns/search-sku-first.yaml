@@ -1,0 +1,10 @@
+id: search-sku-first
+name: Search / SKU-first
+strategy_family: sku-search
+strategic_goal: Optimize exact-item finding through model, part, SKU, and specification search.
+best_when: [find-exact-product, reduce-time-to-order, bulk-procurement, electronics-appliances]
+business_models: [b2b, b2c]
+personas: [procurement-manager, trade-buyer]
+jobs: [find-exact-product, compare-specifications]
+primary_journey: [search, exact-result, pdp, quantity, transaction]
+tradeoffs: {strength: exact-item-efficiency, weakness: weaker-browsing}
