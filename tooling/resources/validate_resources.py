@@ -6,6 +6,8 @@ from pathlib import Path
 import yaml
 from jsonschema import Draft202012Validator
 
+from .normalizer import canonical_id
+
 
 _SCHEMA_NAMES = {
     "requirements": "resource-requirements.schema.json",
@@ -32,6 +34,96 @@ def _provider_status(root: Path, source: str) -> str | None:
     return str(status) if status is not None else None
 
 
+def _validate_candidate(
+    *,
+    root: Path,
+    requirement_id: str,
+    requirement: dict,
+    candidate: dict,
+    provenance: dict,
+    errors: list[str],
+) -> None:
+    source = str(candidate.get("source") or "")
+    mode = (requirement.get("sourcing") or {}).get("mode")
+    if mode == "authoritative" and source not in _INTERNAL_SOURCES:
+        errors.append(f"authoritative resource {requirement_id!r} uses unauthorized source {source!r}")
+
+    if source not in _INTERNAL_SOURCES:
+        provider_status = _provider_status(root, source)
+        if provider_status == "blocked":
+            errors.append(f"external resource {candidate.get('id')!r} uses blocked provider {source!r}")
+        elif provider_status not in _ALLOWED_PROVIDER_STATUSES:
+            errors.append(
+                f"external resource {candidate.get('id')!r} uses unapproved or unknown provider {source!r}"
+            )
+        if candidate.get("id") not in provenance:
+            errors.append(f"external resource {candidate.get('id')!r} missing provenance")
+
+
+def _validate_selection_group(
+    *,
+    root: Path,
+    label: str,
+    group: dict,
+    requirements: dict,
+    candidate_ids: dict,
+    provenance: dict,
+    errors: list[str],
+    require_critical: bool,
+) -> None:
+    canonical_owners: dict[str, str] = {}
+
+    for unknown_requirement_id in set(group) - set(requirements):
+        errors.append(f"{label} references unknown resource requirement {unknown_requirement_id!r}")
+
+    for requirement_id, requirement in requirements.items():
+        selection = group.get(requirement_id)
+        if require_critical and requirement.get("impact") == "critical" and not selection:
+            errors.append(f"critical resource {requirement_id!r} has no selection")
+            continue
+        if not selection:
+            continue
+
+        primary_id = selection.get("primary")
+        candidate = candidate_ids.get(primary_id)
+        if candidate is None:
+            errors.append(f"{label} {requirement_id!r} references unknown candidate {primary_id!r}")
+            continue
+
+        canonical = canonical_id(candidate)
+        existing_owner = canonical_owners.get(canonical)
+        if existing_owner is not None and existing_owner != requirement_id:
+            errors.append(
+                f"canonical resource id collision {canonical!r} between {existing_owner!r} and {requirement_id!r} in {label}"
+            )
+        else:
+            canonical_owners[canonical] = requirement_id
+
+        _validate_candidate(
+            root=root,
+            requirement_id=requirement_id,
+            requirement=requirement,
+            candidate=candidate,
+            provenance=provenance,
+            errors=errors,
+        )
+
+        fallback_id = selection.get("fallback")
+        if fallback_id:
+            fallback = candidate_ids.get(fallback_id)
+            if fallback is None:
+                errors.append(f"{label} {requirement_id!r} references unknown fallback candidate {fallback_id!r}")
+            else:
+                _validate_candidate(
+                    root=root,
+                    requirement_id=requirement_id,
+                    requirement=requirement,
+                    candidate=fallback,
+                    provenance=provenance,
+                    errors=errors,
+                )
+
+
 def validate_resource_artifacts(root: Path, client_dir: Path) -> list[str]:
     errors: list[str] = []
     paths = {
@@ -51,41 +143,41 @@ def validate_resource_artifacts(root: Path, client_dir: Path) -> list[str]:
         for error in Draft202012Validator(schema).iter_errors(loaded):
             errors.append(f"{path}: {error.message}")
 
-    requirements = {item.get("id"): item for item in data["requirements"].get("resources") or []}
+    requirements = {
+        str(item.get("id")): item
+        for item in data["requirements"].get("resources") or []
+        if isinstance(item, dict) and item.get("id")
+    }
     candidate_ids = {
-        candidate.get("id"): candidate
+        str(candidate.get("id")): candidate
         for group in (data["candidates"].get("candidates") or {}).values()
         for candidate in group or []
-        if isinstance(candidate, dict)
+        if isinstance(candidate, dict) and candidate.get("id")
     }
     provenance = data["provenance"].get("resources") or {}
-    selections = data["selection"].get("selections") or {}
+    selection_data = data["selection"]
 
-    for requirement_id, requirement in requirements.items():
-        selection = selections.get(requirement_id)
-        if requirement.get("impact") == "critical" and not selection:
-            errors.append(f"critical resource {requirement_id!r} has no selection")
-            continue
-        if not selection:
-            continue
-        candidate = candidate_ids.get(selection.get("primary"))
-        if candidate is None:
-            errors.append(f"selection {requirement_id!r} references unknown candidate {selection.get('primary')!r}")
-            continue
+    _validate_selection_group(
+        root=root,
+        label="selection",
+        group=selection_data.get("selections") or {},
+        requirements=requirements,
+        candidate_ids=candidate_ids,
+        provenance=provenance,
+        errors=errors,
+        require_critical=True,
+    )
 
-        source = str(candidate.get("source") or "")
-        mode = (requirement.get("sourcing") or {}).get("mode")
-        if mode == "authoritative" and source not in _INTERNAL_SOURCES:
-            errors.append(f"authoritative resource {requirement_id!r} uses unauthorized source {source!r}")
+    for direction_id, group in (selection_data.get("direction_overrides") or {}).items():
+        _validate_selection_group(
+            root=root,
+            label=f"direction override {direction_id!r}",
+            group=group or {},
+            requirements=requirements,
+            candidate_ids=candidate_ids,
+            provenance=provenance,
+            errors=errors,
+            require_critical=False,
+        )
 
-        if source not in _INTERNAL_SOURCES:
-            provider_status = _provider_status(root, source)
-            if provider_status == "blocked":
-                errors.append(f"external resource {candidate.get('id')!r} uses blocked provider {source!r}")
-            elif provider_status not in _ALLOWED_PROVIDER_STATUSES:
-                errors.append(
-                    f"external resource {candidate.get('id')!r} uses unapproved or unknown provider {source!r}"
-                )
-            if candidate.get("id") not in provenance:
-                errors.append(f"external resource {candidate.get('id')!r} missing provenance")
     return errors
