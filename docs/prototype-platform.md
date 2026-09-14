@@ -5,7 +5,7 @@ Milestone B turns validated Experience Directions into runnable Flutter prototyp
 ## Core architecture
 
 ```text
-client profile + A/B/C directions
+derived/client-profile.yaml + A/B/C directions
 → tooling.prototype validation/composition
 → client prototype manifest + deterministic fixtures
 → apps/prototype_app
@@ -14,6 +14,8 @@ client profile + A/B/C directions
 → client selection/mixing
 → approved-experience.yaml
 ```
+
+The client information architecture is defined in `docs/operating-flow.md`. Prototype tooling reads the canonical derived profile; legacy root-level profiles are migration-only read fallback.
 
 ## Shared Flutter system
 
@@ -42,7 +44,7 @@ The internal A/B/C selector supports rapid comparison in the same running app.
 
 ## Client prototype artifacts
 
-`tooling.prototype.build_prototype.compose_prototype(...)` writes:
+`tooling.prototype.build_prototype.compose_prototype(...)` reads `derived/client-profile.yaml` and writes:
 
 ```text
 client-projects/<client>/prototype/
