@@ -1,0 +1,16 @@
+id: example-client
+display_name: Example Client
+business_model: b2c
+industry: d2c-lifestyle
+use_cases:
+  - discovery
+objectives:
+  - increase-conversion
+personas:
+  - consumer
+jobs:
+  - discover
+platforms:
+  - mobile
+constraints: []
+references: []
