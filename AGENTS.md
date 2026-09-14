@@ -189,3 +189,26 @@ Meaningful UI work is not complete based on Dart analysis or unit tests alone. F
 ## Current scope guardrail
 
 Milestone B includes the shared Flutter prototype system, deterministic fixtures, Widgetbook, prototype composition, screenshot/visual-QA contracts, and client approval workflow. Production backend/ERP integrations, Supabase, n8n, production auth/payments/shipping/CRM/WhatsApp, deployment pipelines, and app-store release automation remain later milestones unless explicitly authorized.
+
+## OpenCode model routing
+
+OpenCode should use the repository-local model roles under `.opencode/agents/` rather than keeping expensive reasoning models active for routine execution.
+
+Default execution model:
+- `deepseek/deepseek-v4-pro` for the primary Build session and ordinary implementation work.
+- `deepseek/deepseek-v4-flash` is the lightweight model configured for cheap internal/simple work.
+
+Specialist routing:
+- Use `@strategy` for client interpretation, product/UX strategy, Experience Directions, ambiguous requirements, information architecture, architecture, and high-impact trade-offs. It uses `openai/gpt-5.6-sol#high` and must remain read-only.
+- Use `@builder` for Flutter implementation, repository edits, tests, fixtures, configuration, routine refactors, and operational execution after the decision is clear. It uses `deepseek/deepseek-v4-pro`.
+- Use `@worker` for deterministic, repetitive, low-risk edits and mechanical transformations. It uses `deepseek/deepseek-v4-flash`.
+- Use `@reviewer` for difficult debugging analysis, architecture verification, shared-system review, regression risk, and important pre-merge review. It uses `openai/gpt-5.6-sol#high` and does not edit files.
+
+Routing rules:
+1. Do not use OpenAI merely because it is available; reserve it for judgment-heavy work.
+2. If a task is routine and the design/decision is already clear, use `builder` or `worker`.
+3. If implementation encounters a genuinely ambiguous product, UX, client-truth, architecture, or high-impact decision, stop that decision path and delegate it to `strategy`; then return to `builder` for implementation.
+4. For important platform or shared-system work, prefer `strategy → builder → reviewer`.
+5. For routine low-risk work, `builder` may complete without an OpenAI review when repository validation is sufficient.
+6. Model/provider credentials remain local to OpenCode. Never commit API keys, ChatGPT sessions, provider tokens, or other secrets to this repository.
+7. Agent routing never overrides workflow gates, repository policies, validation requirements, or human approval requirements.
