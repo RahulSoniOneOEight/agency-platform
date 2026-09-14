@@ -176,6 +176,13 @@ class ClientInputContractTests(unittest.TestCase):
             )
             self.assertEqual([], validate_client_input(ROOT, client))
 
+    def test_reference_prototype_demo_validates_end_to_end(self):
+        root = Path(__file__).resolve().parents[2]
+        client = root / "client-projects" / "examples" / "prototype-demo"
+        self.assertEqual([], validate_client_input(root, client))
+        self.assertTrue((client / "derived" / "client-profile.yaml").exists())
+        self.assertFalse((client / "client-profile.yaml").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

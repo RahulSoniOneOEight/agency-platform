@@ -1,0 +1,5 @@
+version: 1
+provided: true
+constraints:
+  - category: business-model
+    statement: b2b
