@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["version", "client", "source_status", "modules", "collections"],
+  "properties": {
+    "version": {"const": 1},
+    "client": {
+      "type": "object",
+      "required": ["id", "display_name"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "display_name": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": true
+    },
+    "source_status": {"type": "string", "minLength": 1},
+    "modules": {"type": "object"},
+    "collections": {"type": "object"},
+    "unresolved_input": {"type": "boolean"}
+  },
+  "additionalProperties": true
+}
