@@ -1,0 +1,23 @@
+version: 1
+icons:
+  icon.commerce.cart:
+    preferred:
+      provider: iconoir
+      name: cart
+    fallback:
+      provider: lucide
+      name: shopping-cart
+  icon.trade.rfq:
+    preferred:
+      provider: lucide
+      name: file-text
+    fallback:
+      provider: iconoir
+      name: page
+  icon.trade.credit:
+    preferred:
+      provider: iconoir
+      name: wallet
+    fallback:
+      provider: lucide
+      name: wallet-cards
