@@ -5,6 +5,9 @@ from pathlib import Path
 
 import yaml
 
+from tooling.resources.normalizer import normalize_bindings
+from tooling.resources.validate_resources import validate_resource_artifacts
+
 from .fixture_generator import generate_fixture_pack
 from .project_direction import project_direction
 from .screenshot_manifest import build_screenshot_manifest
@@ -35,8 +38,20 @@ def _discover_direction_paths(client_dir: Path) -> list[tuple[str, Path]]:
     return found
 
 
+def _resource_bindings(root: Path, client_dir: Path) -> dict:
+    selection_path = client_dir / "resources" / "selection.yaml"
+    candidates_path = client_dir / "resources" / "candidates.yaml"
+    if not selection_path.exists() and not candidates_path.exists():
+        return {}
+    errors = validate_resource_artifacts(root, client_dir)
+    if errors:
+        raise ValueError("invalid resource artifacts: " + "; ".join(errors))
+    selection = _load_yaml(selection_path)
+    candidates = _load_yaml(candidates_path)
+    return normalize_bindings(selection, candidates)
+
+
 def compose_prototype(root: Path, client_dir: Path) -> Path:
-    del root
     profile_path = client_dir / "derived" / "client-profile.yaml"
     if not profile_path.exists():
         raise ValueError("derived/client-profile.yaml missing")
@@ -101,6 +116,10 @@ def compose_prototype(root: Path, client_dir: Path) -> Path:
         "theme": {"seed_color": "#6750A4"},
         "review": {"query_parameter": "direction", "allowed_values": available_ids},
     }
+    resources = _resource_bindings(root, client_dir)
+    if resources:
+        manifest["resources"] = resources
+
     manifest_path = prototype_dir / "prototype-manifest.yaml"
     manifest_path.write_text(yaml.safe_dump(manifest, sort_keys=False), encoding="utf-8")
 
