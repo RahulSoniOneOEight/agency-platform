@@ -7,6 +7,7 @@ import yaml
 
 from tooling.prototype.approved_experience import validate_approved_experience
 from tooling.prototype.validate_visual_qa import unresolved_critical_findings, validate_visual_findings
+from tooling.workflow.client_paths import ClientPaths
 from tooling.workflow.state import STAGES, STATUSES, load_state
 
 
@@ -22,7 +23,13 @@ WORKFLOW_FILES = [
     "08-productionize.md",
 ]
 TEMPLATE_FILES = [
+    "client-input.yaml",
     "client-profile.yaml",
+    "resolved-presets.yaml",
+    "intelligence-map.yaml",
+    "capability-map.yaml",
+    "gaps.yaml",
+    "resource-requirements.yaml",
     "direction.yaml",
     "direction-comparison.yaml",
     "workflow-state.yaml",
@@ -70,7 +77,8 @@ def _load_yaml(path: Path) -> dict:
 
 def validate_client(root: Path, client_dir: Path) -> list[str]:
     errors: list[str] = []
-    state_path = client_dir / "workflow-state.yaml"
+    paths = ClientPaths.for_client(client_dir)
+    state_path = paths.workflow_state
     if not state_path.exists():
         return [f"{client_dir}: missing workflow-state.yaml"]
     try:
@@ -80,10 +88,24 @@ def validate_client(root: Path, client_dir: Path) -> list[str]:
     errors.extend(_validate_state(state, str(client_dir)))
     completed = set(state.get("completed", []))
 
+    if "client-intake" in completed:
+        if not paths.has_client_input_for_migration():
+            errors.append(f"{client_dir}: completed client-intake but missing input/client-input.yaml")
+        if not paths.read_client_profile().exists():
+            errors.append(f"{client_dir}: completed client-intake but missing derived/client-profile.yaml")
+
+    if "resolve-intelligence" in completed and not paths.has_derived_intelligence_for_migration():
+        errors.append(
+            f"{client_dir}: completed resolve-intelligence but missing derived resolved-presets/intelligence-map/capability-map/gaps"
+        )
+
+    if "resource-research" in completed:
+        if not paths.resource_requirements.exists():
+            errors.append(f"{client_dir}: completed resource-research but missing derived/resource-requirements.yaml")
+        if not paths.resource_selection.exists():
+            errors.append(f"{client_dir}: completed resource-research but missing resources/selection.yaml")
+
     required: dict[str, list[Path]] = {
-        "client-intake": [client_dir / "client-profile.yaml"],
-        "resolve-intelligence": [client_dir / "resolved-intelligence.yaml"],
-        "resource-research": [client_dir / "resources" / "selection.yaml"],
         "generate-directions": [
             client_dir / "directions" / "direction-a.yaml",
             client_dir / "directions" / "direction-b.yaml",
@@ -97,9 +119,9 @@ def validate_client(root: Path, client_dir: Path) -> list[str]:
         ],
         "client-review": [client_dir / "approved-experience.yaml"],
     }
-    for stage, paths in required.items():
+    for stage, stage_paths in required.items():
         if stage in completed:
-            for path in paths:
+            for path in stage_paths:
                 if not path.exists():
                     errors.append(f"{client_dir}: completed {stage} but missing {path.relative_to(client_dir)}")
 
