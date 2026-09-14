@@ -8,7 +8,11 @@ Primary architecture source:
 
 `docs/source/agency_flutter_opencode_delivery_system_v2.txt`
 
-Read it before architectural or structural changes. This operating contract must not contradict the governing architecture source.
+Detailed client-delivery operating model:
+
+`docs/operating-flow.md`
+
+Read the relevant architecture/flow source before structural client-platform changes. This operating contract must not contradict them.
 
 ## Source of truth
 
@@ -25,10 +29,43 @@ Before shared UI, tokens, components, patterns, variants, or themes, read `DESIG
 Before prototype composition or shared Flutter implementation, read `docs/prototype-platform.md`.
 Before completing meaningful UI work, read `VISUAL_QA.md`.
 Before Penpot-related work, read `PENPOT_MAPPING.md`.
-Before product-consulting or Experience Direction work, read `docs/knowledge-platform.md` and the relevant client profile, presets, design contracts, and experience patterns.
-Before starting or continuing a client project, read `docs/workflow-runtime.md` and the client's `workflow-state.yaml` when present.
+Before product-consulting or Experience Direction work, read `docs/knowledge-platform.md` and the relevant derived client profile, presets, design contracts, and experience patterns.
+Before starting or continuing a client project, read `docs/workflow-runtime.md`, `docs/operating-flow.md`, and the client's `workflow-state.yaml` when present.
 
 Only load policies relevant to the current task, but never skip a relevant policy.
+
+## Canonical client information architecture
+
+Client-supplied facts and OpenCode-derived interpretation must be kept separate.
+
+```text
+client-projects/<client>/
+├── input/
+│   ├── client-input.yaml
+│   ├── brand/
+│   ├── references/
+│   ├── assets/
+│   └── source-documents/
+├── derived/
+│   ├── client-profile.yaml
+│   ├── resolved-presets.yaml
+│   ├── intelligence-map.yaml
+│   ├── capability-map.yaml
+│   ├── gaps.yaml
+│   └── resource-requirements.yaml
+├── resources/
+├── directions/
+├── prototype/
+├── approved-experience.yaml
+└── workflow-state.yaml
+```
+
+Rules:
+- `input/` contains only supplied/confirmed client facts and attachments.
+- `derived/` contains agency/OpenCode interpretation, classification, reuse/gap analysis, and resource requirements.
+- Do not write inferred business model, personas, use cases, or capability decisions back into `input/client-input.yaml` unless the client explicitly confirms them as facts.
+- `brief.md` is optional human-readable context; it is not the canonical structured fact record.
+- New client writes must use canonical paths. Legacy flat profile/intelligence paths are read-only migration compatibility and must not be produced for new clients.
 
 ## Workflow Runtime operating model
 
@@ -43,9 +80,11 @@ For a new client:
 6. validate the required outputs;
 7. update `workflow-state.yaml` only after the gate is satisfied.
 
-For an existing client, never infer progress from chat history or prose. The GitHub artifacts and `workflow-state.yaml` are authoritative.
+For an existing client, never infer progress from chat history or prose. GitHub artifacts and `workflow-state.yaml` are authoritative.
 
 Every workflow file must contain `PURPOSE`, `READ`, `PROCESS`, `WRITE`, `VALIDATE`, `DO NOT`, and `NEXT`.
+
+The eight runtime workflows map to the canonical 20-stage consulting/delivery flow documented in `docs/operating-flow.md`.
 
 Do not skip mandatory stages. `resource-research` may be skipped only when the state records a reason. Prototype, visual-QA, client-review, and productionization gates are artifact-aware and must not be bypassed.
 
@@ -55,7 +94,7 @@ The shared knowledge layer has four responsibilities:
 
 1. **Design Intelligence** — `design-contract/` + `presets/` + metadata.
 2. **Resource Intelligence** — `resources/registry/` + source routing + normalization/provenance.
-3. **Product Consulting** — `experience-patterns/` + client profile + Experience Direction Engine.
+3. **Product Consulting** — `experience-patterns/` + derived client profile + Experience Direction Engine.
 4. **Client Contract** — client selection/mixing produces `approved-experience.yaml` after prototype and visual QA.
 
 Presets and experience patterns are hypotheses and reusable knowledge, not forced client outputs.
@@ -64,7 +103,7 @@ Presets and experience patterns are hypotheses and reusable knowledge, not force
 For Experience Directions:
 1. resolve business-model + industry + use-case presets;
 2. inspect relevant design-contract components/patterns/journeys;
-3. inspect approved resource/reference context where needed;
+3. inspect `derived/capability-map.yaml`, `derived/gaps.yaml`, and approved resource context;
 4. generate multiple candidate strategies;
 5. score candidate fit;
 6. enforce strategic diversity;
@@ -80,7 +119,7 @@ Milestone B uses one shared Flutter system and one configurable prototype app.
 Required flow:
 
 ```text
-validated A/B/C directions
+derived client profile + validated A/B/C directions
 → tooling.prototype composer
 → client prototype manifest + deterministic fixtures
 → apps/prototype_app
@@ -173,7 +212,7 @@ external source
 For platform changes run:
 
 ```text
-python -m unittest tooling.validation.test_validate_repo tooling.validation.test_knowledge_platform tooling.validation.test_workflow_runtime tooling.validation.test_prototype_platform tooling.validation.test_prototype_workflow_integration -v
+python -m unittest tooling.validation.test_validate_repo tooling.validation.test_knowledge_platform tooling.validation.test_workflow_runtime tooling.validation.test_client_information_architecture tooling.validation.test_prototype_platform tooling.validation.test_prototype_workflow_integration -v
 python tooling/validation/validate_repo.py
 python -m tooling.knowledge.validate_knowledge
 python -m tooling.workflow.validate_workflow
