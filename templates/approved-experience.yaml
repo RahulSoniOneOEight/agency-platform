@@ -1,20 +1,15 @@
 version: 1
 client_id: example-client
-status: draft
-selected_direction: null
-mixed_from: []
-home: {}
-navigation: {}
-search: {}
-plp: {}
-pdp: {}
-checkout: {}
-trade: {}
-theme: {}
-density: normal
+selection:
+  mode: direction
+  direction: a
+  base_direction: a
+sections: {}
+theme:
+  source_direction: a
+density: balanced
 components: []
 resources: []
 primary_journeys: []
-secondary_journeys: []
 client_specific_exceptions: []
 approved_by_client: false
