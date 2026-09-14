@@ -48,6 +48,24 @@ def valid_strategic_direction(direction_id: str) -> dict:
     }
 
 
+def _write_client(root: Path, direction_ids: list[str]) -> Path:
+    client = root / "client-projects" / "acme"
+    directions = client / "directions"
+    directions.mkdir(parents=True)
+    profile = {
+        "id": "acme", "business_model": "b2b", "industry": "electronics-appliances",
+        "use_cases": ["rfq"], "objectives": ["reduce-order-time"],
+        "personas": ["trade-buyer"], "jobs": ["request-quote"], "platforms": ["web"],
+    }
+    (client / "client-profile.yaml").write_text(yaml.safe_dump(profile), encoding="utf-8")
+    for direction_id in direction_ids:
+        (directions / f"direction-{direction_id}.yaml").write_text(
+            yaml.safe_dump(valid_strategic_direction(direction_id)), encoding="utf-8"
+        )
+    (directions / "comparison.yaml").write_text("recommended: a\n", encoding="utf-8")
+    return client
+
+
 class PrototypePlatformTests(unittest.TestCase):
     def test_strategic_direction_requires_canonical_fields(self):
         errors = validate_direction({"id": "a", "name": "A"})
@@ -128,25 +146,58 @@ class PrototypePlatformTests(unittest.TestCase):
     def test_composer_writes_shared_runtime_manifest_and_fixtures(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            client = root / "client-projects" / "acme"
-            directions = client / "directions"
-            directions.mkdir(parents=True)
-            profile = {
-                "id": "acme", "business_model": "b2b", "industry": "electronics-appliances",
-                "use_cases": ["rfq"], "objectives": ["reduce-order-time"],
-                "personas": ["trade-buyer"], "jobs": ["request-quote"], "platforms": ["web"],
-            }
-            (client / "client-profile.yaml").write_text(yaml.safe_dump(profile), encoding="utf-8")
-            for direction_id in ("a", "b", "c"):
-                (directions / f"direction-{direction_id}.yaml").write_text(
-                    yaml.safe_dump(valid_strategic_direction(direction_id)), encoding="utf-8"
-                )
-            (directions / "comparison.yaml").write_text("recommended: a\n", encoding="utf-8")
+            client = _write_client(root, ["a", "b", "c"])
             manifest_path = compose_prototype(root, client)
             manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
             self.assertEqual("apps/prototype_app", manifest["runtime"])
             self.assertEqual(["a", "b", "c"], sorted(manifest["directions"].keys()))
             self.assertTrue((client / "prototype" / "fixtures" / "demo.yaml").exists())
+
+    def test_composer_supports_two_directions(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            client = _write_client(root, ["a", "b"])
+            manifest_path = compose_prototype(root, client)
+            manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+            self.assertEqual(["a", "b"], list(manifest["directions"].keys()))
+            self.assertEqual(["a", "b"], manifest["review"]["allowed_values"])
+            self.assertTrue((client / "prototype" / "runtime" / "direction-a.json").exists())
+            self.assertTrue((client / "prototype" / "runtime" / "direction-b.json").exists())
+            self.assertFalse((client / "prototype" / "runtime" / "direction-c.json").exists())
+
+    def test_composer_supports_three_directions(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            client = _write_client(root, ["a", "b", "c"])
+            manifest_path = compose_prototype(root, client)
+            manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+            self.assertEqual(["a", "b", "c"], list(manifest["directions"].keys()))
+            self.assertEqual(["a", "b", "c"], manifest["review"]["allowed_values"])
+            self.assertTrue((client / "prototype" / "runtime" / "direction-c.json").exists())
+
+    def test_composer_rejects_single_direction(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            client = _write_client(root, ["a"])
+            with self.assertRaisesRegex(ValueError, "at least directions a and b"):
+                compose_prototype(root, client)
+
+    def test_composer_rejects_more_than_three_directions(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            client = _write_client(root, ["a", "b", "c", "d"])
+            with self.assertRaisesRegex(ValueError, "at most 3 directions"):
+                compose_prototype(root, client)
+
+    def test_recomposition_removes_stale_runtime_directions(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            client = _write_client(root, ["a", "b", "c"])
+            compose_prototype(root, client)
+            self.assertTrue((client / "prototype" / "runtime" / "direction-c.json").exists())
+            (client / "directions" / "direction-c.yaml").unlink()
+            compose_prototype(root, client)
+            self.assertFalse((client / "prototype" / "runtime" / "direction-c.json").exists())
 
     def test_approved_experience_accepts_direction_or_mix(self):
         with tempfile.TemporaryDirectory() as tmp:

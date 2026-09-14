@@ -15,7 +15,7 @@ def _is_skipped(state: dict[str, Any], stage: str) -> bool:
 
 def _directions_ready(client_dir: Path) -> bool:
     directions = client_dir / "directions"
-    required = ["direction-a.yaml", "direction-b.yaml", "direction-c.yaml", "comparison.yaml"]
+    required = ["direction-a.yaml", "direction-b.yaml", "comparison.yaml"]
     return all((directions / name).exists() for name in required)
 
 

@@ -11,7 +11,7 @@ from tooling.workflow.state import initial_state
 
 
 class PrototypeWorkflowIntegrationTests(unittest.TestCase):
-    def _client(self, root: Path) -> tuple[Path, dict]:
+    def _client(self, root: Path, direction_ids: tuple[str, ...] = ("a", "b", "c")) -> tuple[Path, dict]:
         client = root / "client-projects" / "acme"
         (client / "directions").mkdir(parents=True)
         (client / "prototype" / "qa").mkdir(parents=True)
@@ -21,8 +21,9 @@ class PrototypeWorkflowIntegrationTests(unittest.TestCase):
         (root / "apps" / "prototype_app" / "pubspec.yaml").write_text("name: app\n", encoding="utf-8")
         (client / "client-profile.yaml").write_text("id: acme\n", encoding="utf-8")
         (client / "resolved-intelligence.yaml").write_text("active_presets: []\n", encoding="utf-8")
-        for name in ("direction-a.yaml", "direction-b.yaml", "direction-c.yaml", "comparison.yaml"):
-            (client / "directions" / name).write_text("id: x\n", encoding="utf-8")
+        for direction_id in direction_ids:
+            (client / "directions" / f"direction-{direction_id}.yaml").write_text("id: x\n", encoding="utf-8")
+        (client / "directions" / "comparison.yaml").write_text("recommended: a\n", encoding="utf-8")
         state = initial_state("acme")
         state["completed"] = ["client-intake", "resolve-intelligence", "generate-directions"]
         state["skipped"] = [{"stage": "resource-research", "reason": "none-needed"}]
@@ -34,6 +35,21 @@ class PrototypeWorkflowIntegrationTests(unittest.TestCase):
             client, state = self._client(root)
             result = next_stage(root, client, state)
             self.assertEqual({"stage": "build-prototype", "status": "ready"}, result)
+
+    def test_two_directions_are_ready_for_prototype(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            client, state = self._client(root, ("a", "b"))
+            result = next_stage(root, client, state)
+            self.assertEqual({"stage": "build-prototype", "status": "ready"}, result)
+
+    def test_single_direction_blocks_prototype(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            client, state = self._client(root, ("a",))
+            result = next_stage(root, client, state)
+            self.assertEqual("generate-directions", result["stage"])
+            self.assertEqual("direction-artifacts-missing", result["reason"])
 
     def test_completed_build_requires_prototype_manifest(self):
         with tempfile.TemporaryDirectory() as tmp:
