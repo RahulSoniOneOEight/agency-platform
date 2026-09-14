@@ -1,0 +1,13 @@
+id: c
+name: Procurement RFQ
+strategic_goal: simplify complex bulk procurement
+navigation: rfq-led
+primary_journey: rfq-to-quote
+discovery_model: category-plus-specification
+merchandising: bulk-and-negotiated-pricing
+density: balanced
+transaction_model: rfq-first
+patterns: [home, plp, pdp, rfq, trade-dashboard]
+components: [product-card, price-display, quote-card, credit-summary]
+strengths: [strong negotiated buying flow, supports complex orders]
+tradeoffs: [slower for simple immediate purchases]
