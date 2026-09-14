@@ -36,20 +36,35 @@ OpenCode should:
 python -m tooling.workflow.initialize_client abc-furniture --name "ABC Furniture"
 ```
 
-Creates:
+Creates the canonical client workspace:
 
 ```text
 client-projects/abc-furniture/
-  brief.md
-  client-profile.yaml
+  input/
+    client-input.yaml
+    ... optional module/collection templates ...
+  derived/
+    client-profile.yaml
+  resources/
+  directions/
+  prototype/
   workflow-state.yaml
-  references/.gitkeep
-  resources/.gitkeep
-  directions/.gitkeep
-  fixtures/.gitkeep
 ```
 
 The initializer refuses to overwrite an existing client.
+
+## Input / derived boundary
+
+```text
+input/   = client/source truth
+derived/ = agency/OpenCode interpretation
+```
+
+`input/client-input.yaml` is the only mandatory structured client-input file. Detailed module
+files are optional at initialization and become required only when referenced from
+`client-input.yaml` or explicitly required by a workflow capability. OpenCode may normalize,
+classify, and infer into `derived/`, but must never silently rewrite an inference back into
+`input/` as if the client supplied it.
 
 ## Stored stages
 
@@ -75,10 +90,11 @@ Every stage declares `PURPOSE`, `READ`, `PROCESS`, `WRITE`, `VALIDATE`, `DO NOT`
 ## Validation
 
 ```bash
-python -m unittest tooling.validation.test_validate_repo tooling.validation.test_knowledge_platform tooling.validation.test_workflow_runtime -v
+python -m unittest tooling.validation.test_validate_repo tooling.validation.test_knowledge_platform tooling.validation.test_workflow_runtime tooling.validation.test_client_input_contract tooling.validation.test_prototype_platform tooling.validation.test_prototype_workflow_integration -v
 python tooling/validation/validate_repo.py
 python -m tooling.knowledge.validate_knowledge
 python -m tooling.workflow.validate_workflow
+python -m tooling.prototype.validate_prototype
 ```
 
 ## Current boundary

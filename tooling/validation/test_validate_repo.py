@@ -41,6 +41,12 @@ class ValidatorContractTests(unittest.TestCase):
         for path in STEP2_CONTROL_FILES:
             self.assertIn(path, validator.REQUIRED_PATHS)
 
+    def test_client_input_contract_paths_are_required(self):
+        validator = self.load_validator()
+        self.assertIn("client-projects/schema/client-profile.schema.json", validator.REQUIRED_PATHS)
+        self.assertIn("client-projects/schema/input/client-input.schema.json", validator.REQUIRED_PATHS)
+        self.assertIn("tooling/workflow/client_input.py", validator.REQUIRED_PATHS)
+
 
 if __name__ == "__main__":
     unittest.main()
