@@ -87,7 +87,6 @@ def validate_client(root: Path, client_dir: Path) -> list[str]:
         "generate-directions": [
             client_dir / "directions" / "direction-a.yaml",
             client_dir / "directions" / "direction-b.yaml",
-            client_dir / "directions" / "direction-c.yaml",
             client_dir / "directions" / "comparison.yaml",
         ],
         "build-prototype": [client_dir / "prototype" / "prototype-manifest.yaml"],

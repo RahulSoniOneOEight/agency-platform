@@ -1,0 +1,23 @@
+{
+  "component_variants": [],
+  "components": [
+    "commerce.credit-summary",
+    "commerce.quote-card",
+    "commerce.product-card"
+  ],
+  "density": "normal",
+  "discovery_model": "account-history",
+  "id": "b",
+  "merchandising_model": "reorder-and-credit",
+  "name": "Trade Dashboard",
+  "navigation_model": "dashboard",
+  "patterns": [
+    "trade-dashboard",
+    "reorder",
+    "cart"
+  ],
+  "primary_journey": "reorder-to-order",
+  "required_resources": [],
+  "strategic_goal": "increase repeat ordering and account self-service",
+  "transaction_model": "account-ordering"
+}

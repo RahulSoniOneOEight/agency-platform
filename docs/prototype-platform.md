@@ -5,15 +5,43 @@ Milestone B turns validated Experience Directions into runnable Flutter prototyp
 ## Core architecture
 
 ```text
-client profile + A/B/C directions
+client profile + A/B/(optional C) directions
 → tooling.prototype validation/composition
-→ client prototype manifest + deterministic fixtures
+→ client prototype manifest + runtime directions + deterministic fixtures
 → apps/prototype_app
 → packages/agency_flutter_ui
 → screenshots + visual QA
 → client selection/mixing
 → approved-experience.yaml
 ```
+
+## Direction contract boundary
+
+Strategic directions are the canonical human/product-consulting source of truth. Runtime
+directions are compact, execution-oriented projections generated deterministically from
+strategic directions:
+
+```text
+canonical strategic direction YAML
+→ canonical strategic schema validation
+→ project_direction.py
+→ generated runtime direction JSON
+→ prototype manifest
+→ Flutter runtime (B.1B consumer)
+```
+
+Rules:
+
+- Strategic direction YAML is canonical; runtime JSON is generated and disposable.
+- Exactly 2 or 3 directions are supported: A and B are mandatory, C is optional.
+- Density uses one canonical vocabulary across the pipeline: `compact`, `normal`, `spacious`.
+- Generated runtime direction JSON must never be hand-authored. The composer rebuilds it from
+  strategic directions, and repository validation fails on manifest/runtime mismatch.
+
+Strategic artifacts live at `client-projects/<client>/directions/direction-<id>.yaml` and are
+validated against `tooling/knowledge/direction.schema.json`. Generated runtime artifacts live at
+`client-projects/<client>/prototype/runtime/direction-<id>.json` and are validated against
+`tooling/prototype/runtime_direction.schema.json`.
 
 ## Shared Flutter system
 
@@ -47,6 +75,10 @@ The internal A/B/C selector supports rapid comparison in the same running app.
 ```text
 client-projects/<client>/prototype/
 ├── prototype-manifest.yaml
+├── runtime/
+│   ├── direction-a.json
+│   ├── direction-b.json
+│   └── direction-c.json (optional)
 ├── fixtures/
 │   └── demo.yaml
 ├── screenshots/
@@ -54,7 +86,8 @@ client-projects/<client>/prototype/
     └── screenshot-manifest.yaml
 ```
 
-The manifest references `apps/prototype_app`; it does not copy Flutter source.
+The manifest references `apps/prototype_app` and points each direction key at its generated
+`runtime/direction-<id>.json`; it does not copy Flutter source.
 
 Initial deterministic fixture packs cover:
 

@@ -1,0 +1,31 @@
+{
+  "component_variants": [
+    {
+      "component": "commerce.product-card",
+      "variant": "b2b"
+    }
+  ],
+  "components": [
+    "commerce.product-card",
+    "commerce.price-display",
+    "commerce.search-field",
+    "commerce.quote-card"
+  ],
+  "density": "compact",
+  "discovery_model": "sku-search",
+  "id": "a",
+  "merchandising_model": "availability-and-price",
+  "name": "Search-led Trade",
+  "navigation_model": "search-led",
+  "patterns": [
+    "commerce.search",
+    "commerce.plp",
+    "commerce.pdp",
+    "cart",
+    "commerce.rfq"
+  ],
+  "primary_journey": "search-to-order",
+  "required_resources": [],
+  "strategic_goal": "reduce known-item order time",
+  "transaction_model": "checkout-plus-rfq"
+}

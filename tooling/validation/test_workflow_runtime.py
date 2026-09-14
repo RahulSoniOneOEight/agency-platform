@@ -8,8 +8,8 @@ import yaml
 
 from tooling.workflow.initialize_client import initialize_client
 from tooling.workflow.router import next_stage
-from tooling.workflow.state import initial_state
-from tooling.workflow.validate_workflow import validate_runtime, validate_workflow_file
+from tooling.workflow.state import initial_state, save_state
+from tooling.workflow.validate_workflow import validate_client, validate_runtime, validate_workflow_file
 
 
 PROFILE = {
@@ -132,6 +132,22 @@ class WorkflowRuntimeTests(unittest.TestCase):
             errors = validate_workflow_file(path)
             self.assertTrue(errors)
             self.assertTrue(any("PROCESS" in error for error in errors))
+
+    def test_two_direction_client_passes_workflow_validation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "client-projects").mkdir()
+            client = root / "client-projects" / "acme"
+            write_early_artifacts(client)
+            directions = client / "directions"
+            directions.mkdir(parents=True, exist_ok=True)
+            for name in ("direction-a.yaml", "direction-b.yaml", "comparison.yaml"):
+                (directions / name).write_text("id: sample\n", encoding="utf-8")
+            state = initial_state("acme")
+            state["completed"] = ["client-intake", "resolve-intelligence", "generate-directions"]
+            save_state(client / "workflow-state.yaml", state)
+            errors = validate_client(root, client)
+            self.assertEqual([], errors)
 
     def test_repository_runtime_contract_validates(self):
         root = Path(__file__).resolve().parents[2]

@@ -1,13 +1,32 @@
 id: c
 name: Procurement RFQ
+archetype: rfq-first
+strategy_family: rfq
+thesis: Simplify complex bulk procurement through negotiated quoting.
 strategic_goal: simplify complex bulk procurement
-navigation: rfq-led
-primary_journey: rfq-to-quote
+primary_personas: [procurement-manager]
+primary_jobs: [request-quote, bulk-buy]
+rationale: Bulk buyers benefit from specification-driven quoting and negotiated pricing.
+information_architecture: [home, plp, pdp, rfq, dashboard]
+navigation:
+  model: rfq-led
+primary_journey:
+  id: rfq-to-quote
+  steps: [home, plp, pdp, rfq, quote]
+secondary_journeys: []
 discovery_model: category-plus-specification
-merchandising: bulk-and-negotiated-pricing
-density: balanced
+search:
+  prominence: medium
+merchandising:
+  emphasis: bulk-and-negotiated-pricing
+density: normal
 transaction_model: rfq-first
-patterns: [home, plp, pdp, rfq, trade-dashboard]
-components: [product-card, price-display, quote-card, credit-summary]
+patterns: [commerce.home, commerce.plp, commerce.pdp, commerce.rfq, trade-dashboard]
+components: [commerce.product-card, commerce.price-display, commerce.quote-card, commerce.credit-summary]
+component_variants: []
+required_resources: []
 strengths: [strong negotiated buying flow, supports complex orders]
 tradeoffs: [slower for simple immediate purchases]
+risks: [longer sales cycle]
+success_metrics: [quote-to-order-conversion]
+score: 0.7

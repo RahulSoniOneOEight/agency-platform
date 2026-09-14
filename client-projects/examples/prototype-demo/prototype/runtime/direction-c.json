@@ -1,0 +1,26 @@
+{
+  "component_variants": [],
+  "components": [
+    "commerce.product-card",
+    "commerce.price-display",
+    "commerce.quote-card",
+    "commerce.credit-summary"
+  ],
+  "density": "normal",
+  "discovery_model": "category-plus-specification",
+  "id": "c",
+  "merchandising_model": "bulk-and-negotiated-pricing",
+  "name": "Procurement RFQ",
+  "navigation_model": "rfq-led",
+  "patterns": [
+    "commerce.home",
+    "commerce.plp",
+    "commerce.pdp",
+    "commerce.rfq",
+    "trade-dashboard"
+  ],
+  "primary_journey": "rfq-to-quote",
+  "required_resources": [],
+  "strategic_goal": "simplify complex bulk procurement",
+  "transaction_model": "rfq-first"
+}

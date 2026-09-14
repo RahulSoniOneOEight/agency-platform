@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "id", "name", "archetype", "strategy_family", "thesis", "strategic_goal",
+    "primary_personas", "primary_jobs", "rationale", "information_architecture",
+    "navigation", "primary_journey", "secondary_journeys", "discovery_model",
+    "search", "merchandising", "density", "transaction_model", "patterns",
+    "components", "component_variants", "required_resources", "strengths",
+    "tradeoffs", "risks", "success_metrics", "score"
+  ],
+  "properties": {
+    "id": {"type": "string", "minLength": 1},
+    "name": {"type": "string", "minLength": 1},
+    "archetype": {"type": "string", "minLength": 1},
+    "strategy_family": {"type": "string", "minLength": 1},
+    "thesis": {"type": "string", "minLength": 1},
+    "strategic_goal": {"type": "string", "minLength": 1},
+    "primary_personas": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1},
+    "primary_jobs": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1},
+    "rationale": {"type": "string", "minLength": 1},
+    "information_architecture": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1},
+    "navigation": {
+      "type": "object",
+      "required": ["model"],
+      "properties": {"model": {"type": "string", "minLength": 1}},
+      "additionalProperties": true
+    },
+    "primary_journey": {
+      "type": "object",
+      "required": ["id", "steps"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "steps": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1}
+      },
+      "additionalProperties": true
+    },
+    "secondary_journeys": {"type": "array", "items": {"type": "object"}},
+    "discovery_model": {"type": "string", "minLength": 1},
+    "search": {"type": "object"},
+    "merchandising": {
+      "type": "object",
+      "required": ["emphasis"],
+      "properties": {"emphasis": {"type": "string", "minLength": 1}},
+      "additionalProperties": true
+    },
+    "density": {"enum": ["compact", "normal", "spacious"]},
+    "transaction_model": {"type": "string", "minLength": 1},
+    "patterns": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1},
+    "components": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1},
+    "component_variants": {"type": "array", "items": {"type": "object"}},
+    "required_resources": {"type": "array", "items": {"type": "string"}},
+    "strengths": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1},
+    "tradeoffs": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1},
+    "risks": {"type": "array", "items": {"type": "string"}},
+    "success_metrics": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1},
+    "score": {"type": "number"}
+  },
+  "additionalProperties": true
+}
