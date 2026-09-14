@@ -1,29 +1,35 @@
 # Visual QA
 
 ## PURPOSE
-Run technical and visual quality checks on rendered prototypes and record structured findings.
+Run technical and visual quality checks on rendered direction prototypes and record structured findings.
 
 ## READ
-- Rendered prototype
+- `client-projects/<client>/prototype/prototype-manifest.yaml`
+- `client-projects/<client>/prototype/qa/screenshot-manifest.yaml`
 - `VISUAL_QA.md`
-- direction config and selected resources
+- direction configs and selected resources
 
 ## PROCESS
-1. Confirm Milestone B rendering/screenshot tooling exists.
-2. If absent, return a structured blocked result and stop.
-3. When available, inspect required viewports, states, hierarchy, spacing, clipping, density, imagery, responsiveness, accessibility, and broken interactions.
-4. Map findings back to component, pattern, token, resource, or direction config.
+1. Build or serve `apps/prototype_app` for Flutter Web.
+2. Use the screenshot manifest to capture A/B/C at 360×800, 390×844, 430×932, 768×1024, and 1440×900.
+3. Review hierarchy, spacing, clipping, density, imagery, responsiveness, accessibility, interaction clarity, and broken states.
+4. Record every issue using the structured visual finding contract.
+5. Resolve or explicitly accept findings; unresolved critical findings block client review.
+6. Re-render affected screens after fixes.
 
 ## WRITE
-- `client-projects/<client>/qa/findings.yaml`
-- resolution status for each finding
+- screenshots under `client-projects/<client>/prototype/screenshots/`
+- `client-projects/<client>/prototype/qa/visual-findings.yaml`
 
 ## VALIDATE
-Required technical and visual checks must be complete before client review.
+- Screenshot manifest exists.
+- Visual findings validate structurally.
+- No unresolved critical findings remain before client review.
 
 ## DO NOT
 - Do not declare UI complete from static analysis alone.
-- Do not hide unresolved high-severity findings.
+- Do not hide unresolved critical findings.
+- Do not change the client strategy merely to make visual QA easier.
 
 ## NEXT
 `07-client-review.md`
