@@ -1,7 +1,8 @@
 ---
 description: Use for product strategy, client interpretation, UX and information architecture, Experience Directions, ambiguous requirements, architectural trade-offs, and other high-judgment decisions.
 mode: subagent
-model: openai/gpt-5.6-sol#high
+model: openai/gpt-5.6-sol
+reasoningEffort: high
 permissions:
   - action: edit
     resource: "*"

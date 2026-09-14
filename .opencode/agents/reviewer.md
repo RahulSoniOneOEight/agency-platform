@@ -1,7 +1,8 @@
 ---
 description: Use for final high-impact review, architecture verification, difficult debugging analysis, shared-system changes, regression risk, and pre-merge quality review.
 mode: subagent
-model: openai/gpt-5.6-sol#high
+model: openai/gpt-5.6-sol
+reasoningEffort: high
 permissions:
   - action: edit
     resource: "*"
