@@ -6,33 +6,45 @@ Code inspection alone is not sufficient for UI approval. Meaningful UI work must
 
 ## Component review
 
-Use Widgetbook for reviewing:
+Use `apps/widgetbook/` for reviewing:
 
 - components
 - states
 - variants
 - themes
-- responsive behavior at component level
+- density
+- responsive behavior at component/pattern level
 
 ## Full-screen review
 
-Use `flutter run` for reviewing:
+Use `apps/prototype_app/` for reviewing:
 
-- complete screens
-- navigation
-- user journeys
+- direction A/B/C
+- complete screen/pattern composition
+- navigation and primary journeys
 - responsive layouts
-- interactions that depend on real screen composition
+- transaction-model differences
+- interactions dependent on real composition
+
+Flutter Web supports stable review URLs:
+
+```text
+/?client=<client-id>&direction=a
+/?client=<client-id>&direction=b
+/?client=<client-id>&direction=c
+```
 
 ## Standard viewports
 
-At minimum review relevant mobile UI at:
+Capture/review:
 
 - 360 × 800
 - 390 × 844
 - 430 × 932
+- 768 × 1024
+- 1440 × 900
 
-Also review tablet and desktop/web sizes where the product supports them.
+The client screenshot manifest under `prototype/qa/` is the machine-readable source for these capture jobs.
 
 ## Visual inspection checklist
 
@@ -48,25 +60,52 @@ Check for:
 - typography hierarchy
 - icon consistency
 - responsive behavior
-- design-system or token violations
+- density appropriateness
+- direction-level journey clarity
+- design-system/token violations
 - obvious accessibility issues
+- broken or misleading interactions
+
+## Structured findings
+
+Write findings to:
+
+`client-projects/<client>/prototype/qa/visual-findings.yaml`
+
+Each finding must include:
+
+- `severity`: low / medium / high / critical
+- `screen`
+- `direction`: a / b / c
+- `viewport`
+- `issue`
+- `status`: open / resolved / accepted
+- optional `evidence`
+
+Unresolved critical findings block client review.
 
 ## Required loop
 
 ```text
-OpenCode changes Flutter
-→ render in Flutter / Widgetbook
-→ capture screenshot
+OpenCode changes Flutter/config
+→ render prototype / Widgetbook
+→ capture required screenshots
 → visual inspection / AI vision review
-→ record issues
-→ OpenCode fixes implementation
-→ render again
-→ golden regression test where appropriate
+→ record structured findings
+→ map issue to config/component/pattern/token/resource
+→ OpenCode fixes
+→ rerender
+→ resolve/accept finding
+→ golden regression where stable and valuable
 ```
+
+## Automation boundary
+
+Milestone B provides deterministic screenshot manifests and capture-job planning. Browser/image capture can be executed locally or in a suitable UI runner; CI must at minimum validate the capture manifest and QA contracts even when browser capture is not available.
 
 ## Completion rule
 
-Do not declare meaningful UI work visually complete solely because Dart analysis or unit tests pass. The rendered result must also be reviewed.
+Do not declare meaningful UI work visually complete solely because Dart analysis or unit tests pass. Required visual artifacts must exist and no unresolved critical findings may remain.
 
 ## Relationship to AGENTS.md
 
