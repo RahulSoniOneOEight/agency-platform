@@ -3,7 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from tooling.workflow.state import STAGES
+import yaml
+
+from tooling.prototype.approved_experience import validate_approved_experience
+from tooling.prototype.validate_visual_qa import unresolved_critical_findings, validate_visual_findings
 
 
 def _is_skipped(state: dict[str, Any], stage: str) -> bool:
@@ -17,7 +20,15 @@ def _directions_ready(client_dir: Path) -> bool:
 
 
 def _prototype_platform_installed(root: Path) -> bool:
-    return (root / "packages" / "agency_flutter_ui" / "lib").exists() and (root / "starters").exists()
+    return (
+        (root / "packages" / "agency_flutter_ui" / "pubspec.yaml").exists()
+        and (root / "apps" / "prototype_app" / "pubspec.yaml").exists()
+    )
+
+
+def _load_yaml(path: Path) -> dict[str, Any]:
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    return data if isinstance(data, dict) else {}
 
 
 def next_stage(root: Path, client_dir: Path, state: dict[str, Any]) -> dict[str, Any]:
@@ -49,8 +60,26 @@ def next_stage(root: Path, client_dir: Path, state: dict[str, Any]) -> dict[str,
             return {"stage": "build-prototype", "status": "blocked", "reason": "prototype-platform-not-installed"}
         return {"stage": "build-prototype", "status": "ready"}
 
+    prototype_manifest = client_dir / "prototype" / "prototype-manifest.yaml"
+    if not prototype_manifest.exists():
+        return {"stage": "build-prototype", "status": "blocked", "reason": "prototype-manifest-missing"}
+
     if "visual-qa" not in completed:
         return {"stage": "visual-qa", "status": "ready"}
+
+    qa_dir = client_dir / "prototype" / "qa"
+    screenshot_manifest = qa_dir / "screenshot-manifest.yaml"
+    findings_path = qa_dir / "visual-findings.yaml"
+    if not screenshot_manifest.exists():
+        return {"stage": "visual-qa", "status": "blocked", "reason": "screenshot-manifest-missing"}
+    if not findings_path.exists():
+        return {"stage": "visual-qa", "status": "blocked", "reason": "visual-findings-missing"}
+    findings = _load_yaml(findings_path)
+    findings_errors = validate_visual_findings(findings)
+    if findings_errors:
+        return {"stage": "visual-qa", "status": "blocked", "reason": "visual-findings-invalid"}
+    if unresolved_critical_findings(findings):
+        return {"stage": "visual-qa", "status": "blocked", "reason": "critical-visual-qa-findings"}
 
     if "client-review" not in completed:
         return {"stage": "client-review", "status": "ready"}
@@ -58,6 +87,8 @@ def next_stage(root: Path, client_dir: Path, state: dict[str, Any]) -> dict[str,
     approved = client_dir / "approved-experience.yaml"
     if not approved.exists():
         return {"stage": "client-review", "status": "blocked", "reason": "approved-experience-missing"}
+    if validate_approved_experience(root, client_dir):
+        return {"stage": "client-review", "status": "blocked", "reason": "approved-experience-invalid"}
 
     if "productionize" not in completed:
         return {"stage": "productionize", "status": "ready"}
