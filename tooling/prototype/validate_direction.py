@@ -1,32 +1,18 @@
 from __future__ import annotations
 
-REQUIRED_FIELDS = (
-    "id",
-    "name",
-    "strategic_goal",
-    "navigation",
-    "primary_journey",
-    "discovery_model",
-    "merchandising",
-    "density",
-    "transaction_model",
-    "patterns",
-    "components",
-    "strengths",
-    "tradeoffs",
-)
+import json
+from pathlib import Path
+
+from jsonschema import Draft202012Validator
+
+_SCHEMA_PATH = Path(__file__).resolve().parents[1] / "knowledge" / "direction.schema.json"
+
+
+def _load_schema() -> dict:
+    return json.loads(_SCHEMA_PATH.read_text(encoding="utf-8"))
 
 
 def validate_direction(direction: dict) -> list[str]:
-    errors: list[str] = []
-    for field in REQUIRED_FIELDS:
-        value = direction.get(field)
-        if value is None or value == "" or value == []:
-            errors.append(f"missing required direction field: {field}")
-    for field in ("patterns", "components", "strengths", "tradeoffs"):
-        value = direction.get(field)
-        if value is not None and not isinstance(value, list):
-            errors.append(f"direction field must be a list: {field}")
-    if direction.get("density") not in {None, "airy", "balanced", "dense"}:
-        errors.append("density must be one of: airy, balanced, dense")
-    return errors
+    validator = Draft202012Validator(_load_schema())
+    errors = sorted(validator.iter_errors(direction), key=lambda error: list(error.path))
+    return [f"{'.'.join(map(str, error.path)) or '<root>'}: {error.message}" for error in errors]

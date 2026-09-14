@@ -2,26 +2,31 @@ id: direction-a
 name: Example Direction
 archetype: discovery-first
 strategy_family: discovery
-thesis: ""
-strategic_goal: []
-primary_personas: []
-primary_jobs: []
-rationale: ""
-information_architecture: []
+thesis: Reduce time from intent to transaction.
+strategic_goal: reduce-order-time
+primary_personas: [trade-buyer]
+primary_jobs: [find-and-order-known-sku]
+rationale: Known-SKU buyers benefit from direct search and dense decision support.
+information_architecture: [home, search, plp, pdp, cart]
 navigation:
-  model: ""
-primary_journey: []
+  model: search-led
+primary_journey:
+  id: search-to-order
+  steps: [search, pdp, cart, checkout]
 secondary_journeys: []
+discovery_model: sku-search
 search:
-  prominence: medium
+  prominence: high
 merchandising:
-  emphasis: medium
+  emphasis: availability-and-price
 density: normal
 transaction_model: checkout
+patterns: [commerce.home, commerce.search, commerce.pdp]
+components: [commerce.product-card, commerce.price-display]
 component_variants: []
 required_resources: []
-strengths: []
-weaknesses: []
+strengths: [fast known-SKU ordering]
+tradeoffs: [less editorial discovery]
 risks: []
-success_metrics: []
-score: 0
+success_metrics: [time-to-cart]
+score: 0.8

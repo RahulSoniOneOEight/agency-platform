@@ -15,32 +15,52 @@ from tooling.prototype.validate_prototype import validate_prototype_platform
 from tooling.prototype.validate_visual_qa import validate_visual_findings
 
 
-def valid_direction(direction_id: str, navigation: str, journey: str) -> dict:
+def valid_strategic_direction(direction_id: str) -> dict:
     return {
         "id": direction_id,
         "name": f"Direction {direction_id.upper()}",
-        "strategic_goal": "improve conversion",
-        "navigation": navigation,
-        "primary_journey": journey,
-        "discovery_model": "sku-search" if navigation == "search-led" else "guided",
-        "merchandising": "availability-and-price",
-        "density": "dense" if navigation == "search-led" else "balanced",
+        "archetype": "search-first",
+        "strategy_family": "search",
+        "thesis": "Reduce time from intent to transaction.",
+        "strategic_goal": "reduce-order-time",
+        "primary_personas": ["trade-buyer"],
+        "primary_jobs": ["find-and-order-known-sku"],
+        "rationale": "Known-SKU buyers benefit from direct search and dense decision support.",
+        "information_architecture": ["home", "search", "plp", "pdp", "cart"],
+        "navigation": {"model": "search-led"},
+        "primary_journey": {"id": "search-to-order", "steps": ["search", "pdp", "cart", "checkout"]},
+        "secondary_journeys": [{"id": "browse-to-order", "steps": ["home", "plp", "pdp", "cart"]}],
+        "discovery_model": "sku-search",
+        "search": {"prominence": "high"},
+        "merchandising": {"emphasis": "availability-and-price"},
+        "density": "compact",
         "transaction_model": "checkout-plus-rfq",
-        "patterns": ["home", "search", "plp", "pdp", "rfq"],
-        "components": ["product-card", "price-display", "quote-card"],
-        "strengths": ["clear primary task"],
-        "tradeoffs": ["secondary discovery reduced"],
+        "patterns": ["commerce.home", "commerce.search", "commerce.pdp"],
+        "components": ["commerce.product-card", "commerce.price-display"],
+        "component_variants": [{"component": "commerce.product-card", "variant": "b2b"}],
+        "required_resources": [],
+        "strengths": ["fast known-SKU ordering"],
+        "tradeoffs": ["less editorial discovery"],
+        "risks": ["depends on catalog data quality"],
+        "success_metrics": ["time-to-cart"],
+        "score": 0.9,
     }
 
 
 class PrototypePlatformTests(unittest.TestCase):
-    def test_direction_requires_strategic_structure(self):
+    def test_strategic_direction_requires_canonical_fields(self):
         errors = validate_direction({"id": "a", "name": "A"})
-        self.assertTrue(errors)
-        self.assertTrue(any("strategic_goal" in e for e in errors))
+        self.assertTrue(any("strategic_goal" in error for error in errors))
+        self.assertTrue(any("primary_journey" in error for error in errors))
 
-    def test_direction_with_required_strategy_fields_validates(self):
-        self.assertEqual([], validate_direction(valid_direction("a", "search-led", "search-to-order")))
+    def test_strategic_direction_rejects_runtime_density_vocabulary(self):
+        direction = valid_strategic_direction("a")
+        direction["density"] = "balanced"
+        errors = validate_direction(direction)
+        self.assertTrue(any("density" in error for error in errors))
+
+    def test_canonical_strategic_direction_validates(self):
+        self.assertEqual([], validate_direction(valid_strategic_direction("a")))
 
     def test_fixture_generation_is_deterministic(self):
         one = generate_fixture_pack("electronics-appliances", seed=108)
@@ -84,13 +104,9 @@ class PrototypePlatformTests(unittest.TestCase):
                 "personas": ["trade-buyer"], "jobs": ["request-quote"], "platforms": ["web"],
             }
             (client / "client-profile.yaml").write_text(yaml.safe_dump(profile), encoding="utf-8")
-            for direction_id, navigation, journey in (
-                ("a", "search-led", "search-to-order"),
-                ("b", "dashboard", "reorder-to-order"),
-                ("c", "rfq-led", "rfq-to-quote"),
-            ):
+            for direction_id in ("a", "b", "c"):
                 (directions / f"direction-{direction_id}.yaml").write_text(
-                    yaml.safe_dump(valid_direction(direction_id, navigation, journey)), encoding="utf-8"
+                    yaml.safe_dump(valid_strategic_direction(direction_id)), encoding="utf-8"
                 )
             (directions / "comparison.yaml").write_text("recommended: a\n", encoding="utf-8")
             manifest_path = compose_prototype(root, client)
@@ -107,7 +123,7 @@ class PrototypePlatformTests(unittest.TestCase):
             directions.mkdir(parents=True)
             for direction_id in ("a", "b", "c"):
                 (directions / f"direction-{direction_id}.yaml").write_text(
-                    yaml.safe_dump(valid_direction(direction_id, "search-led", "search-to-order")), encoding="utf-8"
+                    yaml.safe_dump(valid_strategic_direction(direction_id)), encoding="utf-8"
                 )
             approved = {
                 "version": 1,
