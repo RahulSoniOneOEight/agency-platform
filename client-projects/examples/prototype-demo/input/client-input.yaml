@@ -1,0 +1,16 @@
+version: 1
+client_id: prototype-demo
+display_name: Prototype Demo
+business_context:
+  business_model: b2b
+  industry: electronics-appliances
+users:
+  - trade-buyer
+  - procurement-manager
+goals:
+  - reduce-order-time
+  - increase-repeat-orders
+brand: {}
+references: []
+assets: []
+constraints: []

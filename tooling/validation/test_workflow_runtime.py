@@ -45,12 +45,20 @@ class WorkflowRuntimeTests(unittest.TestCase):
             client_dir = initialize_client(root, "acme", "Acme Furniture")
             expected = {
                 "brief.md",
-                "client-profile.yaml",
                 "workflow-state.yaml",
-                "references/.gitkeep",
+                "input/client-input.yaml",
+                "input/brand/.gitkeep",
+                "input/references/.gitkeep",
+                "input/assets/.gitkeep",
+                "input/source-documents/.gitkeep",
+                "derived/client-profile.yaml",
+                "derived/resolved-presets.yaml",
+                "derived/intelligence-map.yaml",
+                "derived/capability-map.yaml",
+                "derived/gaps.yaml",
+                "derived/resource-requirements.yaml",
                 "resources/.gitkeep",
                 "directions/.gitkeep",
-                "fixtures/.gitkeep",
             }
             actual = {
                 str(path.relative_to(client_dir)).replace("\\", "/")

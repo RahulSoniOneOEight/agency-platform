@@ -7,6 +7,7 @@ import yaml
 
 from tooling.prototype.approved_experience import validate_approved_experience
 from tooling.prototype.validate_visual_qa import unresolved_critical_findings, validate_visual_findings
+from tooling.workflow.client_paths import ClientPaths
 
 
 def _is_skipped(state: dict[str, Any], stage: str) -> bool:
@@ -33,21 +34,31 @@ def _load_yaml(path: Path) -> dict[str, Any]:
 
 def next_stage(root: Path, client_dir: Path, state: dict[str, Any]) -> dict[str, Any]:
     completed = set(state.get("completed", []))
+    paths = ClientPaths.for_client(client_dir)
 
     if "client-intake" not in completed:
         return {"stage": "client-intake", "status": "ready"}
 
-    if not (client_dir / "client-profile.yaml").exists():
+    if not paths.has_client_input_for_migration():
+        return {"stage": "client-intake", "status": "blocked", "reason": "client-input-missing"}
+    if not paths.read_client_profile().exists():
         return {"stage": "client-intake", "status": "blocked", "reason": "client-profile-missing"}
 
     if "resolve-intelligence" not in completed:
         return {"stage": "resolve-intelligence", "status": "ready"}
 
-    if not (client_dir / "resolved-intelligence.yaml").exists():
-        return {"stage": "resolve-intelligence", "status": "blocked", "reason": "resolved-intelligence-missing"}
+    if not paths.has_derived_intelligence_for_migration():
+        return {"stage": "resolve-intelligence", "status": "blocked", "reason": "derived-intelligence-incomplete"}
 
-    if "resource-research" not in completed and not _is_skipped(state, "resource-research"):
+    resource_skipped = _is_skipped(state, "resource-research")
+    if "resource-research" not in completed and not resource_skipped:
         return {"stage": "resource-research", "status": "ready"}
+
+    if "resource-research" in completed:
+        if not paths.resource_requirements.exists():
+            return {"stage": "resource-research", "status": "blocked", "reason": "resource-requirements-missing"}
+        if not paths.resource_selection.exists():
+            return {"stage": "resource-research", "status": "blocked", "reason": "resource-selection-missing"}
 
     if "generate-directions" not in completed:
         return {"stage": "generate-directions", "status": "ready"}

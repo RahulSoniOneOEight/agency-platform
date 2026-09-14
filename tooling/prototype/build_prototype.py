@@ -4,6 +4,8 @@ from pathlib import Path
 
 import yaml
 
+from tooling.workflow.client_paths import ClientPaths
+
 from .fixture_generator import generate_fixture_pack
 from .screenshot_manifest import build_screenshot_manifest
 from .validate_direction import validate_direction
@@ -18,12 +20,13 @@ def _load_yaml(path: Path) -> dict:
 
 def compose_prototype(root: Path, client_dir: Path) -> Path:
     del root
-    profile_path = client_dir / "client-profile.yaml"
+    client_paths = ClientPaths.for_client(client_dir)
+    profile_path = client_paths.read_client_profile()
     if not profile_path.exists():
-        raise ValueError("client-profile.yaml missing")
+        raise ValueError("derived/client-profile.yaml missing")
     profile = _load_yaml(profile_path)
     industry = profile.get("industry")
-    if not isinstance(industry, str):
+    if not isinstance(industry, str) or not industry:
         raise ValueError("client profile industry missing")
 
     directions: dict[str, str] = {}

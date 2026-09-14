@@ -1,0 +1,14 @@
+version: 1
+capabilities:
+  - id: known-item-search
+    status: reuse
+    target: search
+  - id: repeat-order
+    status: reuse
+    target: reorder
+  - id: rfq
+    status: reuse
+    target: rfq
+  - id: trade-credit
+    status: reuse
+    target: credit-summary

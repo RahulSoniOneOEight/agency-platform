@@ -1,0 +1,6 @@
+version: 1
+business_model: b2b
+industry: electronics-appliances
+use_cases:
+  - rfq
+  - repeat-order
