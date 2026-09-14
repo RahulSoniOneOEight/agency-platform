@@ -24,6 +24,21 @@ Implemented on `milestone-a-knowledge-platform` / PR #4:
 - Experience Direction Engine v1
 - Knowledge Platform schema + cross-reference validation
 
+## Workflow Runtime Layer
+
+Implemented on `workflow-runtime-layer-v2` / PR #5:
+
+- repository-stored stage workflows
+- canonical client/output templates
+- client workspace initializer
+- machine-readable `workflow-state.yaml`
+- artifact-aware stage router
+- explicit optional resource-research skipping with reason
+- prototype-platform blocked boundary until Milestone B
+- approved-experience production gate
+- runtime validation + CI contract
+- OpenCode routing rules in `AGENTS.md`
+
 ## Explicitly deferred to Milestone B+
 
 - production Flutter design-system widgets
@@ -32,6 +47,5 @@ Implemented on `milestone-a-knowledge-platform` / PR #4:
 - direction-to-Flutter prototype composer
 - demo fixture generation runtime
 - automated screenshot/AI visual QA
-- client selection/mixing UI
-- `approved-experience.yaml` production contract workflow
+- client selection/mixing UI/runtime beyond the stored approved-experience contract
 - production backend/integrations
