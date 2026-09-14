@@ -1,0 +1,12 @@
+version: 1
+motion:
+  motion.checkout.success:
+    type: lottie
+    asset: resources/motion/checkout-success.json
+    loop: false
+    autoplay: true
+  motion.loading.default:
+    type: lottie
+    asset: resources/motion/loading-default.json
+    loop: true
+    autoplay: true
