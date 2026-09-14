@@ -4,7 +4,7 @@
 Resolve the shared Design Intelligence and reusable presets that should inform the client project.
 
 ## READ
-- `client-projects/<client>/client-profile.yaml`
+- `client-projects/<client>/derived/client-profile.yaml`
 - `presets/business-model/`
 - `presets/industry/`
 - `presets/use-case/`

@@ -4,7 +4,7 @@
 Turn validated Experience Directions into a runnable A/B/C prototype using the shared Flutter platform.
 
 ## READ
-- `client-projects/<client>/client-profile.yaml`
+- `client-projects/<client>/derived/client-profile.yaml`
 - validated `client-projects/<client>/directions/`
 - `design-contract/`
 - `packages/agency_flutter_ui/`
