@@ -2,7 +2,7 @@ import 'package:agency_flutter_ui/agency_flutter_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:widgetbook/widgetbook.dart';
 
-final _sampleProduct = AgencyProduct(
+const _sampleProduct = AgencyProduct(
   id: 'sku-108',
   name: 'Industrial LED Driver 60W',
   sku: 'LED-DRV-60W',
@@ -11,10 +11,19 @@ final _sampleProduct = AgencyProduct(
   price: AgencyPrice(current: 1899, compareAt: 2199),
 );
 
+const _sampleSecondProduct = AgencyProduct(
+  id: 'sku-109',
+  name: '65W USB-C Charger',
+  sku: 'CHG-65W',
+  stock: 47,
+  rating: 4.5,
+  price: AgencyPrice(current: 1799),
+);
+
 Widget buildAgencyWidgetbook() {
   return Widgetbook.material(
     directories: [
-      WidgetbookFolder(
+      WidgetbookCategory(
         name: 'Primitives',
         children: [
           WidgetbookComponent(
@@ -48,7 +57,7 @@ Widget buildAgencyWidgetbook() {
           ),
         ],
       ),
-      WidgetbookFolder(
+      WidgetbookCategory(
         name: 'Commerce',
         children: [
           WidgetbookComponent(
@@ -56,14 +65,14 @@ Widget buildAgencyWidgetbook() {
             useCases: [
               WidgetbookUseCase(
                 name: 'Standard',
-                builder: (_) => SizedBox(
+                builder: (_) => const SizedBox(
                   width: 260,
                   child: ProductCard(product: _sampleProduct),
                 ),
               ),
               WidgetbookUseCase(
-                name: 'B2B',
-                builder: (_) => SizedBox(
+                name: 'B2B dense',
+                builder: (_) => const SizedBox(
                   width: 260,
                   child: ProductCard(
                     product: _sampleProduct,
@@ -73,14 +82,84 @@ Widget buildAgencyWidgetbook() {
                 ),
               ),
               WidgetbookUseCase(
-                name: 'Compact',
-                builder: (_) => SizedBox(
+                name: 'Compact card',
+                builder: (_) => const SizedBox(
                   width: 220,
                   child: ProductCard(
                     product: _sampleProduct,
                     variant: ProductCardVariant.compact,
-                    density: AgencyDensity.compact,
+                    density: AgencyDensity.dense,
                   ),
+                ),
+              ),
+            ],
+          ),
+          WidgetbookComponent(
+            name: 'MerchandisingSplitTile',
+            useCases: [
+              WidgetbookUseCase(
+                name: 'Complementary products',
+                builder: (_) => const SizedBox(
+                  width: 560,
+                  child: MerchandisingSplitTile(
+                    title: 'Complete the setup',
+                    left: _sampleProduct,
+                    right: _sampleSecondProduct,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          WidgetbookComponent(
+            name: 'Trade',
+            useCases: [
+              WidgetbookUseCase(
+                name: 'Credit summary',
+                builder: (_) => const SizedBox(
+                  width: 420,
+                  child: CreditSummary(limit: 250000, used: 92000),
+                ),
+              ),
+              WidgetbookUseCase(
+                name: 'Quote',
+                builder: (_) => const SizedBox(
+                  width: 420,
+                  child: QuoteCard(
+                    quoteId: 'QT-24017',
+                    status: 'Awaiting approval',
+                    total: 78600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+      WidgetbookCategory(
+        name: 'Patterns',
+        children: [
+          WidgetbookComponent(
+            name: 'TradeDashboard',
+            useCases: [
+              WidgetbookUseCase(
+                name: 'Default',
+                builder: (_) => const SizedBox(
+                  width: 900,
+                  height: 700,
+                  child: TradeDashboardPattern(),
+                ),
+              ),
+            ],
+          ),
+          WidgetbookComponent(
+            name: 'RFQ',
+            useCases: [
+              WidgetbookUseCase(
+                name: 'Default',
+                builder: (_) => const SizedBox(
+                  width: 900,
+                  height: 700,
+                  child: RfqPattern(products: [_sampleProduct, _sampleSecondProduct]),
                 ),
               ),
             ],
