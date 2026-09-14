@@ -25,8 +25,28 @@ Before shared UI, tokens, components, patterns, variants, or themes, read `DESIG
 Before completing meaningful UI work, read `VISUAL_QA.md`.
 Before Penpot-related work, read `PENPOT_MAPPING.md`.
 Before product-consulting or Experience Direction work, read `docs/knowledge-platform.md` and the relevant client profile, presets, design contracts, and experience patterns.
+Before starting or continuing a client project, read `docs/workflow-runtime.md` and the client's `workflow-state.yaml` when present.
 
 Only load policies relevant to the current task, but never skip a relevant policy.
+
+## Workflow Runtime operating model
+
+Client work must follow the repository-driven runtime rather than ad-hoc prompt sequences.
+
+For a new client:
+1. initialize the workspace with `python -m tooling.workflow.initialize_client <client-id> --name "<display name>"`;
+2. read `client-projects/<client>/workflow-state.yaml`;
+3. determine the next legal stage with the runtime router;
+4. read only the matching numbered file under `workflows/` plus the files named in its `READ` section;
+5. execute the stage;
+6. validate the required outputs;
+7. update `workflow-state.yaml` only after the gate is satisfied.
+
+For an existing client, never infer progress from chat history or prose. The GitHub artifacts and `workflow-state.yaml` are authoritative.
+
+Every workflow file must contain `PURPOSE`, `READ`, `PROCESS`, `WRITE`, `VALIDATE`, `DO NOT`, and `NEXT`.
+
+Do not skip mandatory stages. `resource-research` may be skipped only when the state records a reason. If the router reports a structured block such as `prototype-platform-not-installed`, stop at that boundary instead of inventing another implementation path.
 
 ## Knowledge Platform operating model
 
@@ -35,7 +55,7 @@ The shared knowledge layer has four responsibilities:
 1. **Design Intelligence** — `design-contract/` + `presets/` + metadata.
 2. **Resource Intelligence** — `resources/registry/` + source routing + normalization/provenance.
 3. **Product Consulting** — `experience-patterns/` + client profile + Experience Direction Engine.
-4. **Client Contract** — later client selection/mixing produces `approved-experience.yaml`.
+4. **Client Contract** — client selection/mixing produces `approved-experience.yaml` after prototype/client-review capability exists.
 
 Presets and experience patterns are hypotheses and reusable knowledge, not forced client outputs.
 `discovery-first`, `search-first`, and `trade-first` are candidate archetypes only. OpenCode must evaluate the actual client objectives, personas, jobs, business model, industry, use cases, constraints, design intelligence, resource availability, and references before selecting directions.
@@ -124,15 +144,16 @@ external source
 
 ## Validation
 
-For Knowledge Platform changes run:
+For Knowledge Platform + Workflow Runtime changes run:
 
 ```text
-python -m unittest tooling.validation.test_validate_repo tooling.validation.test_knowledge_platform -v
+python -m unittest tooling.validation.test_validate_repo tooling.validation.test_knowledge_platform tooling.validation.test_workflow_runtime -v
 python tooling/validation/validate_repo.py
 python -m tooling.knowledge.validate_knowledge
+python -m tooling.workflow.validate_workflow
 ```
 
-All three must pass before completion.
+All four must pass before completion.
 
 ## Visual completion rule
 
@@ -140,4 +161,4 @@ Meaningful UI work is not complete based on Dart analysis or unit tests alone. F
 
 ## Current scope guardrail
 
-Milestone A establishes the Knowledge Platform. Do not add production Flutter components, starter implementations, production backends, Supabase, n8n, deployment pipelines, Penpot automation, or screenshot/vision automation as part of Milestone A. Those belong to later milestones unless explicitly authorized.
+Milestone A plus the Workflow Runtime provide machine-readable agency knowledge and deterministic stage orchestration. Do not add production Flutter components, starter implementations, production backends, Supabase, n8n, deployment pipelines, Penpot automation, or screenshot/vision automation as part of this runtime layer. Those belong to Milestone B+ unless explicitly authorized.

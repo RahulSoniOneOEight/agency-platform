@@ -1,0 +1,21 @@
+client_id: example-client
+directions:
+  - id: direction-a
+    score: 0
+    strategic_goal: []
+    strengths: []
+    tradeoffs: []
+  - id: direction-b
+    score: 0
+    strategic_goal: []
+    strengths: []
+    tradeoffs: []
+  - id: direction-c
+    score: 0
+    strategic_goal: []
+    strengths: []
+    tradeoffs: []
+recommendation: ""
+diversity_check:
+  passed: false
+  notes: ""

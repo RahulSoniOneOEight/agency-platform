@@ -1,0 +1,27 @@
+id: direction-a
+name: Example Direction
+archetype: discovery-first
+strategy_family: discovery
+thesis: ""
+strategic_goal: []
+primary_personas: []
+primary_jobs: []
+rationale: ""
+information_architecture: []
+navigation:
+  model: ""
+primary_journey: []
+secondary_journeys: []
+search:
+  prominence: medium
+merchandising:
+  emphasis: medium
+density: normal
+transaction_model: checkout
+component_variants: []
+required_resources: []
+strengths: []
+weaknesses: []
+risks: []
+success_metrics: []
+score: 0
