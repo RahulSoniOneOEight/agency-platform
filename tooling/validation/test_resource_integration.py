@@ -5,6 +5,9 @@ from pathlib import Path
 
 import yaml
 
+from tooling.prototype.build_prototype import compose_prototype
+from tooling.resources.validate_resources import validate_resource_artifacts
+
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -29,6 +32,21 @@ class ResourceIntegrationTests(unittest.TestCase):
         by_role = {item["role"]: item for item in data["resources"]}
         self.assertEqual("authoritative", by_role["brand.logo"]["sourcing"]["mode"])
         self.assertEqual("comparative", by_role["home.hero"]["sourcing"]["mode"])
+
+    def test_reference_resource_artifacts_validate(self):
+        client = ROOT / "client-projects" / "examples" / "prototype-demo"
+        self.assertEqual([], validate_resource_artifacts(ROOT, client))
+
+    def test_prototype_manifest_contains_canonical_resource_bindings(self):
+        client = ROOT / "client-projects" / "examples" / "prototype-demo"
+        manifest_path = compose_prototype(ROOT, client)
+        manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+        resources = manifest.get("resources") or {}
+        self.assertIn("asset.brand.logo", resources)
+        self.assertIn("asset.home.hero", resources)
+        self.assertIn("icon.commerce.cart", resources)
+        self.assertEqual("pexels-fixture-1001", resources["asset.home.hero"]["candidate_id"])
+        self.assertTrue(all(not key.startswith("http") for key in resources))
 
 
 if __name__ == "__main__":
