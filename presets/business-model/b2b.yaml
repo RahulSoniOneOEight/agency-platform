@@ -1,0 +1,6 @@
+id: b2b
+type: business-model
+description: Trade commerce emphasizing known-item finding, repeat ordering, procurement, quotes, and account context.
+candidate_archetypes: [search-sku-first, trade-first, rfq-first, quick-order]
+important_jobs: [find-exact-product, reorder, bulk-buy, request-quote]
+preferences: {transaction_model: trade, density: compact}

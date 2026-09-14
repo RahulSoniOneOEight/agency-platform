@@ -1,0 +1,16 @@
+id: normalize-manishdayma-flucommerce
+reference_id: github-manishdayma-flucommerce
+extract:
+  architecture: [core-data-presentation-routing-theme-separation]
+  patterns: [product-listing, product-detail, navigation]
+normalization:
+  code: no-copy
+  architecture: concept-only
+  styling: map-to-agency-contract
+  dependencies: do-not-inherit
+destination:
+  patterns: design-contract/patterns
+  documentation: docs
+decision:
+  mode: reference_only
+  copy_source_code: false

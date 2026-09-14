@@ -1,0 +1,10 @@
+id: booking-first
+name: Booking-first
+strategy_family: booking
+strategic_goal: Lead with destination/service, date, party, and booking intent.
+best_when: [booking, book, travel-hospitality, appointment]
+business_models: [service, rental]
+personas: [consumer, service-customer]
+jobs: [check-availability, book]
+primary_journey: [booking-search, availability, option, details, payment]
+tradeoffs: {strength: intent-efficiency, weakness: less-exploratory}

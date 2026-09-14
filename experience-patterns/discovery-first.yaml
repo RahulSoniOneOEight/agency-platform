@@ -1,0 +1,10 @@
+id: discovery-first
+name: Discovery-first
+strategy_family: discovery
+strategic_goal: Maximize exploration, category discovery, and merchandising-led conversion.
+best_when: [discover, increase-conversion, cross-sell, broad-catalog]
+business_models: [b2c, marketplace]
+personas: [consumer]
+jobs: [discover, compare]
+primary_journey: [home, collection, plp, pdp, cart]
+tradeoffs: {strength: merchandising-flexibility, weakness: slower-known-item-path}

@@ -1,0 +1,6 @@
+id: services-rental-appointment
+type: industry
+description: Suitability and availability-driven service selection and scheduling.
+candidate_archetypes: [availability-first, consultation-led, booking-first]
+important_jobs: [find-service, compare-provider, check-availability, book]
+preferences: {availability: primary, provider_context: high}

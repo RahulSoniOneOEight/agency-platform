@@ -1,0 +1,10 @@
+id: reorder-first
+name: Reorder-first
+strategy_family: retention
+strategic_goal: Prioritize previous purchases, favorites, and replenishment.
+best_when: [repeat-order, increase-repeat-purchase, replenish, frequency-high]
+business_models: [b2c, b2b, subscription]
+personas: [consumer, trade-buyer]
+jobs: [reorder, replenish]
+primary_journey: [home, buy-again, quantity, cart, checkout]
+tradeoffs: {strength: retention-efficiency, weakness: new-user-value-lower}

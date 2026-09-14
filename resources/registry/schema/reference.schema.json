@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["id", "source_type", "name", "status", "license", "allowed_use", "normalization_required", "code_reuse_allowed"],
+  "properties": {
+    "id": {"type": "string", "minLength": 3},
+    "source_type": {"type": "string"},
+    "name": {"type": "string"},
+    "source_url": {"type": "string"},
+    "provider": {"type": "string"},
+    "category": {"type": "array", "items": {"type": "string"}},
+    "status": {"enum": ["approved", "approved_with_rules", "reference_only", "blocked"]},
+    "license": {
+      "type": "object",
+      "required": ["type", "status"],
+      "properties": {
+        "type": {"type": "string"},
+        "status": {"enum": ["resolved", "unresolved", "not_applicable"]}
+      }
+    },
+    "compatibility": {"type": "object"},
+    "allowed_use": {"type": "array", "items": {"type": "string"}},
+    "blocked_use": {"type": "array", "items": {"type": "string"}},
+    "normalization_required": {"type": "boolean"},
+    "code_reuse_allowed": {"type": "boolean"},
+    "tags": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

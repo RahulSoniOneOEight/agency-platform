@@ -1,0 +1,6 @@
+id: bulk-procurement
+type: use-case
+description: Multi-item and quantity-heavy procurement.
+candidate_archetypes: [trade-first, quick-order, rfq-first]
+important_jobs: [bulk-buy, request-quote, purchase]
+preferences: {density: compact, quantity_controls: prominent}

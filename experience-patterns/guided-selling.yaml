@@ -1,0 +1,10 @@
+id: guided-selling
+name: Guided selling
+strategy_family: guided
+strategic_goal: Ask structured questions to narrow choices and recommend suitable products or services.
+best_when: [identify-need, check-compatibility, consultation, complex-choice]
+business_models: [b2c, b2b, service]
+personas: [consumer, trade-buyer, service-customer]
+jobs: [identify-need, evaluate, decide]
+primary_journey: [guided-entry, questions, recommendation, detail, transaction]
+tradeoffs: {strength: choice-support, weakness: extra-upfront-steps}

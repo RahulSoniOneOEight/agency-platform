@@ -1,0 +1,13 @@
+id: provider-github
+source_type: code-reference-provider
+name: GitHub
+source_url: https://github.com
+provider: github
+category: [code, references]
+status: approved_with_rules
+license: {type: repository-specific, status: not_applicable}
+allowed_use: [reference-discovery, architecture-review]
+blocked_use: [unlicensed-copy, direct-client-copy]
+normalization_required: true
+code_reuse_allowed: false
+tags: [code, references]

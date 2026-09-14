@@ -1,0 +1,8 @@
+id: fixture-b2b-electronics
+business_model: b2b
+industry: electronics-appliances
+use_cases: [bulk-procurement, rfq, repeat-order]
+objectives: [reduce-time-to-order, increase-repeat-purchase, grow-rfq]
+personas: [procurement-manager, trade-buyer]
+jobs: [find-exact-product, reorder, request-quote]
+platforms: [mobile, web]

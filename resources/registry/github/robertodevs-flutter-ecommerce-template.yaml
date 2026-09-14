@@ -1,0 +1,18 @@
+id: github-robertodevs-flutter-ecommerce-template
+source_type: flutter_reference
+name: RobertoDevs Flutter Ecommerce Template
+source_url: https://github.com/robertodevs/flutter_ecommerce_template
+provider: github
+category: [ecommerce, flutter, ui-kit]
+status: approved_with_rules
+license:
+  type: MIT
+  status: resolved
+compatibility:
+  dart: pre-dart-3
+  disposition: normalize-before-use
+allowed_use: [ux-reference, component-reference, pattern-reference, normalized-reimplementation]
+blocked_use: [direct-client-copy]
+normalization_required: true
+code_reuse_allowed: true
+tags: [commerce, product, checkout, mobile]

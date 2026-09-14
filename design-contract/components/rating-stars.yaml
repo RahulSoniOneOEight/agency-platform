@@ -1,0 +1,17 @@
+id: commerce.rating-stars
+name: RatingStars
+category: commerce.trust
+purpose: Display aggregate customer rating with accessible semantics.
+business_models: [b2c, marketplace]
+industries: [general]
+use_cases: [discovery, comparison]
+variants: [compact, standard]
+states: [normal, unrated]
+density: [compact, normal]
+responsive: [mobile, tablet, desktop]
+requires: []
+compatible_patterns: [commerce.home, commerce.plp, commerce.pdp, commerce.search]
+avoid_when: [ratings-disabled]
+source_refs: [github-robertodevs-flutter-ecommerce-template]
+status: approved
+tags: [rating, trust]

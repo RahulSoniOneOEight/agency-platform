@@ -1,0 +1,10 @@
+id: comparison-first
+name: Comparison-first
+strategy_family: comparison
+strategic_goal: Make attribute and alternative evaluation the central decision experience.
+best_when: [comparison, compare-specifications, high-consideration, electronics-appliances]
+business_models: [b2c, b2b, marketplace, rental]
+personas: [consumer, trade-buyer]
+jobs: [compare, compare-specifications, evaluate]
+primary_journey: [search-or-category, shortlist, compare, pdp, transaction]
+tradeoffs: {strength: decision-confidence, weakness: higher-interface-complexity}

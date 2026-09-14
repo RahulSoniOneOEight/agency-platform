@@ -1,0 +1,6 @@
+id: rfq
+type: use-case
+description: Request-for-quote workflow before order commitment.
+candidate_archetypes: [rfq-first, trade-first]
+important_jobs: [request-quote, review-quote, purchase]
+preferences: {transaction_model: quote}

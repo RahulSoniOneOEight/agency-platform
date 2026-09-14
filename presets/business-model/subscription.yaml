@@ -1,0 +1,6 @@
+id: subscription
+type: business-model
+description: Recurring commerce emphasizing replenishment, retention, and subscription management.
+candidate_archetypes: [reorder-first, recommendation-led, discovery-first]
+important_jobs: [subscribe, reorder, manage-subscription]
+preferences: {retention: high, recurring_context: prominent}

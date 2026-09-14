@@ -1,0 +1,7 @@
+id: commerce.plp
+name: Product Listing
+purpose: Browse, filter, compare, and act on product results.
+status: approved
+compatible_components: [commerce.product-card, commerce.filter-bar, commerce.search-field]
+business_models: [b2c, b2b, marketplace]
+use_cases: [catalog, comparison, bulk-procurement]

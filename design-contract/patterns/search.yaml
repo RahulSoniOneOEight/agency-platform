@@ -1,0 +1,7 @@
+id: commerce.search
+name: Search Results
+purpose: Help users find known products, SKUs, categories, or services quickly.
+status: approved
+compatible_components: [commerce.search-field, commerce.filter-bar, commerce.product-card]
+business_models: [b2c, b2b, marketplace, service]
+use_cases: [search, comparison, bulk-procurement]

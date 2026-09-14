@@ -1,0 +1,6 @@
+id: electronics-appliances
+type: industry
+description: Specification-heavy and frequently high-intent product evaluation.
+candidate_archetypes: [search-sku-first, comparison-first, guided-selling]
+important_jobs: [find-exact-product, compare-specifications, check-compatibility, purchase]
+preferences: {search: high, filtering: specification-heavy, comparison: high}

@@ -1,0 +1,17 @@
+id: commerce.price-display
+name: PriceDisplay
+category: commerce.pricing
+purpose: Present price, discount, tier, and price-context information consistently.
+business_models: [b2c, b2b, marketplace]
+industries: [general]
+use_cases: [catalog, bulk-procurement, comparison]
+variants: [standard, sale, tiered]
+states: [normal, unavailable]
+density: [compact, normal]
+responsive: [mobile, tablet, desktop]
+requires: []
+compatible_patterns: [commerce.home, commerce.plp, commerce.pdp, commerce.rfq]
+avoid_when: []
+source_refs: []
+status: approved
+tags: [price, commerce]

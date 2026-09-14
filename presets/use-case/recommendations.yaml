@@ -1,0 +1,6 @@
+id: recommendations
+type: use-case
+description: Personalize discovery and cross-sell using relevance signals.
+candidate_archetypes: [recommendation-led, discovery-first]
+important_jobs: [discover, cross-sell, purchase]
+preferences: {personalization: high}

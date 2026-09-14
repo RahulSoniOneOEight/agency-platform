@@ -1,0 +1,10 @@
+id: availability-first
+name: Availability-first
+strategy_family: availability
+strategic_goal: Surface what is available where and when before deep evaluation.
+best_when: [check-availability, reduce-time-to-slot, rental, service]
+business_models: [service, rental]
+personas: [service-customer, consumer]
+jobs: [check-availability, book]
+primary_journey: [location-date, available-options, compare, book]
+tradeoffs: {strength: removes-unavailable-options-early, weakness: less-content-discovery}

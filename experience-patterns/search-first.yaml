@@ -1,0 +1,10 @@
+id: search-first
+name: Search-first
+strategy_family: search
+strategic_goal: Minimize time from intent to relevant result.
+best_when: [search, reduce-time-to-order, known-item, large-catalog]
+business_models: [b2c, b2b, marketplace, service]
+personas: [consumer, trade-buyer]
+jobs: [search, find-exact-product]
+primary_journey: [search, results, pdp, transaction]
+tradeoffs: {strength: speed, weakness: lower-inspiration}

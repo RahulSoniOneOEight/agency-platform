@@ -1,0 +1,13 @@
+id: provider-pexels
+source_type: stock-image-provider
+name: Pexels
+source_url: https://www.pexels.com
+provider: pexels
+category: [images, video]
+status: approved_with_rules
+license: {type: provider-specific, status: not_applicable}
+allowed_use: [prototype-search, demo-assets]
+blocked_use: [unreviewed-redistribution]
+normalization_required: false
+code_reuse_allowed: false
+tags: [stock, imagery]

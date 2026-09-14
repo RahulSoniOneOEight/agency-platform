@@ -1,0 +1,13 @@
+id: provider-pubdev
+source_type: flutter-package-provider
+name: pub.dev
+source_url: https://pub.dev
+provider: pubdev
+category: [flutter-packages]
+status: approved_with_rules
+license: {type: package-specific, status: not_applicable}
+allowed_use: [package-discovery, compatibility-review]
+blocked_use: [unreviewed-dependency-addition]
+normalization_required: true
+code_reuse_allowed: false
+tags: [flutter, packages]

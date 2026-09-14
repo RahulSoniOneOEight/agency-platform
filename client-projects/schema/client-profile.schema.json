@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["id", "business_model", "industry", "use_cases", "objectives", "personas", "jobs", "platforms"],
+  "properties": {
+    "id": {"type": "string"}, "business_model": {"type": "string"}, "industry": {"type": "string"},
+    "use_cases": {"type": "array", "items": {"type": "string"}}, "objectives": {"type": "array", "items": {"type": "string"}},
+    "personas": {"type": "array", "items": {"type": "string"}}, "jobs": {"type": "array", "items": {"type": "string"}},
+    "platforms": {"type": "array", "items": {"enum": ["mobile", "web", "tablet", "desktop"]}},
+    "constraints": {"type": "array", "items": {"type": "string"}}, "success_metrics": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

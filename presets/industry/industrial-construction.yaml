@@ -1,0 +1,6 @@
+id: industrial-construction
+type: industry
+description: Trade procurement with specifications, known items, quantity, quote, credit, and PO workflows.
+candidate_archetypes: [trade-first, search-sku-first, rfq-first]
+important_jobs: [find-exact-product, bulk-buy, request-quote, reorder]
+preferences: {density: compact, specifications: high, trade_context: high}

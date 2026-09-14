@@ -1,0 +1,7 @@
+id: commerce.repeat-order
+name: Repeat Order
+purpose: Minimize friction for recurring purchases.
+status: approved
+patterns: [commerce.home, commerce.search, commerce.pdp]
+business_models: [b2c, b2b]
+jobs: [reorder, purchase]

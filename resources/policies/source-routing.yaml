@@ -1,0 +1,11 @@
+priority:
+  - client-owned
+  - agency-approved-local
+  - approved-provider
+  - approved-external-search
+  - generated-demo-fallback
+rules:
+  arbitrary-web-download: blocked
+  record-provenance: required
+  evaluate-license-before-use: required
+  prefer-primary-icon-family: iconoir

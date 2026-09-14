@@ -1,0 +1,23 @@
+id: commerce.product-card
+name: ProductCard
+category: commerce.product
+purpose: Display a purchasable product in discovery, listing, recommendation, and trade contexts.
+business_models: [b2c, b2b, marketplace]
+industries: [general, fashion-apparel, electronics-appliances, furniture-home, grocery-fmcg]
+use_cases: [discovery, catalog, recommendations, bulk-procurement]
+variants: [standard, premium, b2b, marketplace]
+states: [loading, normal, out-of-stock, disabled]
+density: [compact, normal, spacious]
+responsive: [mobile, tablet, desktop]
+requires: [commerce.price-display, commerce.product-image, commerce.rating-stars]
+compatible_patterns: [commerce.home, commerce.plp, commerce.search, commerce.pdp, commerce.rfq]
+avoid_when: [quote-only-service]
+source_refs: [github-robertodevs-flutter-ecommerce-template]
+status: approved
+tags: [product, card, grid, commerce]
+selection_rules:
+  - when: {business_model: b2b}
+    choose_variant: b2b
+  - when: {business_model: marketplace}
+    choose_variant: marketplace
+  - default: {choose_variant: standard}

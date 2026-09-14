@@ -1,0 +1,6 @@
+id: discovery
+type: use-case
+description: Browse and inspire before product selection.
+candidate_archetypes: [discovery-first, editorial-commerce]
+important_jobs: [discover, browse, compare]
+preferences: {merchandising: high}

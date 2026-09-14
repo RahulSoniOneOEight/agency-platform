@@ -1,0 +1,17 @@
+id: commerce.credit-summary
+name: CreditSummary
+category: commerce.trade
+purpose: Present available trade credit, used amount, and payment terms.
+business_models: [b2b]
+industries: [general]
+use_cases: [bulk-procurement, repeat-order]
+variants: [compact, detailed]
+states: [normal, low-credit, blocked]
+density: [compact, normal]
+responsive: [mobile, tablet, desktop]
+requires: []
+compatible_patterns: [commerce.rfq, commerce.home]
+avoid_when: [credit-disabled]
+source_refs: []
+status: approved
+tags: [credit, b2b, account]

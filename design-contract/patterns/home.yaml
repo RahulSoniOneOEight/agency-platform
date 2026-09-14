@@ -1,0 +1,7 @@
+id: commerce.home
+name: Home
+purpose: Provide the primary entry surface for discovery, search, account tasks, or trade actions.
+status: approved
+compatible_components: [commerce.product-card, commerce.search-field, commerce.credit-summary]
+business_models: [b2c, b2b, marketplace, service]
+use_cases: [discovery, search, repeat-order]

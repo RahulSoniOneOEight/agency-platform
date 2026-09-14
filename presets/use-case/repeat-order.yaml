@@ -1,0 +1,6 @@
+id: repeat-order
+type: use-case
+description: Reduce friction for recurring purchases.
+candidate_archetypes: [reorder-first, quick-order]
+important_jobs: [reorder, purchase]
+preferences: {history: prominent, speed: high}

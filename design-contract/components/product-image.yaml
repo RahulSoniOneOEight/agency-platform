@@ -1,0 +1,17 @@
+id: commerce.product-image
+name: ProductImage
+category: commerce.media
+purpose: Render product imagery with consistent aspect ratio and fallback behavior.
+business_models: [b2c, b2b, marketplace]
+industries: [general]
+use_cases: [discovery, catalog, comparison]
+variants: [square, portrait, landscape]
+states: [loading, normal, error]
+density: [compact, normal, spacious]
+responsive: [mobile, tablet, desktop]
+requires: []
+compatible_patterns: [commerce.home, commerce.plp, commerce.pdp, commerce.search]
+avoid_when: []
+source_refs: []
+status: approved
+tags: [image, product, media]

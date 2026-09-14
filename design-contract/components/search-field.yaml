@@ -1,0 +1,17 @@
+id: commerce.search-field
+name: SearchField
+category: commerce.discovery
+purpose: Provide product, category, SKU, or service search entry.
+business_models: [b2c, b2b, marketplace, service]
+industries: [general]
+use_cases: [search, discovery, bulk-procurement]
+variants: [standard, prominent, sku]
+states: [idle, focused, loading, error]
+density: [compact, normal]
+responsive: [mobile, tablet, desktop]
+requires: []
+compatible_patterns: [commerce.home, commerce.plp, commerce.search]
+avoid_when: []
+source_refs: [github-robertodevs-flutter-ecommerce-template]
+status: approved
+tags: [search, discovery]

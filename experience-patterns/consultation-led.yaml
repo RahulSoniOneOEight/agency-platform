@@ -1,0 +1,10 @@
+id: consultation-led
+name: Consultation-led
+strategy_family: assisted
+strategic_goal: Make expert or advisor assistance central to high-consideration decisions.
+best_when: [consultation, consult, high-ticket, complex-choice]
+business_models: [service, b2c, b2b]
+personas: [service-customer, consumer, trade-buyer]
+jobs: [consult, evaluate, decide]
+primary_journey: [need, advisor, consultation, recommendation, transaction]
+tradeoffs: {strength: high-confidence, weakness: operational-dependency}

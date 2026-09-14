@@ -1,0 +1,7 @@
+id: commerce.bulk-procurement
+name: Bulk Procurement
+purpose: Support dense product selection and bulk procurement.
+status: approved
+patterns: [commerce.search, commerce.plp, commerce.rfq]
+business_models: [b2b]
+jobs: [find-exact-product, bulk-buy, request-quote]

@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["id", "type", "candidate_archetypes", "important_jobs", "preferences"],
+  "properties": {
+    "id": {"type": "string"},
+    "type": {"enum": ["business-model", "industry", "use-case"]},
+    "description": {"type": "string"},
+    "candidate_archetypes": {"type": "array", "items": {"type": "string"}},
+    "important_jobs": {"type": "array", "items": {"type": "string"}},
+    "preferences": {"type": "object"}
+  },
+  "additionalProperties": false
+}

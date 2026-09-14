@@ -1,0 +1,8 @@
+id: fixture-grocery
+business_model: b2c
+industry: grocery-fmcg
+use_cases: [repeat-order, discovery]
+objectives: [reduce-time-to-basket, increase-basket-size]
+personas: [consumer]
+jobs: [reorder, search, discover]
+platforms: [mobile, web]

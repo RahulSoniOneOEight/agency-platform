@@ -1,0 +1,6 @@
+id: marketplace
+type: business-model
+description: Multi-seller commerce balancing discovery, comparison, seller trust, and fulfillment differences.
+candidate_archetypes: [marketplace-first, comparison-first, seller-trust-led]
+important_jobs: [discover, compare, evaluate-seller, purchase]
+preferences: {seller_context: prominent, comparison: high}
