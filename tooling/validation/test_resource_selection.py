@@ -63,6 +63,30 @@ class ResourceSelectionTests(unittest.TestCase):
             router.route_sources(requirement, client_candidates_exist=True),
         )
 
+    def test_prefer_client_can_escalate_research_when_client_candidate_is_not_suitable(self):
+        router = importlib.import_module("tooling.resources.provider_router")
+        requirement = {
+            "type": "image",
+            "role": "category.supporting",
+            "sourcing": {"mode": "prefer_client", "allowed_sources": ["client", "agency", "pexels"]},
+        }
+        self.assertEqual(
+            ["client", "agency", "pexels"],
+            router.route_sources(
+                requirement,
+                client_candidates_exist=True,
+                client_candidate_suitable=False,
+            ),
+        )
+        self.assertEqual(
+            ["client"],
+            router.route_sources(
+                requirement,
+                client_candidates_exist=True,
+                client_candidate_suitable=True,
+            ),
+        )
+
     def test_router_keeps_authoritative_assets_off_stock_providers(self):
         router = importlib.import_module("tooling.resources.provider_router")
         requirement = {
@@ -171,6 +195,53 @@ class ResourceSelectionTests(unittest.TestCase):
         ]}}
         selected = selector.select_candidates(requirements, candidates)
         self.assertNotIn("brand-logo", selected["selections"])
+
+    def test_resource_validator_rejects_blocked_external_provider(self):
+        validator = importlib.import_module("tooling.resources.validate_resources")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            schema_dir = root / "resources" / "registry" / "schema"
+            provider_dir = root / "resources" / "registry" / "providers"
+            schema_dir.mkdir(parents=True)
+            provider_dir.mkdir(parents=True)
+            for name in (
+                "resource-requirements.schema.json",
+                "resource-candidates.schema.json",
+                "resource-selection.schema.json",
+                "resource-provenance.schema.json",
+            ):
+                (schema_dir / name).write_text(
+                    (ROOT / "resources" / "registry" / "schema" / name).read_text(encoding="utf-8"),
+                    encoding="utf-8",
+                )
+            (provider_dir / "blockedstock.yaml").write_text(
+                "id: provider-blockedstock\nprovider: blockedstock\nstatus: blocked\n",
+                encoding="utf-8",
+            )
+            client = root / "client-projects" / "acme"
+            (client / "derived").mkdir(parents=True)
+            (client / "resources").mkdir(parents=True)
+            (client / "derived" / "resource-requirements.yaml").write_text(
+                yaml.safe_dump({"version": 1, "resources": [{
+                    "id": "hero", "type": "image", "role": "home.hero", "impact": "critical",
+                    "sourcing": {"mode": "comparative", "allowed_sources": ["blockedstock"]},
+                }]}), encoding="utf-8"
+            )
+            (client / "resources" / "candidates.yaml").write_text(
+                yaml.safe_dump({"version": 1, "candidates": {"hero": [{
+                    "id": "blocked-1", "source": "blockedstock", "type": "image", "role": "home.hero"
+                }]}}), encoding="utf-8"
+            )
+            (client / "resources" / "selection.yaml").write_text(
+                yaml.safe_dump({"version": 1, "selections": {"hero": {"primary": "blocked-1"}}}), encoding="utf-8"
+            )
+            (client / "resources" / "provenance.yaml").write_text(
+                yaml.safe_dump({"version": 1, "resources": {"blocked-1": {
+                    "source": "blockedstock", "usage_status": "prototype-approved"
+                }}}), encoding="utf-8"
+            )
+            errors = validator.validate_resource_artifacts(root, client)
+            self.assertTrue(any("blocked provider" in error for error in errors))
 
     def test_normalizer_emits_canonical_semantic_ids(self):
         normalizer = importlib.import_module("tooling.resources.normalizer")
