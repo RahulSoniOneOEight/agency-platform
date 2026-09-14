@@ -1,0 +1,9 @@
+client_id: prototype-demo
+findings:
+- severity: medium
+  screen: home
+  direction: b
+  viewport: 390x844
+  issue: Trade summary cards require compact spacing review on narrow mobile widths.
+  status: accepted
+  evidence: prototype/screenshots/b-mobile-medium-390x844.png
