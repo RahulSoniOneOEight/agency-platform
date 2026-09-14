@@ -26,6 +26,7 @@ TEMPLATE_FILES = [
     "workflow-state.yaml",
     "approved-experience.yaml",
 ]
+RESERVED_PROJECT_DIRS = {"schema", "examples"}
 
 
 def validate_workflow_file(path: Path) -> list[str]:
@@ -112,7 +113,11 @@ def validate_runtime(root: Path) -> list[str]:
     projects = root / "client-projects"
     if projects.exists():
         for client_dir in sorted(projects.iterdir()):
-            if not client_dir.is_dir() or client_dir.name == "schema" or client_dir.name.startswith("."):
+            if (
+                not client_dir.is_dir()
+                or client_dir.name in RESERVED_PROJECT_DIRS
+                or client_dir.name.startswith(".")
+            ):
                 continue
             errors.extend(validate_client(root, client_dir))
     return errors
