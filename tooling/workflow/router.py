@@ -7,6 +7,7 @@ import yaml
 
 from tooling.prototype.approved_experience import validate_approved_experience
 from tooling.prototype.validate_visual_qa import unresolved_critical_findings, validate_visual_findings
+from tooling.workflow.client_input import blocking_open_questions, validate_client_input
 
 
 def _is_skipped(state: dict[str, Any], stage: str) -> bool:
@@ -34,11 +35,16 @@ def _load_yaml(path: Path) -> dict[str, Any]:
 def next_stage(root: Path, client_dir: Path, state: dict[str, Any]) -> dict[str, Any]:
     completed = set(state.get("completed", []))
 
+    if validate_client_input(root, client_dir):
+        return {"stage": "client-intake", "status": "blocked", "reason": "client-input-invalid"}
+    if blocking_open_questions(client_dir):
+        return {"stage": "client-intake", "status": "blocked", "reason": "blocking-open-questions"}
+
     if "client-intake" not in completed:
         return {"stage": "client-intake", "status": "ready"}
 
-    if not (client_dir / "client-profile.yaml").exists():
-        return {"stage": "client-intake", "status": "blocked", "reason": "client-profile-missing"}
+    if not (client_dir / "derived" / "client-profile.yaml").exists():
+        return {"stage": "client-intake", "status": "blocked", "reason": "derived-client-profile-missing"}
 
     if "resolve-intelligence" not in completed:
         return {"stage": "resolve-intelligence", "status": "ready"}

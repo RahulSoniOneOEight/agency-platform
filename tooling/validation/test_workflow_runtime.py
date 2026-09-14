@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -27,9 +28,36 @@ PROFILE = {
 }
 
 
+def _install_input_schemas(root: Path) -> None:
+    dst = root / "client-projects" / "schema" / "input"
+    dst.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(ROOT / "client-projects" / "schema" / "input", dst, dirs_exist_ok=True)
+
+
+def _write_index(client: Path, *, modules: dict | None = None, collections: dict | None = None) -> None:
+    (client / "input").mkdir(parents=True, exist_ok=True)
+    (client / "input" / "client-input.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "version": 1,
+                "client": {"id": "acme", "display_name": "ACME"},
+                "source_status": "client_supplied",
+                "modules": modules or {},
+                "collections": collections or {},
+                "unresolved_input": False,
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+
 def write_early_artifacts(client: Path) -> None:
+    _install_input_schemas(client.parents[1])
     client.mkdir(parents=True, exist_ok=True)
-    (client / "client-profile.yaml").write_text(yaml.safe_dump(PROFILE), encoding="utf-8")
+    (client / "derived").mkdir(parents=True, exist_ok=True)
+    _write_index(client)
+    (client / "derived" / "client-profile.yaml").write_text(yaml.safe_dump(PROFILE), encoding="utf-8")
     (client / "resolved-intelligence.yaml").write_text("active_presets: []\n", encoding="utf-8")
 
 
@@ -145,8 +173,7 @@ class WorkflowRuntimeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             client = root / "client-projects" / "acme"
-            client.mkdir(parents=True)
-            (client / "client-profile.yaml").write_text(yaml.safe_dump(PROFILE), encoding="utf-8")
+            write_early_artifacts(client)
             state = initial_state("acme")
             state["completed"] = ["client-intake"]
             state["current_stage"] = "resolve-intelligence"
@@ -204,6 +231,7 @@ class WorkflowRuntimeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "client-projects").mkdir()
+            _install_input_schemas(root)
             client = root / "client-projects" / "acme"
             write_early_artifacts(client)
             directions = client / "directions"
@@ -215,6 +243,96 @@ class WorkflowRuntimeTests(unittest.TestCase):
             save_state(client / "workflow-state.yaml", state)
             errors = validate_client(root, client)
             self.assertEqual([], errors)
+
+    def test_router_blocks_intake_when_client_input_invalid(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _install_input_schemas(root)
+            client = root / "client-projects" / "acme"
+            (client / "input").mkdir(parents=True)
+            (client / "input" / "client-input.yaml").write_text("foo: [1, 2", encoding="utf-8")
+            state = initial_state("acme")
+            result = next_stage(root, client, state)
+            self.assertEqual("client-intake", result["stage"])
+            self.assertEqual("blocked", result["status"])
+            self.assertEqual("client-input-invalid", result["reason"])
+
+    def test_router_blocks_intake_when_blocking_question_open(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _install_input_schemas(root)
+            client = root / "client-projects" / "acme"
+            (client / "input").mkdir(parents=True)
+            (client / "input" / "open-questions.yaml").write_text(
+                yaml.safe_dump(
+                    {
+                        "version": 1,
+                        "provided": True,
+                        "questions": [
+                            {"id": "q1", "question": "Who approves?", "status": "open", "blocking": True}
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            _write_index(client, modules={"open_questions": "open-questions.yaml"})
+            state = initial_state("acme")
+            result = next_stage(root, client, state)
+            self.assertEqual("client-intake", result["stage"])
+            self.assertEqual("blocked", result["status"])
+            self.assertEqual("blocking-open-questions", result["reason"])
+
+    def test_router_requires_derived_client_profile_after_intake(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _install_input_schemas(root)
+            client = root / "client-projects" / "acme"
+            _write_index(client)
+            state = initial_state("acme")
+            state["completed"] = ["client-intake"]
+            result = next_stage(root, client, state)
+            self.assertEqual("client-intake", result["stage"])
+            self.assertEqual("blocked", result["status"])
+            self.assertEqual("derived-client-profile-missing", result["reason"])
+
+    def test_router_allows_intake_progress_with_valid_nonblocking_inputs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _install_input_schemas(root)
+            client = root / "client-projects" / "acme"
+            (client / "input").mkdir(parents=True)
+            (client / "input" / "open-questions.yaml").write_text(
+                yaml.safe_dump(
+                    {
+                        "version": 1,
+                        "provided": True,
+                        "questions": [
+                            {"id": "q1", "question": "Tone?", "status": "resolved", "blocking": True}
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            _write_index(client, modules={"open_questions": "open-questions.yaml"})
+            state = initial_state("acme")
+            result = next_stage(root, client, state)
+            self.assertEqual("client-intake", result["stage"])
+            self.assertEqual("ready", result["status"])
+
+    def test_validate_client_rejects_root_only_profile(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "client-projects").mkdir()
+            _install_input_schemas(root)
+            client = root / "client-projects" / "acme"
+            write_early_artifacts(client)
+            (client / "derived" / "client-profile.yaml").unlink()
+            (client / "client-profile.yaml").write_text(yaml.safe_dump(PROFILE), encoding="utf-8")
+            state = initial_state("acme")
+            state["completed"] = ["client-intake"]
+            save_state(client / "workflow-state.yaml", state)
+            errors = validate_client(root, client)
+            self.assertTrue(any("derived" in e and "client-profile.yaml" in e for e in errors))
 
     def test_repository_runtime_contract_validates(self):
         root = Path(__file__).resolve().parents[2]
