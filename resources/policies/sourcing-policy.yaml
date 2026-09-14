@@ -1,0 +1,29 @@
+version: 1
+modes:
+  authoritative:
+    description: Use only client-owned or explicitly official sources.
+    search_when_client_exists: false
+  prefer_client:
+    description: Prefer a suitable client asset; research alternatives only when fit or quality is insufficient.
+    search_when_client_exists: conditional
+  comparative:
+    description: Compare client, agency, and approved external candidates even when client assets exist.
+    search_when_client_exists: true
+  discovery:
+    description: Actively research approved sources to explore stronger or differentiated visual options.
+    search_when_client_exists: true
+role_defaults:
+  brand.logo: authoritative
+  product.primary: authoritative
+  seller.logo: authoritative
+  home.hero: comparative
+  campaign.banner: comparative
+  category.hero: comparative
+  category.supporting: prefer_client
+  editorial.image: discovery
+  navigation.icon: agency_registry
+  action.icon: agency_registry
+  motion.state: agency_registry
+client_preference_bonus:
+  prefer_client: 0.08
+  comparative: 0.0

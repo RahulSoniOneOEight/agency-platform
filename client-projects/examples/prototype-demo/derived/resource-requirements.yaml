@@ -1,0 +1,32 @@
+version: 1
+resources:
+  - id: brand-logo
+    type: image
+    role: brand.logo
+    impact: critical
+    sourcing:
+      mode: authoritative
+      allowed_sources: [client, official]
+    requirements:
+      subject: Prototype Demo brand logo
+  - id: home-hero
+    type: image
+    role: home.hero
+    impact: critical
+    sourcing:
+      mode: comparative
+      allowed_sources: [client, agency, pexels]
+    requirements:
+      subject: premium electronics retail
+      aspect_ratio: "16:9"
+      orientation: landscape
+      text_safe_area: left
+  - id: cart-icon
+    type: icon
+    role: icon.commerce.cart
+    impact: high
+    sourcing:
+      mode: prefer_client
+      allowed_sources: [agency]
+    requirements:
+      semantic_intent: cart

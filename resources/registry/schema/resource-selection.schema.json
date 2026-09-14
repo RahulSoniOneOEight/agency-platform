@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["version", "selections"],
+  "$defs": {
+    "selection": {
+      "type": "object",
+      "required": ["primary"],
+      "properties": {
+        "primary": {"type": "string", "minLength": 1},
+        "fallback": {"type": ["string", "null"]},
+        "rationale": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": true
+    }
+  },
+  "properties": {
+    "version": {"const": 1},
+    "selections": {
+      "type": "object",
+      "additionalProperties": {"$ref": "#/$defs/selection"}
+    },
+    "direction_overrides": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": {"$ref": "#/$defs/selection"}
+      }
+    }
+  },
+  "additionalProperties": true
+}

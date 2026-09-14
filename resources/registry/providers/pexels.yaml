@@ -10,4 +10,10 @@ allowed_use: [prototype-search, demo-assets]
 blocked_use: [unreviewed-redistribution]
 normalization_required: false
 code_reuse_allowed: false
+auth:
+  type: environment
+  variable: PEXELS_API_KEY
+search:
+  endpoint: https://api.pexels.com/v1/search
+  network_in_ci: false
 tags: [stock, imagery]

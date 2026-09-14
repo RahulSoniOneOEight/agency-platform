@@ -6,6 +6,7 @@ Generate the best 2–3 client-specific product strategies from the client conte
 ## READ
 - `client-projects/<client>/derived/client-profile.yaml`
 - `client-projects/<client>/resolved-intelligence.yaml`
+- `client-projects/<client>/derived/resource-requirements.yaml` when present
 - `client-projects/<client>/resources/selection.yaml` when present
 - `experience-patterns/`
 - `design-contract/`
@@ -21,6 +22,7 @@ Generate the best 2–3 client-specific product strategies from the client conte
 5. Enforce strategic diversity across information architecture, primary journey, navigation, discovery/merchandising, interaction model, transaction model, density, personalization, or procurement/service logic.
 6. Select the best three when three materially different viable strategies exist; otherwise select two and explain why.
 7. State rationale, strengths, trade-offs, risks, success metrics, and implementation implications.
+8. Where directions need materially different high-impact imagery or motion, record direction-specific resource implications without bypassing the B.1C selection/provenance contracts.
 
 ## WRITE
 - `client-projects/<client>/directions/direction-a.yaml`
@@ -37,6 +39,7 @@ Generate the best 2–3 client-specific product strategies from the client conte
 - Do not force Discovery-first, Search-first, or Trade-first merely because they are default archetypes.
 - Do not create theme/color-only alternatives.
 - Do not begin Flutter implementation in this stage.
+- Do not embed raw provider URLs or bypass resource provenance in directions.
 
 ## NEXT
 `05-build-prototype.md`
