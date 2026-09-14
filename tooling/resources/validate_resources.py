@@ -14,10 +14,22 @@ _SCHEMA_NAMES = {
     "provenance": "resource-provenance.schema.json",
 }
 
+_INTERNAL_SOURCES = {"client", "agency", "official"}
+_ALLOWED_PROVIDER_STATUSES = {"approved", "approved_with_rules"}
+
 
 def _load_yaml(path: Path) -> dict:
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
     return data if isinstance(data, dict) else {}
+
+
+def _provider_status(root: Path, source: str) -> str | None:
+    path = root / "resources" / "registry" / "providers" / f"{source}.yaml"
+    if not path.exists():
+        return None
+    data = _load_yaml(path)
+    status = data.get("status")
+    return str(status) if status is not None else None
 
 
 def validate_resource_artifacts(root: Path, client_dir: Path) -> list[str]:
@@ -60,9 +72,20 @@ def validate_resource_artifacts(root: Path, client_dir: Path) -> list[str]:
         if candidate is None:
             errors.append(f"selection {requirement_id!r} references unknown candidate {selection.get('primary')!r}")
             continue
+
+        source = str(candidate.get("source") or "")
         mode = (requirement.get("sourcing") or {}).get("mode")
-        if mode == "authoritative" and candidate.get("source") not in {"client", "official", "agency"}:
-            errors.append(f"authoritative resource {requirement_id!r} uses unauthorized source {candidate.get('source')!r}")
-        if candidate.get("source") not in {"client", "agency"} and candidate.get("id") not in provenance:
-            errors.append(f"external resource {candidate.get('id')!r} missing provenance")
+        if mode == "authoritative" and source not in _INTERNAL_SOURCES:
+            errors.append(f"authoritative resource {requirement_id!r} uses unauthorized source {source!r}")
+
+        if source not in _INTERNAL_SOURCES:
+            provider_status = _provider_status(root, source)
+            if provider_status == "blocked":
+                errors.append(f"external resource {candidate.get('id')!r} uses blocked provider {source!r}")
+            elif provider_status not in _ALLOWED_PROVIDER_STATUSES:
+                errors.append(
+                    f"external resource {candidate.get('id')!r} uses unapproved or unknown provider {source!r}"
+                )
+            if candidate.get("id") not in provenance:
+                errors.append(f"external resource {candidate.get('id')!r} missing provenance")
     return errors
