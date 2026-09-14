@@ -1,13 +1,32 @@
 id: b
 name: Trade Dashboard
+archetype: trade-first
+strategy_family: trade
+thesis: Increase repeat ordering and account self-service for existing trade customers.
 strategic_goal: increase repeat ordering and account self-service
-navigation: dashboard
-primary_journey: reorder-to-order
+primary_personas: [trade-buyer]
+primary_jobs: [reorder, review-account]
+rationale: Existing customers benefit from account visibility and low-friction reordering.
+information_architecture: [dashboard, reorder, cart]
+navigation:
+  model: dashboard
+primary_journey:
+  id: reorder-to-order
+  steps: [dashboard, reorder, cart, checkout]
+secondary_journeys: []
 discovery_model: account-history
-merchandising: reorder-and-credit
-density: balanced
+search:
+  prominence: medium
+merchandising:
+  emphasis: reorder-and-credit
+density: normal
 transaction_model: account-ordering
 patterns: [trade-dashboard, reorder, cart]
-components: [credit-summary, quote-card, product-card]
+components: [commerce.credit-summary, commerce.quote-card, commerce.product-card]
+component_variants: []
+required_resources: []
 strengths: [strong repeat-order workflow, account visibility]
 tradeoffs: [weaker first-time catalogue discovery]
+risks: [requires purchase history data]
+success_metrics: [repeat-order-rate]
+score: 0.8

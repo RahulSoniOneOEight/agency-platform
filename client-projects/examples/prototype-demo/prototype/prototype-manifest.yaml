@@ -3,12 +3,15 @@ client_id: prototype-demo
 runtime: apps/prototype_app
 default_direction: a
 directions:
-  a: directions/direction-a.yaml
-  b: directions/direction-b.yaml
-  c: directions/direction-c.yaml
+  a: prototype/runtime/direction-a.json
+  b: prototype/runtime/direction-b.json
+  c: prototype/runtime/direction-c.json
 fixture_pack: prototype/fixtures/demo.yaml
 theme:
   seed_color: '#6750A4'
 review:
   query_parameter: direction
-  allowed_values: [a, b, c]
+  allowed_values:
+  - a
+  - b
+  - c

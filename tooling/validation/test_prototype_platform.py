@@ -222,6 +222,13 @@ class PrototypePlatformTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[2]
         self.assertEqual([], validate_prototype_platform(root))
 
+    def test_reference_example_directions_are_canonical(self):
+        root = Path(__file__).resolve().parents[2]
+        directions = root / "client-projects" / "examples" / "prototype-demo" / "directions"
+        for direction_id in ("a", "b", "c"):
+            data = yaml.safe_load((directions / f"direction-{direction_id}.yaml").read_text(encoding="utf-8"))
+            self.assertEqual([], validate_direction(data), direction_id)
+
 
 if __name__ == "__main__":
     unittest.main()

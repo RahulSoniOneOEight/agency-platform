@@ -1,6 +1,9 @@
 version: 1
 client_id: prototype-demo
-directions: [a, b, c]
+directions:
+- a
+- b
+- c
 viewports:
 - name: mobile-small
   width: 360

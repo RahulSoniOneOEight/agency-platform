@@ -1,13 +1,36 @@
 id: a
 name: Search-led Trade
+archetype: search-first
+strategy_family: search
+thesis: Reduce time from intent to transaction for known-SKU trade buyers.
 strategic_goal: reduce known-item order time
-navigation: search-led
-primary_journey: search-to-order
+primary_personas: [trade-buyer]
+primary_jobs: [find-and-order-known-sku]
+rationale: Known-SKU buyers benefit from direct search and dense decision support.
+information_architecture: [home, search, plp, pdp, cart]
+navigation:
+  model: search-led
+primary_journey:
+  id: search-to-order
+  steps: [search, pdp, cart, checkout]
+secondary_journeys:
+  - id: browse-to-order
+    steps: [home, plp, pdp, cart]
 discovery_model: sku-search
-merchandising: availability-and-price
-density: dense
+search:
+  prominence: high
+merchandising:
+  emphasis: availability-and-price
+density: compact
 transaction_model: checkout-plus-rfq
-patterns: [search, plp, pdp, cart, rfq]
-components: [product-card, price-display, search-field, quote-card]
+patterns: [commerce.search, commerce.plp, commerce.pdp, cart, commerce.rfq]
+components: [commerce.product-card, commerce.price-display, commerce.search-field, commerce.quote-card]
+component_variants:
+  - component: commerce.product-card
+    variant: b2b
+required_resources: []
 strengths: [fast SKU discovery, high information density]
 tradeoffs: [less inspirational discovery]
+risks: [depends on catalog data quality]
+success_metrics: [time-to-cart]
+score: 0.9
