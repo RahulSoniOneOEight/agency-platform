@@ -58,7 +58,8 @@ def _write_client(root: Path, direction_ids: list[str]) -> Path:
         "use_cases": ["rfq"], "objectives": ["reduce-order-time"],
         "personas": ["trade-buyer"], "jobs": ["request-quote"], "platforms": ["web"],
     }
-    (client / "client-profile.yaml").write_text(yaml.safe_dump(profile), encoding="utf-8")
+    (client / "derived").mkdir(parents=True)
+    (client / "derived" / "client-profile.yaml").write_text(yaml.safe_dump(profile), encoding="utf-8")
     for direction_id in direction_ids:
         (directions / f"direction-{direction_id}.yaml").write_text(
             yaml.safe_dump(valid_strategic_direction(direction_id)), encoding="utf-8"
@@ -188,6 +189,23 @@ class PrototypePlatformTests(unittest.TestCase):
             root = Path(tmp)
             client = _write_client(root, ["a", "b", "c", "d"])
             with self.assertRaisesRegex(ValueError, "at most 3 directions"):
+                compose_prototype(root, client)
+
+    def test_composer_rejects_root_only_profile(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            client = root / "client-projects" / "acme"
+            directions = client / "directions"
+            directions.mkdir(parents=True)
+            (client / "client-profile.yaml").write_text(
+                yaml.safe_dump({"id": "acme", "industry": "electronics-appliances"}), encoding="utf-8"
+            )
+            for direction_id in ("a", "b"):
+                (directions / f"direction-{direction_id}.yaml").write_text(
+                    yaml.safe_dump(valid_strategic_direction(direction_id)), encoding="utf-8"
+                )
+            (directions / "comparison.yaml").write_text("recommended: a\n", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "derived/client-profile.yaml"):
                 compose_prototype(root, client)
 
     def test_recomposition_removes_stale_runtime_directions(self):

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["version", "provided", "assets"],
+  "properties": {
+    "version": {"const": 1},
+    "provided": {"type": "boolean"},
+    "assets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id"],
+        "properties": {"id": {"type": "string", "minLength": 1}},
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,7 @@
+version: 1
+provided: true
+questions:
+  - id: q1
+    question: Which of the two use cases (rfq, repeat-order) is the higher business priority?
+    status: open
+    blocking: false

@@ -7,6 +7,7 @@ import yaml
 
 from tooling.prototype.approved_experience import validate_approved_experience
 from tooling.prototype.validate_visual_qa import unresolved_critical_findings, validate_visual_findings
+from tooling.workflow.client_input import blocking_open_questions, validate_client_input
 from tooling.workflow.state import STAGES, STATUSES, load_state
 
 
@@ -81,7 +82,7 @@ def validate_client(root: Path, client_dir: Path) -> list[str]:
     completed = set(state.get("completed", []))
 
     required: dict[str, list[Path]] = {
-        "client-intake": [client_dir / "client-profile.yaml"],
+        "client-intake": [client_dir / "derived" / "client-profile.yaml"],
         "resolve-intelligence": [client_dir / "resolved-intelligence.yaml"],
         "resource-research": [client_dir / "resources" / "selection.yaml"],
         "generate-directions": [
@@ -101,6 +102,11 @@ def validate_client(root: Path, client_dir: Path) -> list[str]:
             for path in paths:
                 if not path.exists():
                     errors.append(f"{client_dir}: completed {stage} but missing {path.relative_to(client_dir)}")
+
+    if "client-intake" in completed:
+        errors.extend(f"{client_dir}: {error}" for error in validate_client_input(root, client_dir))
+        if blocking_open_questions(client_dir):
+            errors.append(f"{client_dir}: client-intake blocked by unresolved blocking questions")
 
     if "visual-qa" in completed:
         findings_path = client_dir / "prototype" / "qa" / "visual-findings.yaml"

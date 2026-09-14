@@ -4,9 +4,9 @@
 Find and govern external/client resources needed by the selected experience context.
 
 ## READ
-- `client-projects/<client>/client-profile.yaml`
+- `client-projects/<client>/derived/client-profile.yaml`
 - `client-projects/<client>/resolved-intelligence.yaml`
-- `client-projects/<client>/references/`
+- `client-projects/<client>/input/references/`
 - `resources/registry/`
 - `resources/policies/`
 - `REFERENCE_POLICY.md`

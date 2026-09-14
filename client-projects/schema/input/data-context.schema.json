@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["version", "provided", "entities"],
+  "properties": {
+    "version": {"const": 1},
+    "provided": {"type": "boolean"},
+    "entities": {"type": "array", "items": {"type": "object"}}
+  },
+  "additionalProperties": true
+}

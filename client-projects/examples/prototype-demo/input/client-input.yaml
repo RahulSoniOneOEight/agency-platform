@@ -1,0 +1,15 @@
+version: 1
+client:
+  id: prototype-demo
+  display_name: Prototype Demo
+source_status: client_supplied
+modules:
+  user_groups: user-groups.yaml
+  journey_priorities: journey-priorities.yaml
+  feature_requirements: feature-requirements.yaml
+  platform_requirements: platform-requirements.yaml
+  constraints: constraints.yaml
+  open_questions: open-questions.yaml
+collections:
+  brand: brand/brand-input.yaml
+unresolved_input: true

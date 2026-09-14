@@ -4,7 +4,7 @@
 Generate the best 2–3 client-specific product strategies from the client context and shared agency intelligence.
 
 ## READ
-- `client-projects/<client>/client-profile.yaml`
+- `client-projects/<client>/derived/client-profile.yaml`
 - `client-projects/<client>/resolved-intelligence.yaml`
 - `client-projects/<client>/resources/selection.yaml` when present
 - `experience-patterns/`

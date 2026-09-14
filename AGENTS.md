@@ -173,7 +173,7 @@ external source
 For platform changes run:
 
 ```text
-python -m unittest tooling.validation.test_validate_repo tooling.validation.test_knowledge_platform tooling.validation.test_workflow_runtime tooling.validation.test_prototype_platform tooling.validation.test_prototype_workflow_integration -v
+python -m unittest tooling.validation.test_validate_repo tooling.validation.test_knowledge_platform tooling.validation.test_workflow_runtime tooling.validation.test_client_input_contract tooling.validation.test_prototype_platform tooling.validation.test_prototype_workflow_integration -v
 python tooling/validation/validate_repo.py
 python -m tooling.knowledge.validate_knowledge
 python -m tooling.workflow.validate_workflow

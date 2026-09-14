@@ -1,0 +1,6 @@
+version: 1
+provided: true
+facts:
+  - key: name
+    value: prototype-demo
+files: []

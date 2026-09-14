@@ -37,9 +37,9 @@ def _discover_direction_paths(client_dir: Path) -> list[tuple[str, Path]]:
 
 def compose_prototype(root: Path, client_dir: Path) -> Path:
     del root
-    profile_path = client_dir / "client-profile.yaml"
+    profile_path = client_dir / "derived" / "client-profile.yaml"
     if not profile_path.exists():
-        raise ValueError("client-profile.yaml missing")
+        raise ValueError("derived/client-profile.yaml missing")
     profile = _load_yaml(profile_path)
     industry = profile.get("industry")
     if not isinstance(industry, str):
