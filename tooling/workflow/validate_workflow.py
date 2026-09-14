@@ -5,6 +5,8 @@ from typing import Any
 
 import yaml
 
+from tooling.prototype.approved_experience import validate_approved_experience
+from tooling.prototype.validate_visual_qa import unresolved_critical_findings, validate_visual_findings
 from tooling.workflow.state import STAGES, STATUSES, load_state
 
 
@@ -26,6 +28,7 @@ TEMPLATE_FILES = [
     "workflow-state.yaml",
     "approved-experience.yaml",
 ]
+RESERVED_PROJECT_DIRS = {"schema", "examples"}
 
 
 def validate_workflow_file(path: Path) -> list[str]:
@@ -60,6 +63,11 @@ def _validate_state(state: dict[str, Any], label: str) -> list[str]:
     return errors
 
 
+def _load_yaml(path: Path) -> dict:
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    return data if isinstance(data, dict) else {}
+
+
 def validate_client(root: Path, client_dir: Path) -> list[str]:
     errors: list[str] = []
     state_path = client_dir / "workflow-state.yaml"
@@ -82,6 +90,11 @@ def validate_client(root: Path, client_dir: Path) -> list[str]:
             client_dir / "directions" / "direction-c.yaml",
             client_dir / "directions" / "comparison.yaml",
         ],
+        "build-prototype": [client_dir / "prototype" / "prototype-manifest.yaml"],
+        "visual-qa": [
+            client_dir / "prototype" / "qa" / "screenshot-manifest.yaml",
+            client_dir / "prototype" / "qa" / "visual-findings.yaml",
+        ],
         "client-review": [client_dir / "approved-experience.yaml"],
     }
     for stage, paths in required.items():
@@ -90,8 +103,22 @@ def validate_client(root: Path, client_dir: Path) -> list[str]:
                 if not path.exists():
                     errors.append(f"{client_dir}: completed {stage} but missing {path.relative_to(client_dir)}")
 
-    if "productionize" in completed and not (client_dir / "approved-experience.yaml").exists():
-        errors.append(f"{client_dir}: productionize requires approved-experience.yaml")
+    if "visual-qa" in completed:
+        findings_path = client_dir / "prototype" / "qa" / "visual-findings.yaml"
+        if findings_path.exists():
+            findings = _load_yaml(findings_path)
+            errors.extend(f"{client_dir}: {error}" for error in validate_visual_findings(findings))
+            if unresolved_critical_findings(findings):
+                errors.append(f"{client_dir}: visual-qa completed with unresolved critical findings")
+
+    if "client-review" in completed and (client_dir / "approved-experience.yaml").exists():
+        errors.extend(f"{client_dir}: {error}" for error in validate_approved_experience(root, client_dir))
+
+    if "productionize" in completed:
+        if not (client_dir / "approved-experience.yaml").exists():
+            errors.append(f"{client_dir}: productionize requires approved-experience.yaml")
+        else:
+            errors.extend(f"{client_dir}: {error}" for error in validate_approved_experience(root, client_dir))
     return errors
 
 
@@ -112,7 +139,11 @@ def validate_runtime(root: Path) -> list[str]:
     projects = root / "client-projects"
     if projects.exists():
         for client_dir in sorted(projects.iterdir()):
-            if not client_dir.is_dir() or client_dir.name == "schema" or client_dir.name.startswith("."):
+            if (
+                not client_dir.is_dir()
+                or client_dir.name in RESERVED_PROJECT_DIRS
+                or client_dir.name.startswith(".")
+            ):
                 continue
             errors.extend(validate_client(root, client_dir))
     return errors

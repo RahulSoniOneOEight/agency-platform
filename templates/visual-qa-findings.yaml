@@ -1,0 +1,10 @@
+version: 1
+client_id: example-client
+findings:
+  - severity: medium
+    screen: home
+    direction: a
+    viewport: 390x844
+    issue: Example issue description
+    evidence: null
+    status: open

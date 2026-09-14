@@ -1,0 +1,8 @@
+id: prototype-demo
+business_model: b2b
+industry: electronics-appliances
+use_cases: [rfq, repeat-order]
+objectives: [reduce-order-time, increase-repeat-orders]
+personas: [trade-buyer, procurement-manager]
+jobs: [find-sku, reorder, request-quote]
+platforms: [web, mobile]

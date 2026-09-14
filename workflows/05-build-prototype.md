@@ -1,30 +1,39 @@
 # Build Prototype
 
 ## PURPOSE
-Turn validated Experience Directions into runnable prototypes using the agency Flutter platform.
+Turn validated Experience Directions into a runnable A/B/C prototype using the shared Flutter platform.
 
 ## READ
-- Validated `directions/`
+- `client-projects/<client>/client-profile.yaml`
+- validated `client-projects/<client>/directions/`
 - `design-contract/`
 - `packages/agency_flutter_ui/`
-- Flutter starter(s) when Milestone B exists
-- selected resources and fixtures
+- `apps/prototype_app/`
+- selected resources where applicable
 
 ## PROCESS
-1. Confirm Milestone B prototype platform is installed.
-2. If absent, return `blocked: prototype-platform-not-installed` and stop.
-3. When available, compose runnable direction-aware Flutter prototypes from shared contracts and client configuration.
+1. Validate direction A/B/C structure and strategic distinctiveness.
+2. Run the prototype composer; do not copy the shared Flutter runtime into the client folder.
+3. Generate deterministic fixture data appropriate to the client industry.
+4. Write the client prototype manifest referencing `apps/prototype_app`.
+5. Confirm the shared Flutter app analyzes, tests, and builds for web.
+6. Use `?client=<id>&direction=a|b|c` or the internal selector to review each direction.
 
 ## WRITE
-- Prototype implementation under `client-projects/<client>/app/`
-- Demo fixtures required by the prototype
+- `client-projects/<client>/prototype/prototype-manifest.yaml`
+- `client-projects/<client>/prototype/fixtures/demo.yaml`
+- `client-projects/<client>/prototype/qa/screenshot-manifest.yaml`
 
 ## VALIDATE
-Prototype must build successfully before the stage can complete.
+- Prototype manifest exists and references the shared runtime.
+- A/B/C directions resolve only known patterns/components.
+- Flutter prototype app builds successfully.
 
 ## DO NOT
-- Do not invent a parallel React/Flutter implementation when the prototype platform is absent.
+- Do not create three separate Flutter apps for A/B/C.
+- Do not copy shared Flutter source into the client workspace.
 - Do not bypass validated Experience Directions.
+- Do not add production backend integrations in this stage.
 
 ## NEXT
 `06-visual-qa.md`

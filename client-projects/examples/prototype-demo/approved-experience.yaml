@@ -1,0 +1,12 @@
+version: 1
+client_id: prototype-demo
+selection:
+  mode: mixed
+  base_direction: a
+sections:
+  home:
+    source_direction: b
+  search:
+    source_direction: a
+  procurement:
+    source_direction: c

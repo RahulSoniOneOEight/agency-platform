@@ -1,0 +1,26 @@
+version: 1
+client_id: prototype-demo
+directions: [a, b, c]
+viewports:
+- name: mobile-small
+  width: 360
+  height: 800
+- name: mobile-medium
+  width: 390
+  height: 844
+- name: mobile-large
+  width: 430
+  height: 932
+- name: tablet
+  width: 768
+  height: 1024
+- name: desktop
+  width: 1440
+  height: 900
+routes:
+- direction: a
+  path: /?client=prototype-demo&direction=a
+- direction: b
+  path: /?client=prototype-demo&direction=b
+- direction: c
+  path: /?client=prototype-demo&direction=c

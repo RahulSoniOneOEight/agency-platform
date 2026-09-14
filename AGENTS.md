@@ -13,7 +13,7 @@ Read it before architectural or structural changes. This operating contract must
 ## Source of truth
 
 - GitHub is the production source of truth.
-- Flutter is authoritative for production implementation.
+- Flutter is authoritative for executable prototype and production UI implementation.
 - OpenCode is the primary engineering/orchestration layer.
 - Penpot is optional for visual reference, selected prototypes, representative screens, and client review.
 - Do not depend on perfect Penpot ↔ Flutter round-tripping.
@@ -22,6 +22,7 @@ Read it before architectural or structural changes. This operating contract must
 
 Before reference discovery, evaluation, adoption, or normalization, read `REFERENCE_POLICY.md`.
 Before shared UI, tokens, components, patterns, variants, or themes, read `DESIGN_SYSTEM.md`.
+Before prototype composition or shared Flutter implementation, read `docs/prototype-platform.md`.
 Before completing meaningful UI work, read `VISUAL_QA.md`.
 Before Penpot-related work, read `PENPOT_MAPPING.md`.
 Before product-consulting or Experience Direction work, read `docs/knowledge-platform.md` and the relevant client profile, presets, design contracts, and experience patterns.
@@ -46,7 +47,7 @@ For an existing client, never infer progress from chat history or prose. The Git
 
 Every workflow file must contain `PURPOSE`, `READ`, `PROCESS`, `WRITE`, `VALIDATE`, `DO NOT`, and `NEXT`.
 
-Do not skip mandatory stages. `resource-research` may be skipped only when the state records a reason. If the router reports a structured block such as `prototype-platform-not-installed`, stop at that boundary instead of inventing another implementation path.
+Do not skip mandatory stages. `resource-research` may be skipped only when the state records a reason. Prototype, visual-QA, client-review, and productionization gates are artifact-aware and must not be bypassed.
 
 ## Knowledge Platform operating model
 
@@ -55,13 +56,12 @@ The shared knowledge layer has four responsibilities:
 1. **Design Intelligence** — `design-contract/` + `presets/` + metadata.
 2. **Resource Intelligence** — `resources/registry/` + source routing + normalization/provenance.
 3. **Product Consulting** — `experience-patterns/` + client profile + Experience Direction Engine.
-4. **Client Contract** — client selection/mixing produces `approved-experience.yaml` after prototype/client-review capability exists.
+4. **Client Contract** — client selection/mixing produces `approved-experience.yaml` after prototype and visual QA.
 
 Presets and experience patterns are hypotheses and reusable knowledge, not forced client outputs.
 `discovery-first`, `search-first`, and `trade-first` are candidate archetypes only. OpenCode must evaluate the actual client objectives, personas, jobs, business model, industry, use cases, constraints, design intelligence, resource availability, and references before selecting directions.
 
 For Experience Directions:
-
 1. resolve business-model + industry + use-case presets;
 2. inspect relevant design-contract components/patterns/journeys;
 3. inspect approved resource/reference context where needed;
@@ -73,11 +73,37 @@ For Experience Directions:
 
 Directions must differ materially in information architecture, primary journey, navigation, discovery model, merchandising, interaction model, transaction model, density, personalization, or procurement/service logic. Theme-only differences do not count.
 
+## Prototype Platform operating model
+
+Milestone B uses one shared Flutter system and one configurable prototype app.
+
+Required flow:
+
+```text
+validated A/B/C directions
+→ tooling.prototype composer
+→ client prototype manifest + deterministic fixtures
+→ apps/prototype_app
+→ shared agency_flutter_ui patterns/components
+→ screenshots + structured visual QA
+→ client selection/mixing
+→ approved-experience.yaml
+```
+
+Rules:
+- Never create separate A/B/C source trees.
+- Never copy shared Flutter source into a client directory.
+- `packages/agency_flutter_ui/` is the reusable implementation layer corresponding to `design-contract/`.
+- `apps/prototype_app/` is the shared client-review runtime.
+- `apps/widgetbook/` is the component/pattern review surface.
+- Client prototype directories store configuration, fixtures, screenshots, and QA artifacts only.
+- Production backend/ERP/auth/payment/shipping/CRM/WhatsApp/Supabase/n8n integrations do not belong in prototype composition.
+
 ## Mandatory lookup order
 
 Before creating any new reusable UI component, pattern, screen-level building block, or package-level implementation, check in this order:
 
-1. Current client application.
+1. Current client application/configuration.
 2. `packages/agency_flutter_ui/`.
 3. `design-contract/` components, patterns, journeys, and variants.
 4. Active business-model / industry / use-case presets.
@@ -91,7 +117,7 @@ Before creating any new reusable UI component, pattern, screen-level building bl
 Before creating a new reusable component or pattern, report:
 
 ```text
-Client app:
+Client app/config:
 Agency Flutter UI:
 Design contract:
 Active presets:
@@ -144,21 +170,22 @@ external source
 
 ## Validation
 
-For Knowledge Platform + Workflow Runtime changes run:
+For platform changes run:
 
 ```text
-python -m unittest tooling.validation.test_validate_repo tooling.validation.test_knowledge_platform tooling.validation.test_workflow_runtime -v
+python -m unittest tooling.validation.test_validate_repo tooling.validation.test_knowledge_platform tooling.validation.test_workflow_runtime tooling.validation.test_prototype_platform tooling.validation.test_prototype_workflow_integration -v
 python tooling/validation/validate_repo.py
 python -m tooling.knowledge.validate_knowledge
 python -m tooling.workflow.validate_workflow
+python -m tooling.prototype.validate_prototype
 ```
 
-All four must pass before completion.
+Flutter CI must additionally analyze/test initialized packages/apps and build `apps/prototype_app` for web.
 
 ## Visual completion rule
 
-Meaningful UI work is not complete based on Dart analysis or unit tests alone. Follow `VISUAL_QA.md`: render the UI, inspect the result, correct issues, and add golden regression coverage where appropriate.
+Meaningful UI work is not complete based on Dart analysis or unit tests alone. Follow `VISUAL_QA.md`: render A/B/C, inspect required viewports, record structured findings, correct issues, and add golden regression coverage where appropriate.
 
 ## Current scope guardrail
 
-Milestone A plus the Workflow Runtime provide machine-readable agency knowledge and deterministic stage orchestration. Do not add production Flutter components, starter implementations, production backends, Supabase, n8n, deployment pipelines, Penpot automation, or screenshot/vision automation as part of this runtime layer. Those belong to Milestone B+ unless explicitly authorized.
+Milestone B includes the shared Flutter prototype system, deterministic fixtures, Widgetbook, prototype composition, screenshot/visual-QA contracts, and client approval workflow. Production backend/ERP integrations, Supabase, n8n, production auth/payments/shipping/CRM/WhatsApp, deployment pipelines, and app-store release automation remain later milestones unless explicitly authorized.

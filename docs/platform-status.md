@@ -4,48 +4,37 @@
 
 - Step 1 — Control structure: merged.
 - Step 2 — OpenCode control + policy layer: merged.
+- Milestone A — Knowledge Platform: merged via PR #4.
+- Workflow Runtime Layer: merged via PR #5.
 
-## Milestone A — Knowledge Platform
+## Milestone B — Prototype Platform
 
-Implemented on `milestone-a-knowledge-platform` / PR #4:
+Implemented on `milestone-b-prototype-platform` / PR #6 pending review/merge:
 
-- Resource Registry foundation
-- seed GitHub Flutter references
-- Resource Intelligence provider/source routing
-- normalization schema + manifests
-- Shared Design Contract schemas + seed commerce contracts
-- business-model presets
-- 12 industry presets
-- use-case presets
-- Experience Pattern Library
-- client-profile schema + regression fixtures
-- preset resolver
-- deterministic design-contract index builder
-- Experience Direction Engine v1
-- Knowledge Platform schema + cross-reference validation
+- shared `packages/agency_flutter_ui` Flutter design-system implementation
+- semantic tokens + Material 3 theme
+- reusable primitives and commerce/trade components
+- canonical Flutter pattern registry and responsive pattern shells
+- one configurable `apps/prototype_app` runtime for A/B/C
+- query-parameter and internal direction switching
+- deterministic fixture generation for four initial industry packs
+- direction validation + direction-to-prototype composer
+- client prototype manifest/fixture/screenshot-manifest artifacts
+- `apps/widgetbook` review surface
+- standard screenshot viewport contract + capture-job planning
+- structured visual-QA findings and critical-issue gate
+- approved-experience validation for selected or mixed directions
+- Workflow Runtime activation through build-prototype → visual-qa → client-review
+- Prototype Platform validation and Flutter Web CI build
 
-## Workflow Runtime Layer
+## Still deferred to later milestones
 
-Implemented on `workflow-runtime-layer-v2` / PR #5:
-
-- repository-stored stage workflows
-- canonical client/output templates
-- client workspace initializer
-- machine-readable `workflow-state.yaml`
-- artifact-aware stage router
-- explicit optional resource-research skipping with reason
-- prototype-platform blocked boundary until Milestone B
-- approved-experience production gate
-- runtime validation + CI contract
-- OpenCode routing rules in `AGENTS.md`
-
-## Explicitly deferred to Milestone B+
-
-- production Flutter design-system widgets
-- Widgetbook
-- starter apps
-- direction-to-Flutter prototype composer
-- demo fixture generation runtime
-- automated screenshot/AI visual QA
-- client selection/mixing UI/runtime beyond the stored approved-experience contract
-- production backend/integrations
+- production backend/ERP integrations
+- production authentication and authorization
+- payment and shipping integrations
+- CRM/WhatsApp integrations
+- Supabase/Postgres operational runtime
+- n8n production workflows
+- production analytics/observability implementation
+- deployment/app-store release pipelines
+- automated browser screenshot execution in CI where no UI runner is available

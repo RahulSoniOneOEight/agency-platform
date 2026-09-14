@@ -1,0 +1,21 @@
+name: prototype_app
+description: Shared configurable agency prototype runtime.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  agency_flutter_ui:
+    path: ../../packages/agency_flutter_ui
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
