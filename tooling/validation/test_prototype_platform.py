@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -228,6 +229,70 @@ class PrototypePlatformTests(unittest.TestCase):
         for direction_id in ("a", "b", "c"):
             data = yaml.safe_load((directions / f"direction-{direction_id}.yaml").read_text(encoding="utf-8"))
             self.assertEqual([], validate_direction(data), direction_id)
+
+    def test_validation_detects_missing_runtime_artifact(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            client = _write_client(root, ["a", "b"])
+            compose_prototype(root, client)
+            (client / "prototype" / "runtime" / "direction-b.json").unlink()
+            errors = validate_prototype_platform(root)
+            self.assertTrue(any("runtime" in error and "direction-b" in error for error in errors))
+
+    def test_validation_detects_runtime_id_mismatch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            client = _write_client(root, ["a", "b"])
+            compose_prototype(root, client)
+            runtime_b = client / "prototype" / "runtime" / "direction-b.json"
+            data = json.loads(runtime_b.read_text(encoding="utf-8"))
+            data["id"] = "c"
+            runtime_b.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            errors = validate_prototype_platform(root)
+            self.assertTrue(any("expected 'b'" in error for error in errors))
+
+    def test_validation_detects_allowed_values_mismatch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            client = _write_client(root, ["a", "b"])
+            manifest_path = compose_prototype(root, client)
+            manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+            manifest["review"]["allowed_values"] = ["a"]
+            manifest_path.write_text(yaml.safe_dump(manifest, sort_keys=False), encoding="utf-8")
+            errors = validate_prototype_platform(root)
+            self.assertTrue(any("allowed_values" in error for error in errors))
+
+    def test_validation_reports_non_object_runtime_artifact(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            client = _write_client(root, ["a", "b"])
+            compose_prototype(root, client)
+            (client / "prototype" / "runtime" / "direction-b.json").write_text("[]", encoding="utf-8")
+            errors = validate_prototype_platform(root)
+            self.assertTrue(any("direction-b" in error for error in errors))
+
+    def test_validation_reports_non_string_runtime_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            client = _write_client(root, ["a", "b"])
+            manifest_path = compose_prototype(root, client)
+            manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+            manifest["directions"]["b"] = None
+            manifest_path.write_text(yaml.safe_dump(manifest, sort_keys=False), encoding="utf-8")
+            errors = validate_prototype_platform(root)
+            self.assertTrue(any("direction b" in error or "must be a string" in error for error in errors))
+
+    def test_validation_reports_unhashable_screenshot_directions(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            client = _write_client(root, ["a", "b"])
+            compose_prototype(root, client)
+            screenshot_path = client / "prototype" / "qa" / "screenshot-manifest.yaml"
+            screenshot = yaml.safe_load(screenshot_path.read_text(encoding="utf-8"))
+            screenshot["directions"] = [{"direction": "a"}]
+            screenshot_path.write_text(yaml.safe_dump(screenshot, sort_keys=False), encoding="utf-8")
+            errors = validate_prototype_platform(root)
+            self.assertTrue(any("screenshot manifest directions" in error for error in errors))
 
 
 if __name__ == "__main__":
