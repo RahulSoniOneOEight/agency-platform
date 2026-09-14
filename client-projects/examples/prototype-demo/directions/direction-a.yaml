@@ -1,0 +1,13 @@
+id: a
+name: Search-led Trade
+strategic_goal: reduce known-item order time
+navigation: search-led
+primary_journey: search-to-order
+discovery_model: sku-search
+merchandising: availability-and-price
+density: dense
+transaction_model: checkout-plus-rfq
+patterns: [search, plp, pdp, cart, rfq]
+components: [product-card, price-display, search-field, quote-card]
+strengths: [fast SKU discovery, high information density]
+tradeoffs: [less inspirational discovery]
