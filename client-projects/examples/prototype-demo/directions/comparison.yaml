@@ -1,0 +1,8 @@
+recommended: a
+comparison:
+  - direction: a
+    best_for: known-item ordering speed
+  - direction: b
+    best_for: repeat customers and account self-service
+  - direction: c
+    best_for: negotiated bulk procurement
