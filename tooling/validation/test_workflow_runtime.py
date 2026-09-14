@@ -8,8 +8,33 @@ import yaml
 
 from tooling.workflow.initialize_client import initialize_client
 from tooling.workflow.router import next_stage
-from tooling.workflow.state import initial_state, save_state
+from tooling.workflow.state import initial_state
 from tooling.workflow.validate_workflow import validate_runtime, validate_workflow_file
+
+
+PROFILE = {
+    "id": "acme",
+    "business_model": "b2b",
+    "industry": "electronics-appliances",
+    "use_cases": ["rfq"],
+    "objectives": ["grow-rfq"],
+    "personas": ["trade-buyer"],
+    "jobs": ["request-quote"],
+    "platforms": ["web"],
+}
+
+
+def write_early_artifacts(client: Path) -> None:
+    client.mkdir(parents=True, exist_ok=True)
+    (client / "client-profile.yaml").write_text(yaml.safe_dump(PROFILE), encoding="utf-8")
+    (client / "resolved-intelligence.yaml").write_text("active_presets: []\n", encoding="utf-8")
+
+
+def write_direction_artifacts(client: Path) -> None:
+    directions = client / "directions"
+    directions.mkdir(parents=True, exist_ok=True)
+    for name in ("direction-a.yaml", "direction-b.yaml", "direction-c.yaml", "comparison.yaml"):
+        (directions / name).write_text("id: sample\n", encoding="utf-8")
 
 
 class WorkflowRuntimeTests(unittest.TestCase):
@@ -54,19 +79,7 @@ class WorkflowRuntimeTests(unittest.TestCase):
             root = Path(tmp)
             client = root / "client-projects" / "acme"
             client.mkdir(parents=True)
-            (client / "client-profile.yaml").write_text(
-                yaml.safe_dump({
-                    "id": "acme",
-                    "business_model": "b2b",
-                    "industry": "electronics-appliances",
-                    "use_cases": ["rfq"],
-                    "objectives": ["grow-rfq"],
-                    "personas": ["trade-buyer"],
-                    "jobs": ["request-quote"],
-                    "platforms": ["web"],
-                }),
-                encoding="utf-8",
-            )
+            (client / "client-profile.yaml").write_text(yaml.safe_dump(PROFILE), encoding="utf-8")
             state = initial_state("acme")
             state["completed"] = ["client-intake"]
             state["current_stage"] = "resolve-intelligence"
@@ -76,8 +89,7 @@ class WorkflowRuntimeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             client = root / "client-projects" / "acme"
-            client.mkdir(parents=True)
-            (client / "resolved-intelligence.yaml").write_text("active_presets: []\n", encoding="utf-8")
+            write_early_artifacts(client)
             state = initial_state("acme")
             state["completed"] = ["client-intake", "resolve-intelligence"]
             state["skipped"] = [{"stage": "resource-research", "reason": "no-external-resources-required"}]
@@ -88,10 +100,8 @@ class WorkflowRuntimeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             client = root / "client-projects" / "acme"
-            directions = client / "directions"
-            directions.mkdir(parents=True)
-            for name in ("direction-a.yaml", "direction-b.yaml", "direction-c.yaml", "comparison.yaml"):
-                (directions / name).write_text("id: sample\n", encoding="utf-8")
+            write_early_artifacts(client)
+            write_direction_artifacts(client)
             state = initial_state("acme")
             state["completed"] = ["client-intake", "resolve-intelligence", "generate-directions"]
             state["skipped"] = [{"stage": "resource-research", "reason": "none-needed"}]
@@ -104,7 +114,8 @@ class WorkflowRuntimeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             client = root / "client-projects" / "acme"
-            client.mkdir(parents=True)
+            write_early_artifacts(client)
+            write_direction_artifacts(client)
             state = initial_state("acme")
             state["completed"] = [
                 "client-intake", "resolve-intelligence", "generate-directions",
@@ -118,7 +129,7 @@ class WorkflowRuntimeTests(unittest.TestCase):
     def test_workflow_file_missing_required_section_fails_validation(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "bad.md"
-            path.write_text("# PURPOSE\nDo a thing\n# READ\ninputs\n", encoding="utf-8")
+            path.write_text("## PURPOSE\nDo a thing\n## READ\ninputs\n", encoding="utf-8")
             errors = validate_workflow_file(path)
             self.assertTrue(errors)
             self.assertTrue(any("PROCESS" in error for error in errors))
