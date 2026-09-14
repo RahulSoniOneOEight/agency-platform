@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "id", "name", "strategic_goal", "navigation_model", "primary_journey",
+    "discovery_model", "merchandising_model", "density", "transaction_model",
+    "patterns", "components", "component_variants", "required_resources"
+  ],
+  "properties": {
+    "id": {"type": "string", "minLength": 1},
+    "name": {"type": "string", "minLength": 1},
+    "strategic_goal": {"type": "string", "minLength": 1},
+    "navigation_model": {"type": "string", "minLength": 1},
+    "primary_journey": {"type": "string", "minLength": 1},
+    "discovery_model": {"type": "string", "minLength": 1},
+    "merchandising_model": {"type": "string", "minLength": 1},
+    "density": {"enum": ["compact", "normal", "spacious"]},
+    "transaction_model": {"type": "string", "minLength": 1},
+    "patterns": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1},
+    "components": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1},
+    "component_variants": {"type": "array", "items": {"type": "object"}},
+    "required_resources": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": false
+}

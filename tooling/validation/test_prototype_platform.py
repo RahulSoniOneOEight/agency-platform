@@ -9,6 +9,7 @@ import yaml
 from tooling.prototype.approved_experience import validate_approved_experience
 from tooling.prototype.build_prototype import compose_prototype
 from tooling.prototype.fixture_generator import generate_fixture_pack
+from tooling.prototype.project_direction import project_direction, validate_runtime_direction
 from tooling.prototype.screenshot_manifest import build_screenshot_manifest
 from tooling.prototype.validate_direction import validate_direction
 from tooling.prototype.validate_prototype import validate_prototype_platform
@@ -61,6 +62,38 @@ class PrototypePlatformTests(unittest.TestCase):
 
     def test_canonical_strategic_direction_validates(self):
         self.assertEqual([], validate_direction(valid_strategic_direction("a")))
+
+    def test_direction_projection_is_deterministic(self):
+        strategic = valid_strategic_direction("a")
+        self.assertEqual(project_direction(strategic), project_direction(strategic))
+
+    def test_direction_projection_preserves_canonical_ids(self):
+        runtime = project_direction(valid_strategic_direction("a"))
+        self.assertEqual(["commerce.home", "commerce.search", "commerce.pdp"], runtime["patterns"])
+        self.assertEqual(["commerce.product-card", "commerce.price-display"], runtime["components"])
+        self.assertEqual("compact", runtime["density"])
+
+    def test_direction_projection_maps_structured_fields(self):
+        runtime = project_direction(valid_strategic_direction("a"))
+        self.assertEqual("search-led", runtime["navigation_model"])
+        self.assertEqual("search-to-order", runtime["primary_journey"])
+        self.assertEqual("availability-and-price", runtime["merchandising_model"])
+
+    def test_direction_projection_rejects_invalid_strategic_input(self):
+        strategic = valid_strategic_direction("a")
+        del strategic["navigation"]["model"]
+        with self.assertRaisesRegex(ValueError, "navigation"):
+            project_direction(strategic)
+
+    def test_runtime_direction_validates_against_runtime_contract(self):
+        runtime = project_direction(valid_strategic_direction("a"))
+        self.assertEqual([], validate_runtime_direction(runtime))
+        missing_field = dict(runtime)
+        del missing_field["navigation_model"]
+        self.assertTrue(any("navigation_model" in e for e in validate_runtime_direction(missing_field)))
+        bad_density = dict(runtime)
+        bad_density["density"] = "dense"
+        self.assertTrue(any("density" in e for e in validate_runtime_direction(bad_density)))
 
     def test_fixture_generation_is_deterministic(self):
         one = generate_fixture_pack("electronics-appliances", seed=108)
