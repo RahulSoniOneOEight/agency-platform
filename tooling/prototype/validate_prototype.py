@@ -4,12 +4,23 @@ from pathlib import Path
 
 REQUIRED_PATHS = (
     "tooling/prototype/__init__.py",
+    "tooling/prototype/direction_schema.json",
     "tooling/prototype/validate_direction.py",
     "tooling/prototype/fixture_generator.py",
     "tooling/prototype/screenshot_manifest.py",
+    "tooling/prototype/capture_screenshots.py",
     "tooling/prototype/validate_visual_qa.py",
+    "tooling/prototype/build_prototype.py",
+    "tooling/prototype/approved_experience.py",
+    "packages/agency_flutter_ui/pubspec.yaml",
+    "packages/agency_flutter_ui/lib/agency_flutter_ui.dart",
+    "apps/prototype_app/pubspec.yaml",
+    "apps/prototype_app/lib/main.dart",
+    "apps/widgetbook/pubspec.yaml",
+    "apps/widgetbook/lib/main.dart",
     "templates/prototype-manifest.yaml",
     "templates/visual-qa-findings.yaml",
+    "templates/approved-experience.yaml",
 )
 
 
