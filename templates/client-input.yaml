@@ -1,0 +1,10 @@
+version: 1
+client_id: example-client
+display_name: Example Client
+business_context: {}
+users: []
+goals: []
+brand: {}
+references: []
+assets: []
+constraints: []
