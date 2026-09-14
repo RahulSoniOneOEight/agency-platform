@@ -6,11 +6,14 @@ from pathlib import Path
 
 import yaml
 
+from tooling.workflow.client_input import validate_client_input
 from tooling.workflow.initialize_client import initialize_client
 from tooling.workflow.router import next_stage
 from tooling.workflow.state import initial_state, save_state
 from tooling.workflow.validate_workflow import validate_client, validate_runtime, validate_workflow_file
 
+
+ROOT = Path(__file__).resolve().parents[2]
 
 PROFILE = {
     "id": "acme",
@@ -37,27 +40,91 @@ def write_direction_artifacts(client: Path) -> None:
         (directions / name).write_text("id: sample\n", encoding="utf-8")
 
 
+MODULE_DOMAINS = {
+    "business-rules.yaml": "rules",
+    "user-groups.yaml": "groups",
+    "journey-priorities.yaml": "journeys",
+    "feature-requirements.yaml": "features",
+    "platform-requirements.yaml": "requirements",
+    "integration-requirements.yaml": "integrations",
+    "content-requirements.yaml": "requirements",
+    "data-context.yaml": "entities",
+    "constraints.yaml": "constraints",
+    "open-questions.yaml": "questions",
+}
+
+COLLECTION_DOMAINS = {
+    "brand": ("brand-input.yaml", "facts"),
+    "references": ("references.yaml", "references"),
+    "assets": ("asset-manifest.yaml", "assets"),
+    "source-documents": ("source-documents.yaml", "documents"),
+}
+
+
 class WorkflowRuntimeTests(unittest.TestCase):
     def test_initializer_creates_exact_standard_structure(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "client-projects").mkdir()
             client_dir = initialize_client(root, "acme", "Acme Furniture")
-            expected = {
-                "brief.md",
-                "client-profile.yaml",
-                "workflow-state.yaml",
-                "references/.gitkeep",
-                "resources/.gitkeep",
-                "directions/.gitkeep",
-                "fixtures/.gitkeep",
-            }
-            actual = {
-                str(path.relative_to(client_dir)).replace("\\", "/")
-                for path in client_dir.rglob("*")
-                if path.is_file()
-            }
-            self.assertEqual(expected, actual)
+            for rel in (
+                "input",
+                "input/brand/brand-assets",
+                "input/references/current-app",
+                "input/references/competitor",
+                "input/references/inspiration",
+                "input/assets/products",
+                "input/assets/categories",
+                "input/assets/banners",
+                "input/assets/sellers",
+                "input/assets/videos",
+                "input/source-documents",
+                "derived",
+                "resources",
+                "directions",
+                "prototype",
+            ):
+                self.assertTrue((client_dir / rel).is_dir(), rel)
+            self.assertTrue((client_dir / "workflow-state.yaml").exists())
+            self.assertTrue((client_dir / "input" / "client-input.yaml").exists())
+            self.assertTrue((client_dir / "derived" / "client-profile.yaml").exists())
+            self.assertFalse((client_dir / "client-profile.yaml").exists())
+            self.assertFalse((client_dir / "references").exists())
+            self.assertFalse((client_dir / "fixtures").exists())
+            self.assertEqual([], validate_client_input(ROOT, client_dir))
+
+            index = yaml.safe_load((client_dir / "input" / "client-input.yaml").read_text(encoding="utf-8"))
+            self.assertEqual("acme", index["client"]["id"])
+            self.assertEqual("Acme Furniture", index["client"]["display_name"])
+            self.assertEqual("client_supplied", index["source_status"])
+            self.assertEqual({}, index["modules"])
+            self.assertEqual({}, index["collections"])
+            self.assertTrue(index["unresolved_input"])
+
+            profile = yaml.safe_load((client_dir / "derived" / "client-profile.yaml").read_text(encoding="utf-8"))
+            self.assertEqual("acme", profile["id"])
+            self.assertEqual("Acme Furniture", profile["display_name"])
+            self.assertEqual("", profile["business_model"])
+            self.assertEqual("", profile["industry"])
+            self.assertEqual([], profile["personas"])
+            self.assertEqual([], profile["platforms"])
+
+    def test_initializer_optional_templates_are_empty(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "client-projects").mkdir()
+            client_dir = initialize_client(root, "acme")
+            input_dir = client_dir / "input"
+            for filename, domain in MODULE_DOMAINS.items():
+                data = yaml.safe_load((input_dir / filename).read_text(encoding="utf-8"))
+                self.assertEqual(1, data["version"], filename)
+                self.assertFalse(data["provided"], filename)
+                self.assertEqual([], data[domain], filename)
+            for subdir, (filename, domain) in COLLECTION_DOMAINS.items():
+                data = yaml.safe_load((input_dir / subdir / filename).read_text(encoding="utf-8"))
+                self.assertEqual(1, data["version"], filename)
+                self.assertFalse(data["provided"], filename)
+                self.assertEqual([], data[domain], filename)
 
     def test_initializer_refuses_existing_client(self):
         with tempfile.TemporaryDirectory() as tmp:
