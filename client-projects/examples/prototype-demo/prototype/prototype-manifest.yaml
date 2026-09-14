@@ -1,0 +1,14 @@
+version: 1
+client_id: prototype-demo
+runtime: apps/prototype_app
+default_direction: a
+directions:
+  a: directions/direction-a.yaml
+  b: directions/direction-b.yaml
+  c: directions/direction-c.yaml
+fixture_pack: prototype/fixtures/demo.yaml
+theme:
+  seed_color: '#6750A4'
+review:
+  query_parameter: direction
+  allowed_values: [a, b, c]
