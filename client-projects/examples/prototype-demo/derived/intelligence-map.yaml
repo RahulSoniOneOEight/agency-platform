@@ -1,0 +1,26 @@
+version: 1
+components:
+  - product-card
+  - price-display
+  - search-field
+  - quote-card
+  - credit-summary
+patterns:
+  - home
+  - search
+  - plp
+  - pdp
+  - cart
+  - rfq
+  - trade-dashboard
+  - reorder
+journeys:
+  - search-to-order
+  - reorder-to-order
+  - rfq-to-quote
+variants: []
+themes: []
+experience_patterns:
+  - search-first
+  - reorder-first
+  - rfq-first
