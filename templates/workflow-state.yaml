@@ -1,0 +1,17 @@
+version: 1
+client_id: example-client
+current_stage: client-intake
+status: not_started
+completed: []
+skipped: []
+pending:
+  - client-intake
+  - resolve-intelligence
+  - resource-research
+  - generate-directions
+  - build-prototype
+  - visual-qa
+  - client-review
+  - productionize
+blocked: []
+last_updated: 2026-09-14
