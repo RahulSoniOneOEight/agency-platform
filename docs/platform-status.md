@@ -6,10 +6,32 @@
 - Step 2 — OpenCode control + policy layer: merged.
 - Milestone A — Knowledge Platform: merged via PR #4.
 - Workflow Runtime Layer: merged via PR #5.
+- Milestone B — Prototype Platform: merged via PR #6.
 
-## Milestone B — Prototype Platform
+## Current implemented platform
 
-Implemented on `milestone-b-prototype-platform` / PR #6 pending review/merge:
+### Knowledge Platform
+
+- Resource Registry + provenance/source routing
+- normalization contracts
+- Shared Design Contract schemas + seed commerce metadata
+- business-model, 12 industry, and use-case presets
+- Experience Pattern Library
+- client-profile schema + regression fixtures
+- preset resolver
+- deterministic Design Contract index builder
+- Experience Direction Engine v1
+
+### Workflow Runtime
+
+- stored stage workflows under `workflows/`
+- client workspace initializer
+- machine-readable `workflow-state.yaml`
+- artifact-aware stage router
+- runtime validation + CI contract
+- approved-experience production gate
+
+### Prototype Platform
 
 - shared `packages/agency_flutter_ui` Flutter design-system implementation
 - semantic tokens + Material 3 theme
@@ -25,7 +47,16 @@ Implemented on `milestone-b-prototype-platform` / PR #6 pending review/merge:
 - structured visual-QA findings and critical-issue gate
 - approved-experience validation for selected or mixed directions
 - Workflow Runtime activation through build-prototype → visual-qa → client-review
-- Prototype Platform validation and Flutter Web CI build
+- Flutter analyze/tests + Flutter Web CI build
+
+## Client information architecture alignment
+
+Being aligned to the canonical 20-stage flow through PR #7:
+
+- `input/` separates supplied client facts/attachments from agent inference
+- `derived/` stores client profile, resolved presets, intelligence map, capability map, gaps, and resource requirements
+- existing eight runtime workflows map to the 20 detailed consulting/delivery stages
+- `docs/operating-flow.md` is the detailed canonical operating model
 
 ## Still deferred to later milestones
 
@@ -38,3 +69,4 @@ Implemented on `milestone-b-prototype-platform` / PR #6 pending review/merge:
 - production analytics/observability implementation
 - deployment/app-store release pipelines
 - automated browser screenshot execution in CI where no UI runner is available
+- full production release automation for stages 19–20
