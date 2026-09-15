@@ -12,6 +12,11 @@ from tooling.design_contract.flutter_bindings import (
     runtime_binding_errors,
     validate_flutter_bindings,
 )
+from tooling.design_contract.generate_flutter_bindings import (
+    check_flutter_bindings_fresh,
+    render_flutter_bindings,
+    write_flutter_bindings,
+)
 from tooling.knowledge.index_design_contract import build_indexes
 
 
@@ -578,6 +583,57 @@ class RuntimeBindingErrorTests(unittest.TestCase):
             ),
             errors,
         )
+
+
+class GeneratedProjectionTests(unittest.TestCase):
+    def test_generated_dart_projection_is_deterministic(self):
+        first = render_flutter_bindings(ROOT)
+        second = render_flutter_bindings(ROOT)
+
+        self.assertEqual(first, second)
+        self.assertTrue(first.endswith("\n"))
+
+    def test_generated_dart_projection_has_required_header(self):
+        source = render_flutter_bindings(ROOT)
+
+        self.assertTrue(source.startswith("// GENERATED FILE. DO NOT EDIT."))
+        self.assertIn("// Source: design-contract/bindings/flutter/*.yaml", source)
+
+    def test_generated_dart_projection_is_sorted_and_complete(self):
+        source = render_flutter_bindings(ROOT)
+        approved = sorted(
+            binding_id
+            for binding_id, binding in load_flutter_bindings(ROOT).items()
+            if binding.get("status") == "approved"
+        )
+
+        positions = [source.index(f"'{binding_id}': DesignBinding(") for binding_id in approved]
+
+        self.assertEqual(positions, sorted(positions))
+        self.assertEqual(len(positions), len(approved))
+
+    def test_checked_projection_matches_fresh_generation(self):
+        self.assertEqual([], check_flutter_bindings_fresh(ROOT))
+
+    def test_stale_projection_is_reported(self):
+        root = _contract_root()
+        _write_component(root)
+        _write_binding(root, component_binding())
+        generated = write_flutter_bindings(root)
+        generated.write_text("// stale\n", encoding="utf-8")
+
+        errors = check_flutter_bindings_fresh(root)
+
+        self.assertTrue(any("stale" in error for error in errors), errors)
+
+    def test_missing_projection_is_reported(self):
+        root = _contract_root()
+        _write_component(root)
+        _write_binding(root, component_binding())
+
+        errors = check_flutter_bindings_fresh(root)
+
+        self.assertTrue(any("missing" in error for error in errors), errors)
 
 
 if __name__ == "__main__":
