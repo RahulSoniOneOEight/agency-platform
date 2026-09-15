@@ -104,15 +104,37 @@ message. Stack traces are never shown to client reviewers.
   both validators, and be identical to a fresh projection of the strategic
   sources. Stale checked-in bundles fail validation.
 
-## Canonical pattern adapter
+## Design Contract ↔ Flutter bindings
 
-Generated bundles keep canonical pattern IDs. The only app-specific translation
-lives in `apps/prototype_app/lib/registry/canonical_pattern_adapter.dart`, an
-explicit allowlisted canonical-to-internal map (for example the canonical
-pattern `commerce.plp` maps to the internal `plp` registry key). Heuristic
-prefix stripping is forbidden, two canonical IDs must not collide on one
-internal key, and a valid canonical ID with no Flutter implementation fails
-visibly.
+`design-contract/` remains the canonical authority for canonical IDs and
+supported UX metadata. Flutter registry keys, Dart class names, enum names, and
+widget factories are implementation details only.
+
+Implementation bindings live under `design-contract/bindings/flutter/`. Each
+binding is keyed by canonical ID and declares:
+
+- `kind` (`component` or `pattern`) and `status`;
+- the `agency_flutter_ui` implementation (`registry_key`, `symbol`);
+- supported `variants` and `states` (subsets of the canonical contract);
+- the canonical-density → internal-density map (total over the contract).
+
+Bindings are validated against the canonical contracts and the current runtime
+directions, then projected into a deterministic, checked Dart table at
+`apps/prototype_app/lib/registry/generated_design_bindings.dart`. Regenerate it
+with:
+
+```text
+python -m tooling.design_contract.generate_flutter_bindings --write
+```
+
+Repository validation requires the checked projection to byte-match a fresh
+render.
+
+The app resolves canonical IDs through
+`apps/prototype_app/lib/registry/design_contract_resolver.dart`, which performs
+exact lookups only. Unknown canonical IDs, variants, or densities fail
+deterministically; there is no prefix stripping, convention-based inference, or
+silent fallback.
 
 ## Regenerating a client bundle
 
