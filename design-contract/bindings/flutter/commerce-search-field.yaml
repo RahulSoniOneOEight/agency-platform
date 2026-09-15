@@ -1,0 +1,14 @@
+id: commerce.search-field
+kind: component
+status: approved
+implementation:
+  package: agency_flutter_ui
+  registry_key: search-field
+  symbol: AgencySearchField
+variants: {}
+states:
+  idle: supported
+  focused: supported
+density:
+  compact: dense
+  normal: balanced

@@ -1,0 +1,12 @@
+id: commerce.quote-card
+kind: component
+status: approved
+implementation:
+  package: agency_flutter_ui
+  registry_key: quote-card
+  symbol: QuoteCard
+variants: {}
+states: {}
+density:
+  compact: dense
+  normal: balanced

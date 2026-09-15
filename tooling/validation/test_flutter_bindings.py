@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -375,6 +376,29 @@ class FlutterBindingTests(unittest.TestCase):
 
         self.assertIn("commerce.product-card", bindings)
         self.assertEqual("component", bindings["commerce.product-card"]["kind"])
+
+    def test_repository_binding_catalog_is_valid(self):
+        self.assertEqual([], validate_flutter_bindings(ROOT))
+
+    def test_current_runtime_directions_have_complete_approved_bindings(self):
+        bindings = load_flutter_bindings(ROOT)
+        runtime_dir = (
+            ROOT
+            / "client-projects"
+            / "examples"
+            / "prototype-demo"
+            / "prototype"
+            / "runtime"
+        )
+        paths = sorted(runtime_dir.glob("direction-*.json"))
+        self.assertTrue(paths)
+
+        errors = []
+        for path in paths:
+            direction = json.loads(path.read_text(encoding="utf-8"))
+            errors.extend(runtime_binding_errors(ROOT, direction, bindings))
+
+        self.assertEqual([], sorted(errors))
 
 
 class RuntimeBindingErrorTests(unittest.TestCase):

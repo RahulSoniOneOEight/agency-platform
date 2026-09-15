@@ -1,0 +1,13 @@
+id: commerce.reorder
+kind: pattern
+status: approved
+implementation:
+  package: agency_flutter_ui
+  registry_key: reorder
+  symbol: TradeDashboardPattern
+variants: {}
+states: {}
+density:
+  compact: dense
+  normal: balanced
+  spacious: airy

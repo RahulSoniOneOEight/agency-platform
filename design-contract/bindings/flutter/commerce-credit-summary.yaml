@@ -1,0 +1,13 @@
+id: commerce.credit-summary
+kind: component
+status: approved
+implementation:
+  package: agency_flutter_ui
+  registry_key: credit-summary
+  symbol: CreditSummary
+variants: {}
+states:
+  normal: supported
+density:
+  compact: dense
+  normal: balanced

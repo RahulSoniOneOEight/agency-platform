@@ -1,0 +1,16 @@
+id: commerce.product-card
+kind: component
+status: approved
+implementation:
+  package: agency_flutter_ui
+  registry_key: product-card
+  symbol: ProductCard
+variants:
+  standard: standard
+  b2b: b2b
+states:
+  normal: supported
+density:
+  compact: dense
+  normal: balanced
+  spacious: airy
