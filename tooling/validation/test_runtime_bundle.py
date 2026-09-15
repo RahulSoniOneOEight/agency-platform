@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import json
 import tempfile
 import unittest
@@ -10,7 +11,10 @@ import yaml
 
 from tooling.knowledge.index_design_contract import build_indexes
 from tooling.prototype.build_runtime_bundle import build_runtime_bundle
-from tooling.prototype.validate_runtime_bundle import validate_runtime_bundle
+from tooling.prototype import validate_runtime_bundle as runtime_bundle_validator
+
+
+validate_runtime_bundle = runtime_bundle_validator.validate_runtime_bundle
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -82,7 +86,29 @@ def _bundle(direction_ids: tuple[str, ...] = ("a", "b")) -> dict:
     }
 
 
+def _write_design_contract(
+    root: Path,
+    *,
+    patterns: dict[str, str] | None = None,
+    components: dict[str, str] | None = None,
+) -> None:
+    catalogs = {
+        "patterns": patterns
+        or {"commerce.search": "approved", "commerce.pdp": "approved"},
+        "components": components or {"commerce.product-card": "approved"},
+    }
+    for catalog, contracts in catalogs.items():
+        catalog_dir = root / "design-contract" / catalog
+        catalog_dir.mkdir(parents=True, exist_ok=True)
+        for contract_id, status in contracts.items():
+            (catalog_dir / f"{contract_id.replace('.', '-')}.yaml").write_text(
+                yaml.safe_dump({"id": contract_id, "status": status}),
+                encoding="utf-8",
+            )
+
+
 def _write_client(client_dir: Path, direction_ids: tuple[str, ...] = ("a", "b")) -> None:
+    _write_design_contract(client_dir.parents[1])
     runtime_dir = client_dir / "prototype" / "runtime"
     fixture_dir = client_dir / "prototype" / "fixtures"
     runtime_dir.mkdir(parents=True)
@@ -233,11 +259,155 @@ class RuntimeBundleTests(unittest.TestCase):
                 errors = validate_runtime_bundle(bundle)
                 self.assertTrue(any(expected in error for error in errors), errors)
 
-    def test_validator_enforces_design_contract_pattern_ids(self):
+    def test_intrinsic_validator_has_one_argument_and_does_not_consult_catalogs(self):
+        self.assertEqual(
+            ["bundle"], list(inspect.signature(validate_runtime_bundle).parameters)
+        )
+        bundle = _bundle()
+        bundle["directions"]["a"]["patterns"] = ["not.in.any.catalog"]
+        bundle["directions"]["a"]["components"] = ["also.not.in.catalog"]
+        bundle["directions"]["a"]["component_variants"] = [
+            {"component": "also.not.in.catalog", "variant": "test"}
+        ]
+
+        self.assertEqual([], validate_runtime_bundle(bundle))
+
+    def test_root_aware_validator_resolves_patterns_components_and_variants(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_design_contract(root)
+            bundle = _bundle()
+            bundle["directions"]["a"]["patterns"] = ["missing.pattern"]
+            bundle["directions"]["a"]["components"] = ["missing.component"]
+            bundle["directions"]["a"]["component_variants"] = [
+                {"component": "missing.variant-component", "variant": "test"}
+            ]
+
+            self.assertEqual(
+                [
+                    "directions.a.component_variants.0.component references unknown "
+                    "canonical component 'missing.variant-component'",
+                    "directions.a.components.0 references unknown canonical component "
+                    "'missing.component'",
+                    "directions.a.patterns.0 references unknown canonical pattern "
+                    "'missing.pattern'",
+                ],
+                runtime_bundle_validator.validate_runtime_bundle_against_design_contract(
+                    root, bundle
+                ),
+            )
+
+    def test_component_variant_component_must_be_listed_in_direction_components(self):
+        bundle = _bundle()
+        bundle["directions"]["a"]["component_variants"] = [
+            {"component": "commerce.search-field", "variant": "compact"}
+        ]
+
+        self.assertEqual(
+            [
+                "directions.a.component_variants.0.component 'commerce.search-field' "
+                "must be listed in directions.a.components"
+            ],
+            validate_runtime_bundle(bundle),
+        )
+
+    def test_root_aware_validator_uses_each_explicit_root_without_cache_leakage(self):
+        with (
+            tempfile.TemporaryDirectory() as first_tmp,
+            tempfile.TemporaryDirectory() as second_tmp,
+        ):
+            first_root = Path(first_tmp)
+            second_root = Path(second_tmp)
+            _write_design_contract(
+                first_root,
+                patterns={"first.pattern": "approved"},
+                components={"first.component": "experimental"},
+            )
+            _write_design_contract(
+                second_root,
+                patterns={"second.pattern": "approved"},
+                components={"second.component": "approved"},
+            )
+            bundle = _bundle()
+            for direction in bundle["directions"].values():
+                direction["patterns"] = ["first.pattern"]
+                direction["components"] = ["first.component"]
+                direction["component_variants"] = [
+                    {"component": "first.component", "variant": "test"}
+                ]
+
+            self.assertEqual(
+                [],
+                runtime_bundle_validator.validate_runtime_bundle_against_design_contract(
+                    first_root, bundle
+                ),
+            )
+            second_errors = (
+                runtime_bundle_validator.validate_runtime_bundle_against_design_contract(
+                    second_root, bundle
+                )
+            )
+            self.assertTrue(
+                any(
+                    "unknown canonical pattern 'first.pattern'" in error
+                    for error in second_errors
+                ),
+                second_errors,
+            )
+            self.assertTrue(
+                any(
+                    "unknown canonical component 'first.component'" in error
+                    for error in second_errors
+                ),
+                second_errors,
+            )
+
+    def test_root_aware_validator_rejects_deprecated_contracts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_design_contract(
+                root,
+                patterns={"commerce.search": "deprecated", "commerce.pdp": "approved"},
+                components={"commerce.product-card": "deprecated"},
+            )
+
+            errors = runtime_bundle_validator.validate_runtime_bundle_against_design_contract(
+                root, _bundle()
+            )
+            self.assertTrue(
+                any(
+                    "ineligible canonical pattern 'commerce.search'" in error
+                    for error in errors
+                ),
+                errors,
+            )
+            self.assertTrue(
+                any(
+                    "directions.a.components.0 references ineligible canonical "
+                    "component 'commerce.product-card'" == error
+                    for error in errors
+                ),
+                errors,
+            )
+            self.assertTrue(
+                any(
+                    "directions.a.component_variants.0.component references "
+                    "ineligible canonical component 'commerce.product-card'" == error
+                    for error in errors
+                ),
+                errors,
+            )
+
+    def test_root_aware_validator_accepts_repository_contract_ids(self):
         canonical_pattern_ids = sorted(build_indexes(ROOT)["patterns"])
         bundle = _bundle()
         bundle["directions"]["a"]["patterns"] = canonical_pattern_ids
-        self.assertEqual([], validate_runtime_bundle(bundle))
+        self.assertEqual(
+            [],
+            runtime_bundle_validator.validate_runtime_bundle_against_design_contract(
+                ROOT, bundle
+            ),
+        )
 
         bundle["directions"]["a"]["patterns"] = ["cart"]
         self.assertEqual(
@@ -245,8 +415,30 @@ class RuntimeBundleTests(unittest.TestCase):
                 "directions.a.patterns.0 references unknown canonical pattern "
                 "'cart'"
             ],
-            validate_runtime_bundle(bundle),
+            runtime_bundle_validator.validate_runtime_bundle_against_design_contract(
+                ROOT, bundle
+            ),
         )
+
+    def test_builder_rejects_checkout_ids_absent_from_supplied_root(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            client = root / "client-projects" / "acme-client"
+            _write_client(client)
+            for path in (root / "design-contract").glob("**/*.yaml"):
+                path.unlink()
+            _write_design_contract(
+                root,
+                patterns={"other.pattern": "approved"},
+                components={"other.component": "approved"},
+            )
+
+            with self.assertRaisesRegex(
+                ValueError,
+                "^invalid runtime bundle: .*unknown canonical component "
+                "'commerce.product-card'.*unknown canonical pattern 'commerce.pdp'",
+            ):
+                build_runtime_bundle(root, client, root / "output")
 
     def test_validator_reports_malformed_fixture_fields(self):
         cases = {}

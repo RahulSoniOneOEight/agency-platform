@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import math
 import re
-from functools import lru_cache
 from pathlib import Path
 
 from tooling.knowledge.index_design_contract import build_indexes
@@ -20,12 +19,7 @@ _RESOURCE_PREFIXES = {
     "icon": "icon.",
     "motion": "motion.",
 }
-_ROOT = Path(__file__).resolve().parents[2]
-
-
-@lru_cache(maxsize=1)
-def _canonical_pattern_ids() -> frozenset[str]:
-    return frozenset(build_indexes(_ROOT)["patterns"])
+_ELIGIBLE_CONTRACT_STATUSES = {"approved", "experimental"}
 
 
 def _is_number(value: object) -> bool:
@@ -247,25 +241,116 @@ def _validate_required_resources(directions: object, resources: object) -> list[
     return errors
 
 
-def _validate_pattern_ids(directions: object) -> list[str]:
+def _validate_component_variant_membership(directions: object) -> list[str]:
     if not isinstance(directions, dict):
         return []
 
-    canonical_ids = _canonical_pattern_ids()
     errors: list[str] = []
     for direction_id, direction in directions.items():
         if not isinstance(direction, dict):
             continue
-        patterns = direction.get("patterns")
-        if not isinstance(patterns, list):
+        components = direction.get("components")
+        variants = direction.get("component_variants")
+        if not isinstance(components, list) or not isinstance(variants, list):
             continue
-        for index, pattern_id in enumerate(patterns):
-            if isinstance(pattern_id, str) and pattern_id not in canonical_ids:
+        for index, variant in enumerate(variants):
+            if not isinstance(variant, dict):
+                continue
+            component_id = variant.get("component")
+            if isinstance(component_id, str) and component_id not in components:
                 errors.append(
-                    f"directions.{direction_id}.patterns.{index} references unknown "
-                    f"canonical pattern {pattern_id!r}"
+                    f"directions.{direction_id}.component_variants.{index}.component "
+                    f"{component_id!r} must be listed in "
+                    f"directions.{direction_id}.components"
                 )
     return errors
+
+
+def _validate_contract_references(
+    directions: object,
+    *,
+    field: str,
+    contracts: dict[str, dict],
+    contract_type: str,
+) -> list[str]:
+    if not isinstance(directions, dict):
+        return []
+
+    errors: list[str] = []
+    for direction_id, direction in directions.items():
+        if not isinstance(direction, dict):
+            continue
+        references = direction.get(field)
+        if not isinstance(references, list):
+            continue
+        for index, contract_id in enumerate(references):
+            if not isinstance(contract_id, str):
+                continue
+            path = f"directions.{direction_id}.{field}.{index}"
+            contract = contracts.get(contract_id)
+            if contract is None:
+                errors.append(
+                    f"{path} references unknown canonical {contract_type} "
+                    f"{contract_id!r}"
+                )
+            elif contract.get("status") not in _ELIGIBLE_CONTRACT_STATUSES:
+                errors.append(
+                    f"{path} references ineligible canonical {contract_type} "
+                    f"{contract_id!r}"
+                )
+    return errors
+
+
+def validate_runtime_bundle_against_design_contract(
+    root: Path, bundle: dict
+) -> list[str]:
+    if not isinstance(bundle, dict):
+        return []
+
+    indexes = build_indexes(root)
+    directions = bundle.get("directions")
+    errors = _validate_contract_references(
+        directions,
+        field="patterns",
+        contracts=indexes["patterns"],
+        contract_type="pattern",
+    )
+    errors.extend(
+        _validate_contract_references(
+            directions,
+            field="components",
+            contracts=indexes["components"],
+            contract_type="component",
+        )
+    )
+
+    if isinstance(directions, dict):
+        for direction_id, direction in directions.items():
+            if not isinstance(direction, dict):
+                continue
+            variants = direction.get("component_variants")
+            if not isinstance(variants, list):
+                continue
+            for index, variant in enumerate(variants):
+                if not isinstance(variant, dict):
+                    continue
+                component_id = variant.get("component")
+                if not isinstance(component_id, str):
+                    continue
+                contract = indexes["components"].get(component_id)
+                path = (
+                    f"directions.{direction_id}.component_variants.{index}.component"
+                )
+                if contract is None:
+                    errors.append(
+                        f"{path} references unknown canonical component {component_id!r}"
+                    )
+                elif contract.get("status") not in _ELIGIBLE_CONTRACT_STATUSES:
+                    errors.append(
+                        f"{path} references ineligible canonical component "
+                        f"{component_id!r}"
+                    )
+    return sorted(errors)
 
 
 def validate_runtime_bundle(bundle: dict) -> list[str]:
@@ -314,7 +399,7 @@ def validate_runtime_bundle(bundle: dict) -> list[str]:
                     f"{direction.get('id')!r}"
                 )
 
-    errors.extend(_validate_pattern_ids(directions))
+    errors.extend(_validate_component_variant_membership(directions))
 
     default_direction = bundle.get("default_direction")
     if not isinstance(default_direction, str) or default_direction not in direction_ids:

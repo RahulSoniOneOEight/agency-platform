@@ -6,7 +6,10 @@ from pathlib import Path
 
 import yaml
 
-from .validate_runtime_bundle import validate_runtime_bundle
+from .validate_runtime_bundle import (
+    validate_runtime_bundle,
+    validate_runtime_bundle_against_design_contract,
+)
 
 
 def _invalid(message: str) -> ValueError:
@@ -78,8 +81,9 @@ def compose_runtime_bundle(client_dir: Path) -> dict:
 def build_runtime_bundle(root: Path, client_dir: Path, output_dir: Path) -> Path:
     bundle = compose_runtime_bundle(client_dir)
     errors = validate_runtime_bundle(bundle)
+    errors.extend(validate_runtime_bundle_against_design_contract(root, bundle))
     if errors:
-        raise _invalid("; ".join(errors))
+        raise _invalid("; ".join(sorted(errors)))
 
     try:
         serialized = json.dumps(bundle, indent=2, sort_keys=True, allow_nan=False) + "\n"
