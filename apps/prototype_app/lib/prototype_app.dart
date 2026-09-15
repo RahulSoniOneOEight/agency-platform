@@ -27,7 +27,7 @@ class PrototypeApp extends StatefulWidget {
 }
 
 class _PrototypeAppState extends State<PrototypeApp> {
-  late final FixtureRepository _fixtures = FixtureRepository.fromRuntime(widget.runtime);
+  FixtureRepository? _fixtures;
   String? _directionId;
   RuntimeException? _error;
 
@@ -37,9 +37,17 @@ class _PrototypeAppState extends State<PrototypeApp> {
     final requested = widget.requestedDirection ?? widget.runtime.defaultDirection;
     try {
       DirectionLoader.resolve(widget.runtime, requested);
+      _fixtures = FixtureRepository.fromRuntime(widget.runtime);
       _directionId = requested;
     } on RuntimeException catch (error) {
       _error = error;
+    } on FormatException catch (error) {
+      _error = RuntimeException(
+        code: RuntimeException.invalidBundle,
+        message: 'Invalid runtime fixtures for client '
+            '"${widget.runtime.clientId}": ${error.message}',
+        clientId: widget.runtime.clientId,
+      );
     }
   }
 
@@ -95,7 +103,7 @@ class _PrototypeAppState extends State<PrototypeApp> {
               ),
             ),
             Expanded(
-              child: PrototypeShell(direction: direction, fixtures: _fixtures),
+              child: PrototypeShell(direction: direction, fixtures: _fixtures!),
             ),
           ],
         ),

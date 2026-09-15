@@ -54,6 +54,10 @@ class PrototypeRuntime {
       directionOverrides[directionId] ?? const {};
 
   factory PrototypeRuntime.fromMap(Map<String, dynamic> map) {
+    if (map['version'] != 1) {
+      throw const FormatException('Runtime bundle version must be 1');
+    }
+
     final clientId = map['client_id'];
     if (clientId is! String || clientId.trim().isEmpty) {
       throw const FormatException('Missing runtime client_id');
@@ -166,8 +170,9 @@ class PrototypeRuntime {
         ),
       ),
       allowedDirections: List<String>.unmodifiable(allowedDirections),
-      queryParameter: (map['review'] is Map)
-          ? (map['review'] as Map)['query_parameter'] as String?
+      queryParameter: (map['review'] is Map &&
+              (map['review'] as Map)['query_parameter'] is String)
+          ? (map['review'] as Map)['query_parameter'] as String
           : null,
     );
   }

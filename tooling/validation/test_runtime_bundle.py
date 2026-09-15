@@ -528,6 +528,23 @@ class RuntimeBundleTests(unittest.TestCase):
             ),
         )
 
+    def test_flutter_canonical_pattern_adapter_covers_repository_patterns(self):
+        adapter_path = (
+            ROOT
+            / "apps"
+            / "prototype_app"
+            / "lib"
+            / "registry"
+            / "canonical_pattern_adapter.dart"
+        )
+        source = adapter_path.read_text(encoding="utf-8")
+        canonical_pattern_ids = sorted(build_indexes(ROOT)["patterns"])
+
+        self.assertTrue(canonical_pattern_ids)
+        for pattern_id in canonical_pattern_ids:
+            with self.subTest(pattern=pattern_id):
+                self.assertIn(f"'{pattern_id}':", source)
+
     def test_builder_rejects_checkout_ids_absent_from_supplied_root(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

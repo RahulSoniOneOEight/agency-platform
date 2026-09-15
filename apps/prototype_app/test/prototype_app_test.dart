@@ -73,6 +73,30 @@ void main() {
     expect(find.textContaining('Direction "z" is not available'), findsOneWidget);
   });
 
+  testWidgets('malformed fixture data renders a governed error', (tester) async {
+    final fixtures = defaultFixtures();
+    (fixtures['products'] as List)[0].remove('name');
+    final runtime = PrototypeRuntime.fromMap(canonicalBundle(fixtures: fixtures));
+
+    await tester.pumpWidget(PrototypeApp(runtime: runtime, requestedDirection: 'a'));
+
+    expect(find.byType(RuntimeErrorScreen), findsOneWidget);
+    expect(find.textContaining('Invalid runtime fixtures'), findsOneWidget);
+  });
+
+  testWidgets('a product pattern with an empty fixture pack does not crash',
+      (tester) async {
+    final bundle = canonicalBundle();
+    ((bundle['directions'] as Map)['a'] as Map)['patterns'] = ['commerce.pdp'];
+    (bundle['fixtures'] as Map)['products'] = <dynamic>[];
+    final runtime = PrototypeRuntime.fromMap(bundle);
+
+    await tester.pumpWidget(PrototypeApp(runtime: runtime, requestedDirection: 'a'));
+
+    expect(tester.takeException(), isNull);
+    expect(find.textContaining('No products available'), findsOneWidget);
+  });
+
   testWidgets('runtime error screen shows the client without a stack trace',
       (tester) async {
     const error = RuntimeException(

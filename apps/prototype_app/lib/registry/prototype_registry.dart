@@ -6,6 +6,9 @@ import '../fixtures/fixture_repository.dart';
 import 'canonical_pattern_adapter.dart';
 
 abstract final class PrototypeRegistry {
+  static String labelFor(String canonicalPatternId) =>
+      PatternRegistry.resolve(CanonicalPatternAdapter.toRegistryKey(canonicalPatternId)).label;
+
   static Widget buildPattern(
     String canonicalPatternId,
     PrototypeDirection direction,
@@ -29,7 +32,9 @@ abstract final class PrototypeRegistry {
           density: direction.density,
           b2b: trade,
         ),
-      'pdp' => PdpPattern(product: products.first, tradeMode: trade),
+      'pdp' => products.isEmpty
+          ? const Center(child: Text('No products available for this client fixture pack.'))
+          : PdpPattern(product: products.first, tradeMode: trade),
       'cart' => CartPattern(products: products.take(3).toList(), tradeMode: trade),
       'rfq' => RfqPattern(products: products),
       'trade-dashboard' => const TradeDashboardPattern(),

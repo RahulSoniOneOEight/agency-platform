@@ -156,6 +156,12 @@ void main() {
       expect(() => PrototypeRuntime.fromMap(bundle), throwsFormatException);
     });
 
+    test('rejects an unsupported bundle version', () {
+      final bundle = canonicalBundle()..['version'] = 2;
+
+      expect(() => PrototypeRuntime.fromMap(bundle), throwsFormatException);
+    });
+
     test('rejects an invalid theme seed color', () {
       final bundle = canonicalBundle();
       bundle['theme'] = {'seed_color': '6750A4'};

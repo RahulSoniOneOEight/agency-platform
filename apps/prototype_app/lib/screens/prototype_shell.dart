@@ -56,7 +56,7 @@ class _PrototypeShellState extends State<PrototypeShell> {
                     NavigationRailDestination(
                       icon: const Icon(Icons.layers_outlined),
                       selectedIcon: const Icon(Icons.layers),
-                      label: Text(id),
+                      label: Text(PrototypeRegistry.labelFor(id)),
                     ),
                 ],
               ),
@@ -72,7 +72,10 @@ class _PrototypeShellState extends State<PrototypeShell> {
             onDestinationSelected: (value) => setState(() => _index = value),
             destinations: [
               for (final id in patterns)
-                NavigationDestination(icon: const Icon(Icons.layers_outlined), label: id),
+                NavigationDestination(
+                  icon: const Icon(Icons.layers_outlined),
+                  label: PrototypeRegistry.labelFor(id),
+                ),
             ],
           ),
         );

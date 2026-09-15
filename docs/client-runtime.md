@@ -108,11 +108,11 @@ message. Stack traces are never shown to client reviewers.
 
 Generated bundles keep canonical pattern IDs. The only app-specific translation
 lives in `apps/prototype_app/lib/registry/canonical_pattern_adapter.dart`, an
-explicit allowlisted canonical-to-internal map (for example
-`commerce.product-card` stays canonical; `commerce.plp` maps to the internal
-`plp` registry key). Heuristic prefix stripping is forbidden, two canonical IDs
-must not collide on one internal key, and a valid canonical ID with no Flutter
-implementation fails visibly.
+explicit allowlisted canonical-to-internal map (for example the canonical
+pattern `commerce.plp` maps to the internal `plp` registry key). Heuristic
+prefix stripping is forbidden, two canonical IDs must not collide on one
+internal key, and a valid canonical ID with no Flutter implementation fails
+visibly.
 
 ## Regenerating a client bundle
 
