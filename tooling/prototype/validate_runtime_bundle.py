@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import math
 import re
+from functools import lru_cache
+from pathlib import Path
+
+from tooling.knowledge.index_design_contract import build_indexes
 
 from .project_direction import validate_runtime_direction
 
@@ -16,6 +20,12 @@ _RESOURCE_PREFIXES = {
     "icon": "icon.",
     "motion": "motion.",
 }
+_ROOT = Path(__file__).resolve().parents[2]
+
+
+@lru_cache(maxsize=1)
+def _canonical_pattern_ids() -> frozenset[str]:
+    return frozenset(build_indexes(_ROOT)["patterns"])
 
 
 def _is_number(value: object) -> bool:
@@ -237,13 +247,34 @@ def _validate_required_resources(directions: object, resources: object) -> list[
     return errors
 
 
+def _validate_pattern_ids(directions: object) -> list[str]:
+    if not isinstance(directions, dict):
+        return []
+
+    canonical_ids = _canonical_pattern_ids()
+    errors: list[str] = []
+    for direction_id, direction in directions.items():
+        if not isinstance(direction, dict):
+            continue
+        patterns = direction.get("patterns")
+        if not isinstance(patterns, list):
+            continue
+        for index, pattern_id in enumerate(patterns):
+            if isinstance(pattern_id, str) and pattern_id not in canonical_ids:
+                errors.append(
+                    f"directions.{direction_id}.patterns.{index} references unknown "
+                    f"canonical pattern {pattern_id!r}"
+                )
+    return errors
+
+
 def validate_runtime_bundle(bundle: dict) -> list[str]:
     if not isinstance(bundle, dict):
         return ["runtime bundle must be an object"]
 
     errors = _validate_json_value(bundle, "runtime bundle")
     if any(error.endswith("(cyclic reference)") for error in errors):
-        return errors
+        return sorted(errors)
     version = bundle.get("version")
     if not isinstance(version, int) or isinstance(version, bool) or version != 1:
         errors.append("version must equal 1")
@@ -283,6 +314,8 @@ def validate_runtime_bundle(bundle: dict) -> list[str]:
                     f"{direction.get('id')!r}"
                 )
 
+    errors.extend(_validate_pattern_ids(directions))
+
     default_direction = bundle.get("default_direction")
     if not isinstance(default_direction, str) or default_direction not in direction_ids:
         errors.append("default_direction must identify an existing direction")
@@ -309,4 +342,4 @@ def validate_runtime_bundle(bundle: dict) -> list[str]:
     resources = bundle.get("resources")
     errors.extend(_validate_resources(resources, direction_ids))
     errors.extend(_validate_required_resources(directions, resources))
-    return errors
+    return sorted(errors)

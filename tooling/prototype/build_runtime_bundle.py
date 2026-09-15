@@ -16,7 +16,7 @@ def _invalid(message: str) -> ValueError:
 def _load_yaml(path: Path) -> object:
     try:
         return yaml.safe_load(path.read_text(encoding="utf-8"))
-    except (OSError, yaml.YAMLError) as exc:
+    except (OSError, UnicodeError, yaml.YAMLError) as exc:
         raise _invalid(f"cannot load {path}: {exc}") from exc
 
 
@@ -48,7 +48,7 @@ def compose_runtime_bundle(client_dir: Path) -> dict:
         )
         try:
             direction = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
+        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
             raise _invalid(f"cannot load direction {direction_id} from {path}: {exc}") from exc
         directions[direction_id] = direction
 

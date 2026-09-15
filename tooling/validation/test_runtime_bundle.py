@@ -8,6 +8,7 @@ from pathlib import Path
 
 import yaml
 
+from tooling.knowledge.index_design_contract import build_indexes
 from tooling.prototype.build_runtime_bundle import build_runtime_bundle
 from tooling.prototype.validate_runtime_bundle import validate_runtime_bundle
 
@@ -142,13 +143,15 @@ def _write_client(client_dir: Path, direction_ids: tuple[str, ...] = ("a", "b"))
 
 
 class RuntimeBundleTests(unittest.TestCase):
-    def test_builds_reference_client_bundle(self):
-        client = ROOT / "client-projects" / "examples" / "prototype-demo"
+    def test_builds_canonical_client_bundle(self):
         with tempfile.TemporaryDirectory() as tmp:
-            output = build_runtime_bundle(ROOT, client, Path(tmp))
+            root = Path(tmp)
+            client = root / "client-projects" / "acme-client"
+            _write_client(client, ("a", "b", "c"))
+            output = build_runtime_bundle(root, client, root / "output")
             bundle = json.loads(output.read_text(encoding="utf-8"))
 
-        self.assertEqual("prototype-demo", bundle["client_id"])
+        self.assertEqual("acme-client", bundle["client_id"])
         self.assertEqual("a", bundle["default_direction"])
         self.assertEqual({"a", "b", "c"}, set(bundle["directions"]))
         self.assertEqual(
@@ -230,6 +233,21 @@ class RuntimeBundleTests(unittest.TestCase):
                 errors = validate_runtime_bundle(bundle)
                 self.assertTrue(any(expected in error for error in errors), errors)
 
+    def test_validator_enforces_design_contract_pattern_ids(self):
+        canonical_pattern_ids = sorted(build_indexes(ROOT)["patterns"])
+        bundle = _bundle()
+        bundle["directions"]["a"]["patterns"] = canonical_pattern_ids
+        self.assertEqual([], validate_runtime_bundle(bundle))
+
+        bundle["directions"]["a"]["patterns"] = ["cart"]
+        self.assertEqual(
+            [
+                "directions.a.patterns.0 references unknown canonical pattern "
+                "'cart'"
+            ],
+            validate_runtime_bundle(bundle),
+        )
+
     def test_validator_reports_malformed_fixture_fields(self):
         cases = {}
         for collection, field in (
@@ -303,6 +321,32 @@ class RuntimeBundleTests(unittest.TestCase):
                     ["resources.asset.home.hero.type must be a non-empty string"],
                     validate_runtime_bundle(bundle),
                 )
+
+    def test_validator_error_order_is_independent_of_map_insertion_order(self):
+        bundle = _bundle()
+        bundle["directions"]["a"]["patterns"] = ["cart", "unknown-pattern"]
+        bundle["resources"] = {
+            "bad.second": {"type": "image"},
+            "bad.first": {"type": "icon"},
+            "direction_overrides": {
+                "z": {"bad.override": {"type": "motion"}},
+                "b": {"bad.nested": {"type": "image"}},
+            },
+        }
+
+        def reverse_maps(value):
+            if isinstance(value, dict):
+                return {
+                    key: reverse_maps(item)
+                    for key, item in reversed(list(value.items()))
+                }
+            if isinstance(value, list):
+                return [reverse_maps(item) for item in value]
+            return value
+
+        errors = validate_runtime_bundle(bundle)
+        self.assertTrue(errors)
+        self.assertEqual(errors, validate_runtime_bundle(reverse_maps(bundle)))
 
     def test_validator_resolves_required_resources_per_direction(self):
         bundle = _bundle()
@@ -469,6 +513,39 @@ class RuntimeBundleTests(unittest.TestCase):
                 "^invalid runtime bundle: .*JSON-compatible .*cyclic reference",
             ):
                 build_runtime_bundle(root, client, root / "output")
+
+    def test_builder_governs_invalid_utf8_input_errors(self):
+        cases = {
+            "manifest YAML": lambda client: client
+            / "prototype"
+            / "prototype-manifest.yaml",
+            "direction JSON": lambda client: client
+            / "prototype"
+            / "runtime"
+            / "direction-a.json",
+            "fixture YAML": lambda client: client
+            / "prototype"
+            / "fixtures"
+            / "demo.yaml",
+        }
+
+        for label, input_path in cases.items():
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                client = root / "client-projects" / "acme-client"
+                _write_client(client)
+                input_path(client).write_bytes(b"\xff")
+
+                with self.assertRaises(ValueError) as caught:
+                    build_runtime_bundle(root, client, root / "output")
+
+                self.assertEqual(ValueError, type(caught.exception))
+                self.assertTrue(
+                    str(caught.exception).startswith(
+                        "invalid runtime bundle: cannot load "
+                    ),
+                    caught.exception,
+                )
 
     def test_builder_rejects_invalid_manifest_review(self):
         with tempfile.TemporaryDirectory() as tmp:
