@@ -66,7 +66,13 @@ Stable Flutter Web review URLs use:
 /?client=<client-id>&direction=c
 ```
 
-The internal A/B/C selector supports rapid comparison in the same running app.
+The internal selector supports rapid comparison in the same running app.
+
+The app loads `assets/generated/<client-id>.json` at startup, resolves the requested direction
+from that bundle, and never silently falls back to Direction A. An explicit unknown client or
+direction renders a governed error screen. Local startup without a `client` parameter uses the
+checked-in regression client `prototype-demo`; omitting `direction` uses that client's
+`default_direction`.
 
 ## Client prototype artifacts
 
@@ -89,6 +95,18 @@ client-projects/<client>/prototype/
 The manifest references `apps/prototype_app` and points each direction key at its generated
 `runtime/direction-<id>.json`; it does not copy Flutter source.
 
+`tooling.prototype.build_runtime_bundle.build_runtime_bundle(...)` then composes one
+deterministic, self-contained client bundle at the Flutter asset boundary:
+
+```text
+apps/prototype_app/assets/generated/
+└── <client-id>.json
+```
+
+The bundle carries directions, fixtures, theme seed, and canonical B.1C resource bindings.
+It is regenerated from source by the composer and never hand-edited; repository validation
+fails when a checked-in bundle is missing, invalid, or stale.
+
 Initial deterministic fixture packs cover:
 
 - electronics/appliances
@@ -98,21 +116,23 @@ Initial deterministic fixture packs cover:
 
 ## Pattern registry
 
-Initial canonical runtime patterns:
+Canonical runtime pattern IDs come from `design-contract/patterns/` and are preserved
+unchanged in generated bundles and runtime directions:
 
-- home
-- search
-- plp
-- pdp
-- cart
-- checkout
-- quick-order
-- rfq
-- trade-dashboard
-- reorder
-- booking
+- commerce.home
+- commerce.search
+- commerce.plp
+- commerce.pdp
+- commerce.cart
+- commerce.rfq
+- commerce.reorder
+- commerce.trade-dashboard
 
-Unknown pattern IDs fail rather than silently creating ad-hoc UI.
+The Flutter app translates canonical IDs to internal `agency_flutter_ui` registry keys through
+an explicit allowlisted adapter at
+`apps/prototype_app/lib/registry/canonical_pattern_adapter.dart`. Heuristic prefix stripping is
+forbidden, and two canonical IDs must not collide on one internal key. A valid canonical pattern
+ID with no Flutter implementation fails visibly rather than silently creating ad-hoc UI.
 
 ## Widgetbook
 
