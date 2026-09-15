@@ -8,6 +8,7 @@ import yaml
 from tooling.resources.normalizer import normalize_bindings
 from tooling.resources.validate_resources import validate_resource_artifacts
 
+from .build_runtime_bundle import build_runtime_bundle
 from .fixture_generator import generate_fixture_pack
 from .project_direction import project_direction
 from .screenshot_manifest import build_screenshot_manifest
@@ -127,5 +128,11 @@ def compose_prototype(root: Path, client_dir: Path) -> Path:
     screenshot_path.write_text(
         yaml.safe_dump(build_screenshot_manifest(client_id, available_ids), sort_keys=False),
         encoding="utf-8",
+    )
+
+    build_runtime_bundle(
+        root,
+        client_dir,
+        root / "apps" / "prototype_app" / "assets" / "generated",
     )
     return manifest_path
