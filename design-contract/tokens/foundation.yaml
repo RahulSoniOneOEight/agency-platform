@@ -1,0 +1,18 @@
+version: 1
+color:
+  neutral: {"0": "#FFFFFF", "50": "#F7F8FA", "100": "#EEF0F4", "200": "#E4E6EB", "400": "#9AA0AB", "600": "#626874", "900": "#16181D"}
+  blue: {"500": "#3B6BFF", "600": "#2454FF", "700": "#1B41CC"}
+  amber: {"500": "#EF8A23"}
+  red: {"600": "#D32F2F"}
+typography:
+  size: {display: 40, headline: 32, title: 22, body: 15, label: 13}
+  line_height: {body: 1.5, heading: 1.25}
+  weight: {regular: 400, medium: 500, bold: 700}
+spacing: {"1": 4, "2": 8, "3": 12, "4": 16, "5": 20, "6": 24, "8": 32, "10": 40}
+radius: {sm: 6, md: 12, lg: 20, pill: 999}
+elevation: {none: 0, card: 1, overlay: 4}
+size: {control_height: 44, control_height_compact: 36, icon: 20}
+density:
+  multiplier: {compact: 0.85, normal: 1.0, spacious: 1.15}
+motion: {fast_ms: 150, normal_ms: 250, slow_ms: 400, easing: ease-out}
+breakpoints: {mobile: 0, tablet: 768, desktop: 1200}

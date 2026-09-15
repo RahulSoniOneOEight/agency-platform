@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "design-contract/schema/foundation-tokens.schema.json",
+  "title": "Agency Foundation Tokens",
+  "description": "Canonical implementation-neutral foundation scales. Documentation/CI asset; tooling/design_contract/theme_contract.py is authoritative.",
+  "type": "object",
+  "required": [
+    "version",
+    "color",
+    "typography",
+    "spacing",
+    "radius",
+    "elevation",
+    "size",
+    "density",
+    "motion",
+    "breakpoints"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {"const": 1},
+    "color": {
+      "type": "object",
+      "description": "Color families mapped to shade scales.",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": {
+          "type": "string",
+          "pattern": "^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+        }
+      }
+    },
+    "typography": {
+      "type": "object",
+      "required": ["size", "line_height", "weight"],
+      "additionalProperties": false,
+      "properties": {
+        "size": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {"type": "number", "exclusiveMinimum": 0}
+        },
+        "line_height": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {"type": "number", "exclusiveMinimum": 0}
+        },
+        "weight": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {"type": "number", "exclusiveMinimum": 0}
+        }
+      }
+    },
+    "spacing": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"type": "number", "minimum": 0}
+    },
+    "radius": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"type": "number", "minimum": 0}
+    },
+    "elevation": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"type": "number", "minimum": 0}
+    },
+    "size": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"type": "number", "minimum": 0}
+    },
+    "density": {
+      "type": "object",
+      "required": ["multiplier"],
+      "additionalProperties": false,
+      "properties": {
+        "multiplier": {
+          "type": "object",
+          "required": ["compact", "normal", "spacious"],
+          "additionalProperties": false,
+          "propertyNames": {"enum": ["compact", "normal", "spacious"]},
+          "patternProperties": {
+            "^(compact|normal|spacious)$": {"type": "number", "exclusiveMinimum": 0}
+          }
+        }
+      }
+    },
+    "motion": {
+      "type": "object",
+      "required": ["fast_ms", "normal_ms", "slow_ms", "easing"],
+      "additionalProperties": false,
+      "properties": {
+        "fast_ms": {"type": "number", "minimum": 0},
+        "normal_ms": {"type": "number", "minimum": 0},
+        "slow_ms": {"type": "number", "minimum": 0},
+        "easing": {"type": "string", "minLength": 1}
+      }
+    },
+    "breakpoints": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"type": "number", "minimum": 0}
+    }
+  }
+}

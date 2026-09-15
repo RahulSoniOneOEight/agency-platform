@@ -1,0 +1,52 @@
+version: 1
+color:
+  primary: "{foundation.color.blue.600}"
+  on_primary: "{foundation.color.neutral.0}"
+  secondary: "{foundation.color.amber.500}"
+  on_secondary: "{foundation.color.neutral.0}"
+  surface: "{foundation.color.neutral.0}"
+  surface_muted: "{foundation.color.neutral.50}"
+  text_primary: "{foundation.color.neutral.900}"
+  text_secondary: "{foundation.color.neutral.600}"
+  border: "{foundation.color.neutral.200}"
+  error: "{foundation.color.red.600}"
+  on_error: "{foundation.color.neutral.0}"
+typography:
+  font_family: Inter
+  font_fallback: Roboto
+  display: "{foundation.typography.size.display}"
+  headline: "{foundation.typography.size.headline}"
+  title: "{foundation.typography.size.title}"
+  body: "{foundation.typography.size.body}"
+  label: "{foundation.typography.size.label}"
+  line_height_body: "{foundation.typography.line_height.body}"
+  weight_regular: "{foundation.typography.weight.regular}"
+  weight_emphasis: "{foundation.typography.weight.bold}"
+  heading_emphasis: normal
+spacing:
+  inline: "{foundation.spacing.2}"
+  control: "{foundation.spacing.3}"
+  card: "{foundation.spacing.4}"
+  tile: "{foundation.spacing.3}"
+  section: "{foundation.spacing.8}"
+radius:
+  control: "{foundation.radius.md}"
+  card: "{foundation.radius.lg}"
+elevation:
+  card: "{foundation.elevation.card}"
+  overlay: "{foundation.elevation.overlay}"
+size:
+  control_height: "{foundation.size.control_height}"
+  control_height_compact: "{foundation.size.control_height_compact}"
+  icon: "{foundation.size.icon}"
+density:
+  default: normal
+motion:
+  fast_ms: "{foundation.motion.fast_ms}"
+  normal_ms: "{foundation.motion.normal_ms}"
+  slow_ms: "{foundation.motion.slow_ms}"
+  easing: "{foundation.motion.easing}"
+breakpoints:
+  mobile: "{foundation.breakpoints.mobile}"
+  tablet: "{foundation.breakpoints.tablet}"
+  desktop: "{foundation.breakpoints.desktop}"
