@@ -27,6 +27,24 @@ Implemented on `milestone-b-prototype-platform` / PR #6 pending review/merge:
 - Workflow Runtime activation through build-prototype → visual-qa → client-review
 - Prototype Platform validation and Flutter Web CI build
 
+### Milestone B.1 — Runtime integrity, resource intelligence, client runtime loading
+
+- B.1A — canonical direction contract: merged via PR #10.
+- B.1A1 — client input contract: merged via PR #11.
+- B.1C — resource selection and canonical bindings: merged via PR #12.
+- B.1B — client runtime loading: implemented on `milestone-b1b-client-runtime-loading`
+  (PR pending review/merge):
+  - one shared `apps/prototype_app` runtime that loads generated client bundles
+  - `tooling/prototype/build_runtime_bundle.py` composes one deterministic bundle per client
+  - generated asset boundary at `apps/prototype_app/assets/generated/<client-id>.json`
+  - `?client=<client-id>&direction=<direction-id>` with no silent fallback
+  - canonical B.1A direction vocabulary plus an app-layer canonical pattern adapter
+  - runtime fixtures, theme seed, and B.1C canonical resource bindings loaded from the bundle
+  - direction selector reflects only the client's declared directions
+  - governed, visible runtime errors with stable codes
+  - deterministic generation plus repository validation of bundle freshness
+  - approved canonical Cart, Reorder, and Trade Dashboard Design Contract pattern entries
+
 ## Still deferred to later milestones
 
 - production backend/ERP integrations

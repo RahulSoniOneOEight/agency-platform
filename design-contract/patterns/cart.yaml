@@ -1,0 +1,7 @@
+id: commerce.cart
+name: Cart
+purpose: Review selected products, quantities, and pricing before purchase or trade checkout.
+status: approved
+compatible_components: [commerce.product-card, commerce.price-display]
+business_models: [b2c, b2b, marketplace]
+use_cases: [purchase, bulk-procurement, repeat-order]

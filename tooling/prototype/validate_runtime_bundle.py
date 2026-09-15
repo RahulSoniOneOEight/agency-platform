@@ -1,0 +1,430 @@
+from __future__ import annotations
+
+import math
+import re
+from pathlib import Path
+
+from tooling.knowledge.index_design_contract import build_indexes
+
+from .project_direction import validate_runtime_direction
+
+
+_CLIENT_ID = re.compile(r"[A-Za-z0-9._-]+")
+_SEED_COLOR = re.compile(r"#[0-9A-Fa-f]{6}")
+_CANONICAL_RESOURCE_ID = re.compile(
+    r"(?:asset|icon|motion|resource)(?:\.[A-Za-z0-9_-]+)+"
+)
+_RESOURCE_PREFIXES = {
+    "image": "asset.",
+    "icon": "icon.",
+    "motion": "motion.",
+}
+_ELIGIBLE_CONTRACT_STATUSES = {"approved", "experimental"}
+
+
+def _is_number(value: object) -> bool:
+    return (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and (not isinstance(value, float) or math.isfinite(value))
+    )
+
+
+def _validate_json_value(
+    value: object, path: str, active_containers: set[int] | None = None
+) -> list[str]:
+    if active_containers is None:
+        active_containers = set()
+    if value is None or isinstance(value, (str, bool, int)):
+        return []
+    if isinstance(value, float):
+        if math.isfinite(value):
+            return []
+        return [f"{path} must be JSON-compatible (finite number required)"]
+    if isinstance(value, list):
+        identity = id(value)
+        if identity in active_containers:
+            return [f"{path} must be JSON-compatible (cyclic reference)"]
+        active_containers.add(identity)
+        errors: list[str] = []
+        try:
+            for index, item in enumerate(value):
+                errors.extend(
+                    _validate_json_value(item, f"{path}.{index}", active_containers)
+                )
+        finally:
+            active_containers.remove(identity)
+        return errors
+    if isinstance(value, dict):
+        identity = id(value)
+        if identity in active_containers:
+            return [f"{path} must be JSON-compatible (cyclic reference)"]
+        active_containers.add(identity)
+        errors = []
+        try:
+            for key, item in sorted(
+                value.items(), key=lambda pair: (type(pair[0]).__name__, repr(pair[0]))
+            ):
+                if not isinstance(key, str):
+                    errors.append(
+                        f"{path}.<key {key!r}> must be JSON-compatible "
+                        "(object keys must be strings)"
+                    )
+                    continue
+                errors.extend(
+                    _validate_json_value(item, f"{path}.{key}", active_containers)
+                )
+        finally:
+            active_containers.remove(identity)
+        return errors
+    return [f"{path} must be JSON-compatible, got {type(value).__name__}"]
+
+
+def _validate_fixture_item(
+    item: object,
+    *,
+    path: str,
+    string_fields: tuple[str, ...],
+    number_fields: tuple[str, ...],
+    integer_fields: tuple[str, ...],
+) -> list[str]:
+    if not isinstance(item, dict):
+        return [f"{path} must be an object"]
+
+    errors: list[str] = []
+    for field in string_fields:
+        value = item.get(field)
+        if not isinstance(value, str) or not value:
+            errors.append(f"{path}.{field} must be a non-empty string")
+    for field in number_fields:
+        if not _is_number(item.get(field)):
+            errors.append(f"{path}.{field} must be a number")
+    for field in integer_fields:
+        value = item.get(field)
+        if not isinstance(value, int) or isinstance(value, bool):
+            errors.append(f"{path}.{field} must be an integer")
+    return errors
+
+
+def _validate_fixtures(fixtures: object) -> list[str]:
+    if not isinstance(fixtures, dict):
+        return ["fixtures must be an object"]
+
+    errors: list[str] = []
+    industry = fixtures.get("industry")
+    if not isinstance(industry, str) or not industry:
+        errors.append("fixtures.industry must be a non-empty string")
+    seed = fixtures.get("seed")
+    if not isinstance(seed, int) or isinstance(seed, bool):
+        errors.append("fixtures.seed must be an integer")
+
+    products = fixtures.get("products")
+    if not isinstance(products, list):
+        errors.append("fixtures.products must be an array")
+    else:
+        for index, product in enumerate(products):
+            errors.extend(
+                _validate_fixture_item(
+                    product,
+                    path=f"fixtures.products.{index}",
+                    string_fields=("id", "sku", "name", "category"),
+                    number_fields=("price", "compare_at", "rating"),
+                    integer_fields=("stock",),
+                )
+            )
+
+    services = fixtures.get("services")
+    if not isinstance(services, list):
+        errors.append("fixtures.services must be an array")
+    else:
+        for index, service in enumerate(services):
+            errors.extend(
+                _validate_fixture_item(
+                    service,
+                    path=f"fixtures.services.{index}",
+                    string_fields=("id", "name"),
+                    number_fields=("price", "rating"),
+                    integer_fields=("duration_minutes",),
+                )
+            )
+    return errors
+
+
+def _validate_resource_binding(binding: object, path: str) -> list[str]:
+    if not isinstance(binding, dict):
+        return [f"{path} must be an object"]
+
+    errors: list[str] = []
+    for field in ("candidate_id", "source", "type"):
+        value = binding.get(field)
+        if not isinstance(value, str) or not value:
+            errors.append(f"{path}.{field} must be a non-empty string")
+    if not isinstance(binding.get("asset"), dict):
+        errors.append(f"{path}.asset must be an object")
+    return errors
+
+
+def _validate_binding_group(group: object, path: str) -> list[str]:
+    if not isinstance(group, dict):
+        return [f"{path} must be an object"]
+
+    errors: list[str] = []
+    for canonical_id, binding in group.items():
+        binding_path = f"{path}.{canonical_id}"
+        if (
+            not isinstance(canonical_id, str)
+            or not _CANONICAL_RESOURCE_ID.fullmatch(canonical_id)
+        ):
+            errors.append(f"{binding_path}: invalid canonical resource id")
+        errors.extend(_validate_resource_binding(binding, binding_path))
+        if not isinstance(binding, dict):
+            continue
+
+        resource_type = binding.get("type")
+        if not isinstance(resource_type, str) or not resource_type:
+            continue
+        expected_prefix = _RESOURCE_PREFIXES.get(resource_type, "resource.")
+        if isinstance(canonical_id, str) and not canonical_id.startswith(expected_prefix):
+            errors.append(
+                f"{binding_path}: canonical resource id must start with "
+                f"{expected_prefix!r} for type {resource_type!r}"
+            )
+
+    return errors
+
+
+def _validate_resources(resources: object, direction_ids: set[str]) -> list[str]:
+    if not isinstance(resources, dict):
+        return ["resources must be an object"]
+
+    base = {key: value for key, value in resources.items() if key != "direction_overrides"}
+    errors = _validate_binding_group(base, "resources")
+    if "direction_overrides" not in resources:
+        return errors
+
+    overrides = resources["direction_overrides"]
+    if not isinstance(overrides, dict):
+        return errors + ["resources.direction_overrides must be an object"]
+    for direction_id, group in overrides.items():
+        path = f"resources.direction_overrides.{direction_id}"
+        if direction_id not in direction_ids:
+            errors.append(f"{path} references unknown direction")
+        errors.extend(_validate_binding_group(group, path))
+    return errors
+
+
+def _validate_required_resources(directions: object, resources: object) -> list[str]:
+    if not isinstance(directions, dict) or not isinstance(resources, dict):
+        return []
+
+    base_ids = {key for key in resources if key != "direction_overrides"}
+    overrides = resources.get("direction_overrides")
+    errors: list[str] = []
+    for direction_id in sorted(directions, key=str):
+        direction = directions[direction_id]
+        if not isinstance(direction, dict):
+            continue
+        resolved_ids = set(base_ids)
+        if isinstance(overrides, dict):
+            direction_overrides = overrides.get(direction_id)
+            if isinstance(direction_overrides, dict):
+                resolved_ids.update(direction_overrides)
+        required_resources = direction.get("required_resources")
+        if not isinstance(required_resources, list):
+            continue
+        for index, resource_id in enumerate(required_resources):
+            if isinstance(resource_id, str) and resource_id not in resolved_ids:
+                errors.append(
+                    f"directions.{direction_id}.required_resources.{index} references "
+                    f"unresolved resource {resource_id!r}"
+                )
+    return errors
+
+
+def _validate_component_variant_membership(directions: object) -> list[str]:
+    if not isinstance(directions, dict):
+        return []
+
+    errors: list[str] = []
+    for direction_id, direction in directions.items():
+        if not isinstance(direction, dict):
+            continue
+        components = direction.get("components")
+        variants = direction.get("component_variants")
+        if not isinstance(components, list) or not isinstance(variants, list):
+            continue
+        for index, variant in enumerate(variants):
+            if not isinstance(variant, dict):
+                continue
+            component_id = variant.get("component")
+            if isinstance(component_id, str) and component_id not in components:
+                errors.append(
+                    f"directions.{direction_id}.component_variants.{index}.component "
+                    f"{component_id!r} must be listed in "
+                    f"directions.{direction_id}.components"
+                )
+    return errors
+
+
+def _validate_contract_references(
+    directions: object,
+    *,
+    field: str,
+    contracts: dict[str, dict],
+    contract_type: str,
+) -> list[str]:
+    if not isinstance(directions, dict):
+        return []
+
+    errors: list[str] = []
+    for direction_id, direction in directions.items():
+        if not isinstance(direction, dict):
+            continue
+        references = direction.get(field)
+        if not isinstance(references, list):
+            continue
+        for index, contract_id in enumerate(references):
+            if not isinstance(contract_id, str):
+                continue
+            path = f"directions.{direction_id}.{field}.{index}"
+            contract = contracts.get(contract_id)
+            if contract is None:
+                errors.append(
+                    f"{path} references unknown canonical {contract_type} "
+                    f"{contract_id!r}"
+                )
+            elif contract.get("status") not in _ELIGIBLE_CONTRACT_STATUSES:
+                errors.append(
+                    f"{path} references ineligible canonical {contract_type} "
+                    f"{contract_id!r}"
+                )
+    return errors
+
+
+def validate_runtime_bundle_against_design_contract(
+    root: Path, bundle: dict
+) -> list[str]:
+    if not isinstance(bundle, dict):
+        return []
+
+    indexes = build_indexes(root)
+    directions = bundle.get("directions")
+    errors = _validate_contract_references(
+        directions,
+        field="patterns",
+        contracts=indexes["patterns"],
+        contract_type="pattern",
+    )
+    errors.extend(
+        _validate_contract_references(
+            directions,
+            field="components",
+            contracts=indexes["components"],
+            contract_type="component",
+        )
+    )
+
+    if isinstance(directions, dict):
+        for direction_id, direction in directions.items():
+            if not isinstance(direction, dict):
+                continue
+            variants = direction.get("component_variants")
+            if not isinstance(variants, list):
+                continue
+            for index, variant in enumerate(variants):
+                if not isinstance(variant, dict):
+                    continue
+                component_id = variant.get("component")
+                if not isinstance(component_id, str):
+                    continue
+                contract = indexes["components"].get(component_id)
+                path = (
+                    f"directions.{direction_id}.component_variants.{index}.component"
+                )
+                if contract is None:
+                    errors.append(
+                        f"{path} references unknown canonical component {component_id!r}"
+                    )
+                elif contract.get("status") not in _ELIGIBLE_CONTRACT_STATUSES:
+                    errors.append(
+                        f"{path} references ineligible canonical component "
+                        f"{component_id!r}"
+                    )
+    return sorted(errors)
+
+
+def validate_runtime_bundle(bundle: dict) -> list[str]:
+    if not isinstance(bundle, dict):
+        return ["runtime bundle must be an object"]
+
+    errors = _validate_json_value(bundle, "runtime bundle")
+    if any(error.endswith("(cyclic reference)") for error in errors):
+        return sorted(errors)
+    version = bundle.get("version")
+    if not isinstance(version, int) or isinstance(version, bool) or version != 1:
+        errors.append("version must equal 1")
+
+    client_id = bundle.get("client_id")
+    if not isinstance(client_id, str) or not _CLIENT_ID.fullmatch(client_id):
+        errors.append("client_id must be a non-empty safe ID matching [A-Za-z0-9._-]+")
+
+    directions = bundle.get("directions")
+    direction_ids: set[str] = set()
+    expected_order: list[str] = []
+    if not isinstance(directions, dict):
+        errors.append("directions must be an object")
+    else:
+        direction_ids = {key for key in directions if isinstance(key, str)}
+        expected_order = sorted(direction_ids)
+        if not 2 <= len(directions) <= 3:
+            errors.append("directions must contain exactly 2 or 3 entries")
+        if not {"a", "b"}.issubset(direction_ids):
+            errors.append("directions must include a and b")
+        if (
+            not direction_ids.issubset({"a", "b", "c"})
+            or len(direction_ids) != len(directions)
+        ):
+            errors.append("direction IDs must be a, b, and optional c")
+        for direction_id, direction in directions.items():
+            path = f"directions.{direction_id}"
+            if not isinstance(direction, dict):
+                errors.append(f"{path} must be an object")
+                continue
+            errors.extend(
+                f"{path}.{error}" for error in validate_runtime_direction(direction)
+            )
+            if direction.get("id") != direction_id:
+                errors.append(
+                    f"{path}: direction key {direction_id!r} must equal embedded id "
+                    f"{direction.get('id')!r}"
+                )
+
+    errors.extend(_validate_component_variant_membership(directions))
+
+    default_direction = bundle.get("default_direction")
+    if not isinstance(default_direction, str) or default_direction not in direction_ids:
+        errors.append("default_direction must identify an existing direction")
+
+    review = bundle.get("review")
+    if not isinstance(review, dict):
+        errors.append("review must be an object")
+    elif review.get("allowed_directions") != expected_order:
+        errors.append(
+            "review.allowed_directions must exactly equal direction keys in "
+            f"deterministic order {expected_order!r}"
+        )
+
+    errors.extend(_validate_fixtures(bundle.get("fixtures")))
+
+    theme = bundle.get("theme")
+    if not isinstance(theme, dict):
+        errors.append("theme must be an object")
+    else:
+        seed_color = theme.get("seed_color")
+        if not isinstance(seed_color, str) or not _SEED_COLOR.fullmatch(seed_color):
+            errors.append("theme.seed_color must be a #RRGGBB color")
+
+    resources = bundle.get("resources")
+    errors.extend(_validate_resources(resources, direction_ids))
+    errors.extend(_validate_required_resources(directions, resources))
+    return sorted(errors)

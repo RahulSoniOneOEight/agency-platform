@@ -12,9 +12,9 @@
   "name": "Trade Dashboard",
   "navigation_model": "dashboard",
   "patterns": [
-    "trade-dashboard",
-    "reorder",
-    "cart"
+    "commerce.trade-dashboard",
+    "commerce.reorder",
+    "commerce.cart"
   ],
   "primary_journey": "reorder-to-order",
   "required_resources": [],

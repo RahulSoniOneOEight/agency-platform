@@ -17,7 +17,7 @@
     "commerce.plp",
     "commerce.pdp",
     "commerce.rfq",
-    "trade-dashboard"
+    "commerce.trade-dashboard"
   ],
   "primary_journey": "rfq-to-quote",
   "required_resources": [],

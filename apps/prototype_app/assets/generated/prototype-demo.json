@@ -1,0 +1,214 @@
+{
+  "client_id": "prototype-demo",
+  "default_direction": "a",
+  "directions": {
+    "a": {
+      "component_variants": [
+        {
+          "component": "commerce.product-card",
+          "variant": "b2b"
+        }
+      ],
+      "components": [
+        "commerce.product-card",
+        "commerce.price-display",
+        "commerce.search-field",
+        "commerce.quote-card"
+      ],
+      "density": "compact",
+      "discovery_model": "sku-search",
+      "id": "a",
+      "merchandising_model": "availability-and-price",
+      "name": "Search-led Trade",
+      "navigation_model": "search-led",
+      "patterns": [
+        "commerce.search",
+        "commerce.plp",
+        "commerce.pdp",
+        "commerce.cart",
+        "commerce.rfq"
+      ],
+      "primary_journey": "search-to-order",
+      "required_resources": [],
+      "strategic_goal": "reduce known-item order time",
+      "transaction_model": "checkout-plus-rfq"
+    },
+    "b": {
+      "component_variants": [],
+      "components": [
+        "commerce.credit-summary",
+        "commerce.quote-card",
+        "commerce.product-card"
+      ],
+      "density": "normal",
+      "discovery_model": "account-history",
+      "id": "b",
+      "merchandising_model": "reorder-and-credit",
+      "name": "Trade Dashboard",
+      "navigation_model": "dashboard",
+      "patterns": [
+        "commerce.trade-dashboard",
+        "commerce.reorder",
+        "commerce.cart"
+      ],
+      "primary_journey": "reorder-to-order",
+      "required_resources": [],
+      "strategic_goal": "increase repeat ordering and account self-service",
+      "transaction_model": "account-ordering"
+    },
+    "c": {
+      "component_variants": [],
+      "components": [
+        "commerce.product-card",
+        "commerce.price-display",
+        "commerce.quote-card",
+        "commerce.credit-summary"
+      ],
+      "density": "normal",
+      "discovery_model": "category-plus-specification",
+      "id": "c",
+      "merchandising_model": "bulk-and-negotiated-pricing",
+      "name": "Procurement RFQ",
+      "navigation_model": "rfq-led",
+      "patterns": [
+        "commerce.home",
+        "commerce.plp",
+        "commerce.pdp",
+        "commerce.rfq",
+        "commerce.trade-dashboard"
+      ],
+      "primary_journey": "rfq-to-quote",
+      "required_resources": [],
+      "strategic_goal": "simplify complex bulk procurement",
+      "transaction_model": "rfq-first"
+    }
+  },
+  "fixtures": {
+    "industry": "electronics-appliances",
+    "products": [
+      {
+        "category": "category-1",
+        "compare_at": 674,
+        "id": "prd-01",
+        "name": "USB-C Hub",
+        "price": 674,
+        "rating": 4.1,
+        "sku": "SKU-ELE-1000",
+        "stock": 18
+      },
+      {
+        "category": "category-2",
+        "compare_at": 1299,
+        "id": "prd-02",
+        "name": "Wireless Mouse",
+        "price": 1049,
+        "rating": 4.8,
+        "sku": "SKU-ELE-1001",
+        "stock": 57
+      },
+      {
+        "category": "category-3",
+        "compare_at": 1674,
+        "id": "prd-03",
+        "name": "Mechanical Keyboard",
+        "price": 1424,
+        "rating": 4.7,
+        "sku": "SKU-ELE-1002",
+        "stock": 56
+      },
+      {
+        "category": "category-4",
+        "compare_at": 1799,
+        "id": "prd-04",
+        "name": "27-inch Monitor",
+        "price": 1799,
+        "rating": 4.2,
+        "sku": "SKU-ELE-1003",
+        "stock": 18
+      },
+      {
+        "category": "category-1",
+        "compare_at": 2424,
+        "id": "prd-05",
+        "name": "Laptop Stand",
+        "price": 2174,
+        "rating": 4.3,
+        "sku": "SKU-ELE-1004",
+        "stock": 31
+      },
+      {
+        "category": "category-2",
+        "compare_at": 2799,
+        "id": "prd-06",
+        "name": "65W Charger",
+        "price": 2549,
+        "rating": 4.2,
+        "sku": "SKU-ELE-1005",
+        "stock": 48
+      },
+      {
+        "category": "category-3",
+        "compare_at": 2924,
+        "id": "prd-07",
+        "name": "Noise-Cancel Headphones",
+        "price": 2924,
+        "rating": 4.2,
+        "sku": "SKU-ELE-1006",
+        "stock": 32
+      },
+      {
+        "category": "category-4",
+        "compare_at": 3549,
+        "id": "prd-08",
+        "name": "Portable SSD",
+        "price": 3299,
+        "rating": 4.1,
+        "sku": "SKU-ELE-1007",
+        "stock": 79
+      }
+    ],
+    "seed": 108,
+    "services": []
+  },
+  "resources": {
+    "asset.brand.logo": {
+      "asset": {
+        "path": "input/brand/brand-assets/logo.svg"
+      },
+      "candidate_id": "client-brand-logo",
+      "source": "client",
+      "type": "image"
+    },
+    "asset.home.hero": {
+      "asset": {
+        "height": 1350,
+        "url": "https://images.pexels.com/photos/fixture/hero.jpg",
+        "width": 2400
+      },
+      "candidate_id": "pexels-fixture-1001",
+      "source": "pexels",
+      "type": "image"
+    },
+    "icon.commerce.cart": {
+      "asset": {
+        "name": "cart",
+        "provider": "iconoir"
+      },
+      "candidate_id": "iconoir-cart",
+      "source": "agency",
+      "type": "icon"
+    }
+  },
+  "review": {
+    "allowed_directions": [
+      "a",
+      "b",
+      "c"
+    ],
+    "query_parameter": "direction"
+  },
+  "theme": {
+    "seed_color": "#6750A4"
+  },
+  "version": 1
+}

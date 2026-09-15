@@ -49,7 +49,23 @@ def valid_strategic_direction(direction_id: str) -> dict:
     }
 
 
+def _write_design_contract(root: Path) -> None:
+    catalogs = {
+        "patterns": ("commerce.home", "commerce.search", "commerce.pdp"),
+        "components": ("commerce.product-card", "commerce.price-display"),
+    }
+    for catalog, contract_ids in catalogs.items():
+        directory = root / "design-contract" / catalog
+        directory.mkdir(parents=True, exist_ok=True)
+        for contract_id in contract_ids:
+            (directory / f"{contract_id.replace('.', '-')}.yaml").write_text(
+                yaml.safe_dump({"id": contract_id, "status": "approved"}),
+                encoding="utf-8",
+            )
+
+
 def _write_client(root: Path, direction_ids: list[str]) -> Path:
+    _write_design_contract(root)
     client = root / "client-projects" / "acme"
     directions = client / "directions"
     directions.mkdir(parents=True)

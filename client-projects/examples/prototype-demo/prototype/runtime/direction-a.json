@@ -21,7 +21,7 @@
     "commerce.search",
     "commerce.plp",
     "commerce.pdp",
-    "cart",
+    "commerce.cart",
     "commerce.rfq"
   ],
   "primary_journey": "search-to-order",

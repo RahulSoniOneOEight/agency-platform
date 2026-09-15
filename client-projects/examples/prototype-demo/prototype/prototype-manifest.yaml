@@ -15,3 +15,25 @@ review:
   - a
   - b
   - c
+resources:
+  asset.brand.logo:
+    candidate_id: client-brand-logo
+    type: image
+    source: client
+    asset:
+      path: input/brand/brand-assets/logo.svg
+  asset.home.hero:
+    candidate_id: pexels-fixture-1001
+    type: image
+    source: pexels
+    asset:
+      url: https://images.pexels.com/photos/fixture/hero.jpg
+      width: 2400
+      height: 1350
+  icon.commerce.cart:
+    candidate_id: iconoir-cart
+    type: icon
+    source: agency
+    asset:
+      provider: iconoir
+      name: cart
