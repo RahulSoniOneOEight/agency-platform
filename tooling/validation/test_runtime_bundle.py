@@ -170,23 +170,72 @@ def _write_client(client_dir: Path, direction_ids: tuple[str, ...] = ("a", "b"))
 
 
 class RuntimeBundleTests(unittest.TestCase):
-    def test_prototype_demo_strategic_and_projected_pattern_ids_are_canonical(self):
-        pattern_ids = set(build_indexes(ROOT)["patterns"])
+    def test_prototype_demo_runtime_directions_match_approved_canonical_sources(self):
+        indexes = build_indexes(ROOT)
         legacy_short_ids = {"cart", "reorder", "trade-dashboard"}
-        directions_dir = (
-            ROOT / "client-projects" / "examples" / "prototype-demo" / "directions"
+        client_dir = ROOT / "client-projects" / "examples" / "prototype-demo"
+        directions_dir = client_dir / "directions"
+        manifest = yaml.safe_load(
+            (client_dir / "prototype" / "prototype-manifest.yaml").read_text(
+                encoding="utf-8"
+            )
         )
+        runtime_paths = manifest["directions"]
+        strategic_paths = {
+            path.stem.removeprefix("direction-"): path
+            for path in sorted(directions_dir.glob("direction-*.yaml"))
+        }
+        generated_runtime_paths = {
+            path.relative_to(client_dir).as_posix()
+            for path in (client_dir / "prototype" / "runtime").glob("direction-*.json")
+        }
 
-        for direction_path in sorted(directions_dir.glob("direction-*.yaml")):
-            strategic = yaml.safe_load(direction_path.read_text(encoding="utf-8"))
+        self.assertEqual(set(strategic_paths), set(runtime_paths))
+        self.assertEqual(set(runtime_paths.values()), generated_runtime_paths)
+
+        for direction_id, relative_runtime_path in sorted(runtime_paths.items()):
+            strategic = yaml.safe_load(
+                strategic_paths[direction_id].read_text(encoding="utf-8")
+            )
             projected = project_direction(strategic)
+            runtime_path = client_dir / relative_runtime_path
+            runtime_text = runtime_path.read_text(encoding="utf-8")
+            runtime = json.loads(runtime_text)
+
+            with self.subTest(direction=direction_id, assertion="semantic projection"):
+                self.assertEqual(projected, runtime)
+            with self.subTest(direction=direction_id, assertion="deterministic JSON"):
+                self.assertEqual(
+                    json.dumps(project_direction(strategic), indent=2, sort_keys=True)
+                    + "\n",
+                    runtime_text,
+                )
+
             for label, patterns in (
                 ("strategic", strategic["patterns"]),
                 ("projected", projected["patterns"]),
             ):
-                with self.subTest(direction=direction_path.stem, artifact=label):
+                with self.subTest(direction=direction_id, artifact=label):
                     self.assertTrue(legacy_short_ids.isdisjoint(patterns), patterns)
-                    self.assertEqual([], sorted(set(patterns) - pattern_ids))
+
+            references = (
+                ("patterns", runtime["patterns"], indexes["patterns"]),
+                ("components", runtime["components"], indexes["components"]),
+                (
+                    "component_variants",
+                    [item["component"] for item in runtime["component_variants"]],
+                    indexes["components"],
+                ),
+            )
+            for field, contract_ids, contracts in references:
+                for contract_id in contract_ids:
+                    with self.subTest(
+                        direction=direction_id, field=field, contract=contract_id
+                    ):
+                        contract = contracts.get(contract_id)
+                        self.assertIsNotNone(contract, "canonical contract is missing")
+                        if contract is not None:
+                            self.assertEqual("approved", contract.get("status"))
 
     def test_builds_canonical_client_bundle(self):
         with tempfile.TemporaryDirectory() as tmp:
