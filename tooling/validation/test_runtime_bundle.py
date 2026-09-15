@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import copy
 import json
 import tempfile
 import unittest
+from datetime import date
 from pathlib import Path
 
 import yaml
@@ -55,6 +55,15 @@ def _fixtures() -> dict:
     }
 
 
+def _resource_binding(candidate_id: str = "hero") -> dict:
+    return {
+        "candidate_id": candidate_id,
+        "source": "client",
+        "type": "image",
+        "asset": {},
+    }
+
+
 def _bundle(direction_ids: tuple[str, ...] = ("a", "b")) -> dict:
     directions = {direction_id: _direction(direction_id) for direction_id in direction_ids}
     return {
@@ -64,7 +73,7 @@ def _bundle(direction_ids: tuple[str, ...] = ("a", "b")) -> dict:
         "directions": directions,
         "fixtures": _fixtures(),
         "theme": {"seed_color": "#6750A4"},
-        "resources": {},
+        "resources": {"asset.home.hero": _resource_binding()},
         "review": {
             "query_parameter": "direction",
             "allowed_directions": list(direction_ids),
@@ -279,23 +288,123 @@ class RuntimeBundleTests(unittest.TestCase):
         malformed_override["resources"] = {"direction_overrides": {"b": []}}
         cases["override group"] = (malformed_override, "must be an object")
 
-        collision = _bundle()
-        binding = {
-            "candidate_id": "shared-candidate",
-            "source": "client",
-            "type": "image",
-            "asset": {},
-        }
-        collision["resources"] = {
-            "asset.home.hero": copy.deepcopy(binding),
-            "asset.category.hero": copy.deepcopy(binding),
-        }
-        cases["collision"] = (collision, "collision")
-
         for label, (bundle, expected) in cases.items():
             with self.subTest(label=label):
                 errors = validate_runtime_bundle(bundle)
                 self.assertTrue(any(expected in error for error in errors), errors)
+
+    def test_validator_resolves_required_resources_per_direction(self):
+        bundle = _bundle()
+        bundle["resources"] = {
+            "direction_overrides": {
+                "a": {"asset.home.hero": _resource_binding("hero-a")},
+                "b": {"asset.home.hero": _resource_binding("hero-b")},
+            }
+        }
+        self.assertEqual([], validate_runtime_bundle(bundle))
+
+    def test_validator_reports_required_resource_missing_from_own_bindings(self):
+        bundle = _bundle()
+        bundle["resources"] = {
+            "direction_overrides": {
+                "b": {"asset.home.hero": _resource_binding("hero-b")}
+            }
+        }
+
+        self.assertEqual(
+            [
+                "directions.a.required_resources.0 references unresolved resource "
+                "'asset.home.hero'"
+            ],
+            validate_runtime_bundle(bundle),
+        )
+
+    def test_validator_accepts_candidate_reuse_across_canonical_ids(self):
+        bundle = _bundle()
+        bundle["resources"]["asset.category.hero"] = _resource_binding("hero")
+
+        self.assertEqual([], validate_runtime_bundle(bundle))
+
+    def test_validator_rejects_bool_and_non_finite_fixture_numbers(self):
+        cases = {
+            "bool price": ("price", True),
+            "nan price": ("price", float("nan")),
+            "positive infinity rating": ("rating", float("inf")),
+            "negative infinity compare_at": ("compare_at", float("-inf")),
+        }
+
+        for label, (field, value) in cases.items():
+            with self.subTest(label=label):
+                bundle = _bundle()
+                bundle["fixtures"]["products"][0][field] = value
+                errors = validate_runtime_bundle(bundle)
+                self.assertTrue(
+                    any(f"fixtures.products.0.{field} must be a number" in error for error in errors),
+                    errors,
+                )
+
+    def test_validator_rejects_values_outside_json_data_model(self):
+        cases = {
+            "yaml date": ("fixtures.generated_on", date(2026, 9, 15)),
+            "yaml set": ("resources.asset.home.hero.asset.tags", {"featured"}),
+            "unsupported map key": ("theme.<key 1>", {1: "invalid"}),
+        }
+
+        for label, (expected_path, value) in cases.items():
+            with self.subTest(label=label):
+                bundle = _bundle()
+                if label == "yaml date":
+                    bundle["fixtures"]["generated_on"] = value
+                elif label == "yaml set":
+                    bundle["resources"]["asset.home.hero"]["asset"]["tags"] = value
+                else:
+                    bundle["theme"].update(value)
+                errors = validate_runtime_bundle(bundle)
+                self.assertTrue(
+                    any(
+                        expected_path in error and "JSON-compatible" in error
+                        for error in errors
+                    ),
+                    errors,
+                )
+
+    def test_builder_rejects_non_json_yaml_values_with_governed_error(self):
+        cases = {
+            "non-finite number": lambda manifest, fixtures: fixtures["products"][0].update(
+                {"price": float("nan")}
+            ),
+            "yaml date": lambda manifest, fixtures: manifest["theme"].update(
+                {"generated_on": date(2026, 9, 15)}
+            ),
+            "yaml set": lambda manifest, fixtures: manifest["resources"][
+                "asset.home.hero"
+            ]["asset"].update({"tags": {"featured"}}),
+            "unsupported map key": lambda manifest, fixtures: manifest["resources"][
+                "asset.home.hero"
+            ].update({1: "invalid"}),
+        }
+
+        for label, mutate in cases.items():
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                client = root / "client-projects" / "acme-client"
+                _write_client(client)
+                manifest_path = client / "prototype" / "prototype-manifest.yaml"
+                fixture_path = client / "prototype" / "fixtures" / "demo.yaml"
+                manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+                fixtures = yaml.safe_load(fixture_path.read_text(encoding="utf-8"))
+                mutate(manifest, fixtures)
+                manifest_path.write_text(
+                    yaml.safe_dump(manifest, sort_keys=False), encoding="utf-8"
+                )
+                fixture_path.write_text(
+                    yaml.safe_dump(fixtures, sort_keys=False), encoding="utf-8"
+                )
+
+                with self.assertRaisesRegex(
+                    ValueError, "^invalid runtime bundle: .*JSON-compatible"
+                ):
+                    build_runtime_bundle(root, client, root / "output")
 
     def test_builder_rejects_invalid_manifest_review(self):
         with tempfile.TemporaryDirectory() as tmp:

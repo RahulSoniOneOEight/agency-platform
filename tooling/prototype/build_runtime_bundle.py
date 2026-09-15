@@ -81,11 +81,12 @@ def build_runtime_bundle(root: Path, client_dir: Path, output_dir: Path) -> Path
     if errors:
         raise _invalid("; ".join(errors))
 
+    try:
+        serialized = json.dumps(bundle, indent=2, sort_keys=True, allow_nan=False) + "\n"
+    except (TypeError, ValueError) as exc:
+        raise _invalid(f"bundle is not JSON-compatible: {exc}") from exc
+
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / f"{bundle['client_id']}.json"
-    output_path.write_text(
-        json.dumps(bundle, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-        newline="\n",
-    )
+    output_path.write_text(serialized, encoding="utf-8", newline="\n")
     return output_path

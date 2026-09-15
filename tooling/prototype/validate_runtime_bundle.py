@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import re
 
 from .project_direction import validate_runtime_direction
@@ -18,7 +19,39 @@ _RESOURCE_PREFIXES = {
 
 
 def _is_number(value: object) -> bool:
-    return isinstance(value, (int, float)) and not isinstance(value, bool)
+    return (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and (not isinstance(value, float) or math.isfinite(value))
+    )
+
+
+def _validate_json_value(value: object, path: str) -> list[str]:
+    if value is None or isinstance(value, (str, bool, int)):
+        return []
+    if isinstance(value, float):
+        if math.isfinite(value):
+            return []
+        return [f"{path} must be JSON-compatible (finite number required)"]
+    if isinstance(value, list):
+        errors: list[str] = []
+        for index, item in enumerate(value):
+            errors.extend(_validate_json_value(item, f"{path}.{index}"))
+        return errors
+    if isinstance(value, dict):
+        errors = []
+        for key, item in sorted(
+            value.items(), key=lambda pair: (type(pair[0]).__name__, repr(pair[0]))
+        ):
+            if not isinstance(key, str):
+                errors.append(
+                    f"{path}.<key {key!r}> must be JSON-compatible "
+                    "(object keys must be strings)"
+                )
+                continue
+            errors.extend(_validate_json_value(item, f"{path}.{key}"))
+        return errors
+    return [f"{path} must be JSON-compatible, got {type(value).__name__}"]
 
 
 def _validate_fixture_item(
@@ -110,7 +143,6 @@ def _validate_binding_group(group: object, path: str) -> list[str]:
         return [f"{path} must be an object"]
 
     errors: list[str] = []
-    candidate_owners: dict[str, str] = {}
     for canonical_id, binding in group.items():
         binding_path = f"{path}.{canonical_id}"
         if (
@@ -130,16 +162,6 @@ def _validate_binding_group(group: object, path: str) -> list[str]:
                 f"{expected_prefix!r} for type {resource_type!r}"
             )
 
-        candidate_id = binding.get("candidate_id")
-        if isinstance(candidate_id, str) and candidate_id:
-            existing_owner = candidate_owners.get(candidate_id)
-            if existing_owner is not None and existing_owner != canonical_id:
-                errors.append(
-                    f"{path}: canonical resource collision for candidate {candidate_id!r} "
-                    f"between {existing_owner!r} and {canonical_id!r}"
-                )
-            else:
-                candidate_owners[candidate_id] = canonical_id
     return errors
 
 
@@ -163,11 +185,39 @@ def _validate_resources(resources: object, direction_ids: set[str]) -> list[str]
     return errors
 
 
+def _validate_required_resources(directions: object, resources: object) -> list[str]:
+    if not isinstance(directions, dict) or not isinstance(resources, dict):
+        return []
+
+    base_ids = {key for key in resources if key != "direction_overrides"}
+    overrides = resources.get("direction_overrides")
+    errors: list[str] = []
+    for direction_id in sorted(directions, key=str):
+        direction = directions[direction_id]
+        if not isinstance(direction, dict):
+            continue
+        resolved_ids = set(base_ids)
+        if isinstance(overrides, dict):
+            direction_overrides = overrides.get(direction_id)
+            if isinstance(direction_overrides, dict):
+                resolved_ids.update(direction_overrides)
+        required_resources = direction.get("required_resources")
+        if not isinstance(required_resources, list):
+            continue
+        for index, resource_id in enumerate(required_resources):
+            if isinstance(resource_id, str) and resource_id not in resolved_ids:
+                errors.append(
+                    f"directions.{direction_id}.required_resources.{index} references "
+                    f"unresolved resource {resource_id!r}"
+                )
+    return errors
+
+
 def validate_runtime_bundle(bundle: dict) -> list[str]:
     if not isinstance(bundle, dict):
         return ["runtime bundle must be an object"]
 
-    errors: list[str] = []
+    errors = _validate_json_value(bundle, "runtime bundle")
     version = bundle.get("version")
     if not isinstance(version, int) or isinstance(version, bool) or version != 1:
         errors.append("version must equal 1")
@@ -230,5 +280,7 @@ def validate_runtime_bundle(bundle: dict) -> list[str]:
         if not isinstance(seed_color, str) or not _SEED_COLOR.fullmatch(seed_color):
             errors.append("theme.seed_color must be a #RRGGBB color")
 
-    errors.extend(_validate_resources(bundle.get("resources"), direction_ids))
+    resources = bundle.get("resources")
+    errors.extend(_validate_resources(resources, direction_ids))
+    errors.extend(_validate_required_resources(directions, resources))
     return errors
