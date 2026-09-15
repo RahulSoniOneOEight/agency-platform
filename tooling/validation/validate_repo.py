@@ -98,7 +98,7 @@ REQUIRED_PATHS = (
     "apps/prototype_app/lib/runtime/runtime_loader.dart",
     "apps/prototype_app/lib/runtime/runtime_exception.dart",
     "apps/prototype_app/lib/runtime/resource_binding.dart",
-    "apps/prototype_app/lib/registry/canonical_pattern_adapter.dart",
+    "apps/prototype_app/lib/registry/design_contract_resolver.dart",
     "AGENTS.md",
     "REFERENCE_POLICY.md",
     "DESIGN_SYSTEM.md",
