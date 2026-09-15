@@ -281,6 +281,46 @@ class RuntimeBundleTests(unittest.TestCase):
             )["resources"]
             self.assertEqual(expected_resources, bundle["resources"])
 
+    def test_builder_preserves_full_b1c_resource_binding_shape(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            client = root / "client-projects" / "acme-client"
+            _write_client(client)
+
+            bundle = json.loads(
+                build_runtime_bundle(root, client, root / "output").read_text(
+                    encoding="utf-8"
+                )
+            )
+
+        self.assertEqual(
+            {
+                "candidate_id": "pexels-42",
+                "source": "pexels",
+                "type": "image",
+                "asset": {
+                    "url": "https://images.pexels.com/photos/42/large.jpeg",
+                    "width": 2400,
+                    "provider_metadata": {"photographer": "Example"},
+                },
+                "provider_extension": {"license": "Pexels"},
+            },
+            bundle["resources"]["asset.home.hero"],
+        )
+        self.assertEqual(
+            {
+                "b": {
+                    "asset.home.hero": {
+                        "candidate_id": "client-hero",
+                        "source": "client",
+                        "type": "image",
+                        "asset": {"path": "input/assets/banners/hero.jpg"},
+                    }
+                }
+            },
+            bundle["resources"]["direction_overrides"],
+        )
+
     def test_validator_accepts_three_directions_and_fixture_shapes(self):
         bundle = _bundle(("a", "b", "c"))
         bundle["directions"]["b"]["density"] = "normal"

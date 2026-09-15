@@ -46,6 +46,37 @@ void main() {
     expect(runtime.resource('asset.home.hero')!.candidateId, 'pexels-fixture-1001');
   });
 
+  test('preserves canonical B.1C resource bindings from the checked-in bundle', () async {
+    final bundle = FakeAssetBundle({
+      'assets/generated/prototype-demo.json': checkedInBundle(),
+    });
+
+    final runtime = await RuntimeLoader.loadClient('prototype-demo', bundle: bundle);
+
+    final hero = runtime.resource('asset.home.hero')!;
+    expect(hero.id, 'asset.home.hero');
+    expect(hero.candidateId, 'pexels-fixture-1001');
+    expect(hero.source, 'pexels');
+    expect(hero.type, 'image');
+    expect(hero.asset, {
+      'url': 'https://images.pexels.com/photos/fixture/hero.jpg',
+      'width': 2400,
+      'height': 1350,
+    });
+
+    final cart = runtime.resource('icon.commerce.cart')!;
+    expect(cart.id, 'icon.commerce.cart');
+    expect(cart.source, 'agency');
+    expect(cart.type, 'icon');
+    expect(cart.asset, {'provider': 'iconoir', 'name': 'cart'});
+
+    final logo = runtime.resource('asset.brand.logo')!;
+    expect(logo.id, 'asset.brand.logo');
+    expect(logo.asset, {'path': 'input/brand/brand-assets/logo.svg'});
+
+    expect(runtime.overridesFor('a'), isEmpty);
+  });
+
   test('unknown client throws client_not_found without fallback', () async {
     final bundle = FakeAssetBundle({
       'assets/generated/prototype-demo.json': checkedInBundle(),
