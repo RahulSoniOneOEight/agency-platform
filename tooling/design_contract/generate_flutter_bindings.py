@@ -40,11 +40,23 @@ _CLASS = """class DesignBinding {
 """
 
 
+def _dart_string(value: object) -> str:
+    return (
+        str(value)
+        .replace("\\", "\\\\")
+        .replace("'", "\\'")
+        .replace("$", "\\$")
+        .replace("\n", "\\n")
+        .replace("\r", "\\r")
+    )
+
+
 def _render_map(name: str, mapping: object) -> str:
     if not isinstance(mapping, dict) or not mapping:
         return f"    {name}: <String, String>{{}},"
     entries = "\n".join(
-        f"      '{key}': '{mapping[key]}'," for key in sorted(mapping)
+        f"      '{_dart_string(key)}': '{_dart_string(mapping[key])}',"
+        for key in sorted(mapping, key=str)
     )
     return f"    {name}: <String, String>{{\n{entries}\n    }},"
 
@@ -52,11 +64,11 @@ def _render_map(name: str, mapping: object) -> str:
 def _render_binding(binding_id: str, binding: dict) -> str:
     implementation = binding["implementation"]
     lines = [
-        f"  '{binding_id}': DesignBinding(",
-        f"    id: '{binding_id}',",
-        f"    kind: '{binding['kind']}',",
-        f"    registryKey: '{implementation['registry_key']}',",
-        f"    symbol: '{implementation['symbol']}',",
+        f"  '{_dart_string(binding_id)}': DesignBinding(",
+        f"    id: '{_dart_string(binding_id)}',",
+        f"    kind: '{_dart_string(binding['kind'])}',",
+        f"    registryKey: '{_dart_string(implementation['registry_key'])}',",
+        f"    symbol: '{_dart_string(implementation['symbol'])}',",
         _render_map("variants", binding.get("variants")),
         _render_map("states", binding.get("states")),
         _render_map("density", binding.get("density")),
@@ -96,14 +108,19 @@ def write_flutter_bindings(root: Path) -> Path:
 
 
 def check_flutter_bindings_fresh(root: Path) -> list[str]:
-    """Return a deterministic error list when the checked projection is not fresh."""
+    """Return a deterministic error list when the checked projection is not fresh.
+
+    Comparison is byte-exact (including line endings) so a CRLF or otherwise
+    re-encoded projection is reported stale.
+    """
+    relative = GENERATED_RELATIVE.as_posix()
     path = root / GENERATED_RELATIVE
     if not path.exists():
-        return [f"{path}: generated Flutter binding projection is missing"]
-    expected = render_flutter_bindings(root)
-    if path.read_text(encoding="utf-8") != expected:
+        return [f"{relative}: generated Flutter binding projection is missing"]
+    expected = render_flutter_bindings(root).encode("utf-8")
+    if path.read_bytes() != expected:
         return [
-            f"{path}: generated Flutter binding projection is stale; regenerate with "
+            f"{relative}: generated Flutter binding projection is stale; regenerate with "
             "python -m tooling.design_contract.generate_flutter_bindings --write"
         ]
     return []

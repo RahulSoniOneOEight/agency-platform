@@ -591,13 +591,46 @@ class GeneratedProjectionTests(unittest.TestCase):
         second = render_flutter_bindings(ROOT)
 
         self.assertEqual(first, second)
+        self.assertNotIn("\r", first)
         self.assertTrue(first.endswith("\n"))
+        self.assertFalse(first.endswith("\n\n"))
 
-    def test_generated_dart_projection_has_required_header(self):
+    def test_generated_dart_projection_header_is_exact(self):
         source = render_flutter_bindings(ROOT)
 
-        self.assertTrue(source.startswith("// GENERATED FILE. DO NOT EDIT."))
-        self.assertIn("// Source: design-contract/bindings/flutter/*.yaml", source)
+        self.assertTrue(
+            source.startswith(
+                "// GENERATED FILE. DO NOT EDIT.\n"
+                "// Source: design-contract/bindings/flutter/*.yaml\n\n"
+            )
+        )
+
+    def test_crlf_projection_is_reported_stale(self):
+        root = _contract_root()
+        _write_component(root)
+        _write_binding(root, component_binding())
+        generated = write_flutter_bindings(root)
+        generated.write_bytes(generated.read_bytes().replace(b"\n", b"\r\n"))
+
+        errors = check_flutter_bindings_fresh(root)
+
+        self.assertTrue(any("stale" in error for error in errors), errors)
+
+    def test_non_approved_bindings_are_excluded_from_projection(self):
+        root = _contract_root()
+        _write_component(root, "commerce.product-card")
+        _write_component(root, "commerce.quote-card")
+        _write_binding(root, component_binding("commerce.product-card"))
+        experimental = component_binding("commerce.quote-card")
+        experimental["status"] = "experimental"
+        experimental["implementation"]["registry_key"] = "quote-card"
+        experimental["implementation"]["symbol"] = "QuoteCard"
+        _write_binding(root, experimental)
+
+        source = render_flutter_bindings(root)
+
+        self.assertIn("'commerce.product-card': DesignBinding(", source)
+        self.assertNotIn("'commerce.quote-card': DesignBinding(", source)
 
     def test_generated_dart_projection_is_sorted_and_complete(self):
         source = render_flutter_bindings(ROOT)
