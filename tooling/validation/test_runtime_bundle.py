@@ -549,24 +549,32 @@ class RuntimeBundleTests(unittest.TestCase):
         )
 
     def test_no_hand_maintained_canonical_pattern_adapter_remains(self):
-        registry_dir = ROOT / "apps" / "prototype_app" / "lib" / "registry"
-        legacy_adapter = registry_dir / "canonical_pattern_adapter.dart"
-        self.assertFalse(legacy_adapter.exists())
+        lib_dir = ROOT / "apps" / "prototype_app" / "lib"
+        self.assertFalse(
+            (lib_dir / "registry" / "canonical_pattern_adapter.dart").exists()
+        )
 
-        sources = {
-            "design_contract_resolver.dart": registry_dir
-            / "design_contract_resolver.dart",
-            "prototype_registry.dart": registry_dir / "prototype_registry.dart",
-        }
-        for label, path in sources.items():
+        heuristic_patterns = (
+            "canonicalToRegistry",
+            "toRegistryKey",
+            "replace('commerce.",
+            'replace("commerce.',
+            "replaceFirst('commerce.",
+            'replaceFirst("commerce.',
+            ".split('.').last",
+            '.split(".").last',
+            ".split('.').first",
+            '.split(".").first',
+        )
+        for path in sorted(lib_dir.rglob("*.dart")):
             source = path.read_text(encoding="utf-8")
-            with self.subTest(file=label):
-                self.assertNotIn("canonicalToRegistry", source)
-                self.assertNotIn("toRegistryKey", source)
-                self.assertNotIn("replace('commerce.", source)
-                self.assertNotIn('replace("commerce.', source)
-                self.assertNotIn("substring(", source)
-                self.assertNotIn(".split('.').last", source)
+            for pattern in heuristic_patterns:
+                with self.subTest(file=path.relative_to(ROOT).as_posix(), pattern=pattern):
+                    self.assertNotIn(pattern, source)
+
+        for path in sorted((lib_dir / "registry").glob("*.dart")):
+            with self.subTest(file=path.name, pattern="substring"):
+                self.assertNotIn("substring(", path.read_text(encoding="utf-8"))
 
     def test_builder_rejects_checkout_ids_absent_from_supplied_root(self):
         with tempfile.TemporaryDirectory() as tmp:
