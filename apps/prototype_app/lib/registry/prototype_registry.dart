@@ -3,18 +3,18 @@ import 'package:flutter/material.dart';
 
 import '../direction/prototype_direction.dart';
 import '../fixtures/fixture_repository.dart';
-import 'canonical_pattern_adapter.dart';
+import 'design_contract_resolver.dart';
 
 abstract final class PrototypeRegistry {
   static String labelFor(String canonicalPatternId) =>
-      PatternRegistry.resolve(CanonicalPatternAdapter.toRegistryKey(canonicalPatternId)).label;
+      PatternRegistry.resolve(DesignContractResolver.patternKey(canonicalPatternId)).label;
 
   static Widget buildPattern(
     String canonicalPatternId,
     PrototypeDirection direction,
     FixtureRepository fixtures,
   ) {
-    final id = CanonicalPatternAdapter.toRegistryKey(canonicalPatternId);
+    final id = DesignContractResolver.patternKey(canonicalPatternId);
     PatternRegistry.resolve(id);
     final products = fixtures.products;
     final trade = direction.isTrade;
