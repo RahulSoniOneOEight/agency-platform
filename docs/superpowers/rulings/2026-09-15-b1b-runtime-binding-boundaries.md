@@ -27,3 +27,13 @@ Rewriting canonical pattern IDs during bundle generation to match Flutter regist
 - Existing docs and tests that describe short internal registry keys as canonical must be reconciled during B.1B implementation and documentation.
 
 This clarification preserves the approved architecture: canonical generation stays in Python, app-specific translation stays in Flutter, shared UI registry keys remain internal, and B.1B only parses and exposes B.1C bindings.
+
+## Addendum (2026-09-15): Repository-Aware Contract Resolution
+
+At the caller-supplied repository root, the `design-contract/patterns/` and `design-contract/components/` catalogs are authoritative for canonical pattern and component IDs. Every runtime direction `patterns` entry must resolve to an eligible pattern contract, and every `components` entry plus every `component_variants[].component` reference must resolve to an eligible component contract. Flutter registry entries are implementation bindings only and do not create canonical IDs.
+
+Repository-aware validation must receive the repository root explicitly; it must not infer a checkout from `__file__`. Preserve `validate_runtime_bundle(bundle) -> list[str]` as the intrinsic, repository-independent bundle validator, and add a separate root-aware validation boundary for builder and repository validation paths.
+
+The `prototype-demo` short IDs `cart`, `reorder`, and `trade-dashboard` are baseline contract inconsistencies. They require approved namespaced Design Contract entries and regeneration of derived runtime artifacts from their strategic sources, not heuristic prefixing. Adding those three contracts is a governed prerequisite and explicit scope deviation that preserves the approved demo strategy and B.1B architecture; it does not authorize any new widget or component implementation.
+
+The resource-binding ruling above remains unchanged.
