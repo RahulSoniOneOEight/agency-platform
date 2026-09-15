@@ -117,7 +117,12 @@ def check_flutter_bindings_fresh(root: Path) -> list[str]:
     path = root / GENERATED_RELATIVE
     if not path.exists():
         return [f"{relative}: generated Flutter binding projection is missing"]
-    expected = render_flutter_bindings(root).encode("utf-8")
+    try:
+        expected = render_flutter_bindings(root).encode("utf-8")
+    except (KeyError, TypeError, ValueError) as exc:
+        return [
+            f"{relative}: cannot render Flutter binding projection: {exc}"
+        ]
     if path.read_bytes() != expected:
         return [
             f"{relative}: generated Flutter binding projection is stale; regenerate with "

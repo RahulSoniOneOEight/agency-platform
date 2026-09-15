@@ -549,9 +549,13 @@ class RuntimeBundleTests(unittest.TestCase):
         )
 
     def test_no_hand_maintained_canonical_pattern_adapter_remains(self):
-        lib_dir = ROOT / "apps" / "prototype_app" / "lib"
+        app_lib_dir = ROOT / "apps" / "prototype_app" / "lib"
+        lib_dirs = (
+            app_lib_dir,
+            ROOT / "packages" / "agency_flutter_ui" / "lib",
+        )
         self.assertFalse(
-            (lib_dir / "registry" / "canonical_pattern_adapter.dart").exists()
+            (app_lib_dir / "registry" / "canonical_pattern_adapter.dart").exists()
         )
 
         heuristic_patterns = (
@@ -566,13 +570,16 @@ class RuntimeBundleTests(unittest.TestCase):
             ".split('.').first",
             '.split(".").first',
         )
-        for path in sorted(lib_dir.rglob("*.dart")):
-            source = path.read_text(encoding="utf-8")
-            for pattern in heuristic_patterns:
-                with self.subTest(file=path.relative_to(ROOT).as_posix(), pattern=pattern):
-                    self.assertNotIn(pattern, source)
+        for lib_dir in lib_dirs:
+            for path in sorted(lib_dir.rglob("*.dart")):
+                source = path.read_text(encoding="utf-8")
+                for pattern in heuristic_patterns:
+                    with self.subTest(
+                        file=path.relative_to(ROOT).as_posix(), pattern=pattern
+                    ):
+                        self.assertNotIn(pattern, source)
 
-        for path in sorted((lib_dir / "registry").glob("*.dart")):
+        for path in sorted((app_lib_dir / "registry").glob("*.dart")):
             with self.subTest(file=path.name, pattern="substring"):
                 self.assertNotIn("substring(", path.read_text(encoding="utf-8"))
 

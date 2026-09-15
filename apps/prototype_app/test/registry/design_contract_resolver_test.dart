@@ -1,6 +1,8 @@
+import 'package:agency_flutter_ui/agency_flutter_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prototype_app/direction/prototype_direction.dart';
 import 'package:prototype_app/registry/design_contract_resolver.dart';
+import 'package:prototype_app/registry/generated_design_bindings.dart';
 
 Map<String, dynamic> directionMap({
   String density = 'compact',
@@ -199,6 +201,27 @@ void main() {
         () => DesignContractResolver.validateDirection(direction),
         throwsArgumentError,
       );
+    });
+  });
+
+  group('DesignContractResolver enum parity', () {
+    test('every generated density value is a real AgencyDensity member', () {
+      final members = AgencyDensity.values.map((value) => value.name).toSet();
+
+      for (final binding in generatedDesignBindings.values) {
+        for (final internal in binding.density.values) {
+          expect(members, contains(internal), reason: '${binding.id} -> $internal');
+        }
+      }
+    });
+
+    test('product-card variant values are real ProductCardVariant members', () {
+      final members = ProductCardVariant.values.map((value) => value.name).toSet();
+      final binding = DesignContractResolver.component('commerce.product-card');
+
+      for (final internal in binding.variants.values) {
+        expect(members, contains(internal), reason: internal);
+      }
     });
   });
 }

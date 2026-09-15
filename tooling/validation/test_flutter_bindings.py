@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -29,6 +30,18 @@ def _flutter_source() -> str:
     return "\n".join(
         path.read_text(encoding="utf-8") for path in sorted(FLUTTER_LIB.rglob("*.dart"))
     )
+
+
+def _dart_enum_members(relative_path: str, enum_name: str) -> set[str]:
+    source = (FLUTTER_LIB / relative_path).read_text(encoding="utf-8")
+    match = re.search(rf"enum\s+{enum_name}\s*\{{([^}}]*)\}}", source)
+    if match is None:
+        raise AssertionError(f"enum {enum_name} not found in {relative_path}")
+    return {
+        member.strip().split("(")[0].strip()
+        for member in match.group(1).split(",")
+        if member.strip()
+    }
 
 _TEMP_DIRECTORIES: list[tempfile.TemporaryDirectory] = []
 
@@ -432,7 +445,26 @@ class FlutterBindingTests(unittest.TestCase):
         for binding_id, binding in sorted(load_flutter_bindings(ROOT).items()):
             symbol = binding["implementation"]["symbol"]
             with self.subTest(binding=binding_id):
-                self.assertIn(f"class {symbol}", source)
+                self.assertRegex(source, rf"\bclass\s+{re.escape(symbol)}\b")
+
+    def test_binding_internal_values_match_flutter_enums(self):
+        density_members = _dart_enum_members(
+            "foundation/agency_tokens.dart", "AgencyDensity"
+        )
+        self.assertEqual({"airy", "balanced", "dense"}, density_members)
+        product_card_variants = _dart_enum_members(
+            "domain/product_card.dart", "ProductCardVariant"
+        )
+        self.assertEqual({"standard", "b2b", "compact"}, product_card_variants)
+
+        for binding_id, binding in sorted(load_flutter_bindings(ROOT).items()):
+            for internal in (binding.get("density") or {}).values():
+                with self.subTest(binding=binding_id, density=internal):
+                    self.assertIn(internal, density_members)
+            if binding_id == "commerce.product-card":
+                for internal in (binding.get("variants") or {}).values():
+                    with self.subTest(binding=binding_id, variant=internal):
+                        self.assertIn(internal, product_card_variants)
 
     def test_pattern_binding_registry_keys_exist_in_pattern_registry(self):
         registry_source = (
@@ -617,6 +649,30 @@ class RepositoryParityTests(unittest.TestCase):
         errors = flutter_binding_errors(root)
 
         self.assertTrue(any("stale" in error for error in errors), errors)
+
+    def test_unrenderable_approved_binding_is_reported_without_raising(self):
+        root = _contract_root()
+        _write_component(root)
+        binding = component_binding()
+        del binding["implementation"]
+        _write_binding(root, binding)
+        generated = (
+            root
+            / "apps"
+            / "prototype_app"
+            / "lib"
+            / "registry"
+            / "generated_design_bindings.dart"
+        )
+        generated.parent.mkdir(parents=True, exist_ok=True)
+        generated.write_text("// existing\n", encoding="utf-8")
+
+        errors = flutter_binding_errors(root)
+
+        self.assertTrue(
+            any("cannot render Flutter binding projection" in error for error in errors),
+            errors,
+        )
 
     def test_missing_runtime_pattern_binding_is_reported(self):
         root = _contract_root()

@@ -15,7 +15,6 @@ abstract final class PrototypeRegistry {
     FixtureRepository fixtures,
   ) {
     final id = DesignContractResolver.patternKey(canonicalPatternId);
-    PatternRegistry.resolve(id);
     final products = fixtures.products;
     final trade = direction.isTrade;
     return switch (id) {

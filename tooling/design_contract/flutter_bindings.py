@@ -10,18 +10,21 @@ from tooling.knowledge.index_design_contract import build_indexes
 
 
 _BINDINGS_RELATIVE = Path("design-contract") / "bindings" / "flutter"
-_SCHEMA_PATH = (
-    Path(__file__).resolve().parents[2]
-    / "design-contract"
-    / "schema"
-    / "flutter-binding.schema.json"
-)
+_SCHEMA_RELATIVE = Path("design-contract") / "schema" / "flutter-binding.schema.json"
+_TOOLING_SCHEMA_PATH = Path(__file__).resolve().parents[2] / _SCHEMA_RELATIVE
 _KIND_CATALOG = {"component": "components", "pattern": "patterns"}
 _RUNTIME_DENSITIES = ("compact", "normal", "spacious")
 
 
-def _schema() -> dict:
-    return json.loads(_SCHEMA_PATH.read_text(encoding="utf-8"))
+def _load_schema(root: Path) -> dict:
+    """Load the binding schema from the supplied root, falling back to tooling.
+
+    The repository root is authoritative when it carries the schema; the tooling
+    checkout copy keeps validators usable against minimal temporary roots.
+    """
+    candidate = root / _SCHEMA_RELATIVE
+    path = candidate if candidate.exists() else _TOOLING_SCHEMA_PATH
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def _binding_documents(root: Path) -> list[tuple[Path, object, str | None]]:
@@ -51,10 +54,10 @@ def load_flutter_bindings(root: Path) -> dict[str, dict]:
     return bindings
 
 
-def _schema_errors(binding: object) -> list[str]:
+def _schema_errors(binding: object, schema: dict) -> list[str]:
     binding_id = binding.get("id") if isinstance(binding, dict) else None
     label = binding_id if isinstance(binding_id, str) and binding_id else "<unknown>"
-    validator = Draft202012Validator(_schema())
+    validator = Draft202012Validator(schema)
     errors = []
     for error in validator.iter_errors(binding):
         path = ".".join(str(part) for part in error.path) or "<root>"
@@ -63,12 +66,12 @@ def _schema_errors(binding: object) -> list[str]:
 
 
 def _validate_binding(
-    binding_id: str, binding: object, catalogs: dict[str, dict]
+    binding_id: str, binding: object, catalogs: dict[str, dict], schema: dict
 ) -> list[str]:
     if not isinstance(binding, dict):
         return [f"binding {binding_id}: binding document must be an object"]
 
-    errors = _schema_errors(binding)
+    errors = _schema_errors(binding, schema)
     kind = binding.get("kind")
     if kind not in _KIND_CATALOG:
         return errors
@@ -208,6 +211,7 @@ def validate_flutter_bindings(root: Path, bindings: dict | None = None) -> list[
         "component": indexes["components"],
         "pattern": indexes["patterns"],
     }
+    schema = _load_schema(root)
     errors: list[str] = []
 
     if bindings is None:
@@ -235,7 +239,7 @@ def validate_flutter_bindings(root: Path, bindings: dict | None = None) -> list[
         entries = sorted(bindings.items())
 
     for binding_id, binding in entries:
-        errors.extend(_validate_binding(binding_id, binding, catalogs))
+        errors.extend(_validate_binding(binding_id, binding, catalogs, schema))
     errors.extend(_duplicate_identifier_errors(entries))
     return sorted(set(errors))
 
