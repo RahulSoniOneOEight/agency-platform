@@ -1,11 +1,13 @@
 Map<String, dynamic> canonicalDirection({
   String id = 'a',
   String density = 'compact',
+  String name = 'Search-led Trade',
+  String strategicGoal = 'reduce known-item order time',
 }) {
   return {
     'id': id,
-    'name': 'Search-led Trade',
-    'strategic_goal': 'reduce known-item order time',
+    'name': name,
+    'strategic_goal': strategicGoal,
     'navigation_model': 'search-led',
     'primary_journey': 'search-to-order',
     'discovery_model': 'sku-search',
@@ -43,6 +45,8 @@ Map<String, dynamic> defaultFixtures() {
 
 Map<String, dynamic> canonicalBundle({
   List<String> directionIds = const ['a', 'b'],
+  Map<String, String>? names,
+  Map<String, String>? strategicGoals,
   Map<String, dynamic>? fixtures,
   Map<String, dynamic>? resources,
 }) {
@@ -51,7 +55,12 @@ Map<String, dynamic> canonicalBundle({
     'client_id': 'prototype-demo',
     'default_direction': 'a',
     'directions': {
-      for (final id in directionIds) id: canonicalDirection(id: id),
+      for (final id in directionIds)
+        id: canonicalDirection(
+          id: id,
+          name: names?[id] ?? 'Search-led Trade',
+          strategicGoal: strategicGoals?[id] ?? 'reduce known-item order time',
+        ),
     },
     'fixtures': fixtures ?? defaultFixtures(),
     'theme': {'seed_color': '#6750A4'},

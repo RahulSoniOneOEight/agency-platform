@@ -2,35 +2,43 @@ import 'package:agency_flutter_ui/agency_flutter_ui.dart';
 import 'package:flutter/material.dart';
 
 import '../direction/prototype_direction.dart';
-import '../fixtures/demo_repository.dart';
+import '../fixtures/fixture_repository.dart';
+import 'canonical_pattern_adapter.dart';
 
 abstract final class PrototypeRegistry {
-  static Widget buildPattern(String id, PrototypeDirection direction) {
+  static Widget buildPattern(
+    String canonicalPatternId,
+    PrototypeDirection direction,
+    FixtureRepository fixtures,
+  ) {
+    final id = CanonicalPatternAdapter.toRegistryKey(canonicalPatternId);
     PatternRegistry.resolve(id);
+    final products = fixtures.products;
     final trade = direction.isTrade;
     return switch (id) {
       'home' => HomePattern(
-          products: DemoRepository.products,
+          products: products,
           title: direction.name,
           subtitle: direction.strategicGoal,
           density: direction.density,
         ),
-      'search' => SearchPattern(products: DemoRepository.products),
+      'search' => SearchPattern(products: products),
       'plp' => PlpPattern(
-          products: DemoRepository.products,
+          products: products,
           title: trade ? 'Trade catalogue' : 'Products',
           density: direction.density,
           b2b: trade,
         ),
-      'pdp' => PdpPattern(product: DemoRepository.products.first, tradeMode: trade),
-      'cart' => CartPattern(products: DemoRepository.products.take(3).toList(), tradeMode: trade),
-      'rfq' => RfqPattern(products: DemoRepository.products),
+      'pdp' => PdpPattern(product: products.first, tradeMode: trade),
+      'cart' => CartPattern(products: products.take(3).toList(), tradeMode: trade),
+      'rfq' => RfqPattern(products: products),
       'trade-dashboard' => const TradeDashboardPattern(),
-      'booking' => const BookingPattern(services: DemoRepository.services),
-      'quick-order' => SearchPattern(products: DemoRepository.products, hintText: 'Enter SKU or product'),
       'reorder' => const TradeDashboardPattern(),
-      'checkout' => CartPattern(products: DemoRepository.products.take(2).toList(), tradeMode: trade),
-      _ => throw ArgumentError.value(id, 'id', 'Unsupported prototype pattern'),
+      _ => throw ArgumentError.value(
+          canonicalPatternId,
+          'canonicalPatternId',
+          'Unsupported prototype pattern',
+        ),
     };
   }
 }

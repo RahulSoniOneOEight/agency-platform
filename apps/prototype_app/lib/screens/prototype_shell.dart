@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
 
 import '../direction/prototype_direction.dart';
+import '../fixtures/fixture_repository.dart';
 import '../registry/prototype_registry.dart';
 
 class PrototypeShell extends StatefulWidget {
-  const PrototypeShell({super.key, required this.direction});
+  const PrototypeShell({
+    super.key,
+    required this.direction,
+    required this.fixtures,
+  });
 
   final PrototypeDirection direction;
+  final FixtureRepository fixtures;
 
   @override
   State<PrototypeShell> createState() => _PrototypeShellState();
@@ -30,7 +36,14 @@ class _PrototypeShellState extends State<PrototypeShell> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= 900;
-        final body = PrototypeRegistry.buildPattern(patterns[safeIndex], widget.direction);
+        final body = PrototypeRegistry.buildPattern(
+          patterns[safeIndex],
+          widget.direction,
+          widget.fixtures,
+        );
+        if (patterns.length < 2) {
+          return Scaffold(body: body);
+        }
         if (wide) {
           return Row(
             children: [
