@@ -1,5 +1,31 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:prototype_app/direction/prototype_direction.dart';
 import 'package:prototype_app/registry/design_contract_resolver.dart';
+
+Map<String, dynamic> directionMap({
+  String density = 'compact',
+  List<String> patterns = const ['commerce.search'],
+  List<String> components = const ['commerce.product-card'],
+  List<Map<String, dynamic>> componentVariants = const [
+    {'component': 'commerce.product-card', 'variant': 'b2b'},
+  ],
+}) {
+  return {
+    'id': 'a',
+    'name': 'Search-led Trade',
+    'strategic_goal': 'reduce known-item order time',
+    'navigation_model': 'search-led',
+    'primary_journey': 'search-to-order',
+    'discovery_model': 'sku-search',
+    'merchandising_model': 'availability-and-price',
+    'density': density,
+    'transaction_model': 'checkout-plus-rfq',
+    'patterns': patterns,
+    'components': components,
+    'component_variants': componentVariants,
+    'required_resources': <dynamic>[],
+  };
+}
 
 void main() {
   group('DesignContractResolver patterns', () {
@@ -103,6 +129,58 @@ void main() {
       );
       expect(
         () => DesignContractResolver.density('commerce.price-display', 'spacious'),
+        throwsArgumentError,
+      );
+    });
+  });
+
+  group('DesignContractResolver direction parity', () {
+    test('validates a canonical direction against generated bindings', () {
+      final direction = PrototypeDirection.fromMap(directionMap());
+
+      expect(
+        () => DesignContractResolver.validateDirection(direction),
+        returnsNormally,
+      );
+    });
+
+    test('rejects a direction with an unsupported variant', () {
+      final direction = PrototypeDirection.fromMap(
+        directionMap(
+          componentVariants: const [
+            {'component': 'commerce.product-card', 'variant': 'premium'},
+          ],
+        ),
+      );
+
+      expect(
+        () => DesignContractResolver.validateDirection(direction),
+        throwsArgumentError,
+      );
+    });
+
+    test('rejects a direction with an unsupported density', () {
+      final direction = PrototypeDirection.fromMap(
+        directionMap(
+          density: 'spacious',
+          components: const ['commerce.price-display'],
+          componentVariants: const [],
+        ),
+      );
+
+      expect(
+        () => DesignContractResolver.validateDirection(direction),
+        throwsArgumentError,
+      );
+    });
+
+    test('rejects a direction with an unknown pattern', () {
+      final direction = PrototypeDirection.fromMap(
+        directionMap(patterns: const ['commerce.missing']),
+      );
+
+      expect(
+        () => DesignContractResolver.validateDirection(direction),
         throwsArgumentError,
       );
     });

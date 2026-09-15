@@ -1,4 +1,5 @@
-﻿import 'generated_design_bindings.dart';
+﻿import '../direction/prototype_direction.dart';
+import 'generated_design_bindings.dart';
 
 /// Governed canonical-ID resolver for Flutter implementations.
 ///
@@ -68,5 +69,24 @@ abstract final class DesignContractResolver {
       );
     }
     return resolved;
+  }
+
+  /// Validates every canonical reference in [direction] against the generated
+  /// binding projection: patterns, components, component variants, and the
+  /// direction density for each referenced component.
+  ///
+  /// This is a pure parity helper for tests and runtime validation. It performs
+  /// no rendering and never falls back for an unknown reference.
+  static void validateDirection(PrototypeDirection direction) {
+    for (final patternId in direction.patterns) {
+      patternKey(patternId);
+    }
+    for (final componentId in direction.components) {
+      component(componentId);
+      density(componentId, direction.canonicalDensity);
+    }
+    for (final variant in direction.componentVariants) {
+      componentVariant(variant.component, variant.variant);
+    }
   }
 }
