@@ -86,6 +86,13 @@ abstract final class DesignContractResolver {
       density(componentId, direction.canonicalDensity);
     }
     for (final variant in direction.componentVariants) {
+      if (!direction.components.contains(variant.component)) {
+        throw ArgumentError.value(
+          variant.component,
+          'component',
+          'Variant component must be listed in components',
+        );
+      }
       componentVariant(variant.component, variant.variant);
     }
   }

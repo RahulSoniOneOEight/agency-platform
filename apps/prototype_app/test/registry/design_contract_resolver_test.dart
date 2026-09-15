@@ -174,6 +174,22 @@ void main() {
       );
     });
 
+    test('rejects a variant component that is not listed in components', () {
+      final direction = PrototypeDirection.fromMap(
+        directionMap(
+          components: const ['commerce.price-display'],
+          componentVariants: const [
+            {'component': 'commerce.product-card', 'variant': 'b2b'},
+          ],
+        ),
+      );
+
+      expect(
+        () => DesignContractResolver.validateDirection(direction),
+        throwsArgumentError,
+      );
+    });
+
     test('rejects a direction with an unknown pattern', () {
       final direction = PrototypeDirection.fromMap(
         directionMap(patterns: const ['commerce.missing']),
