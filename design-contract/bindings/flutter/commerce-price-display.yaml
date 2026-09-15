@@ -1,0 +1,13 @@
+id: commerce.price-display
+kind: component
+status: approved
+implementation:
+  package: agency_flutter_ui
+  registry_key: price-display
+  symbol: PriceDisplay
+variants: {}
+states:
+  normal: supported
+density:
+  compact: dense
+  normal: balanced

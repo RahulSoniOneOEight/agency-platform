@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["id", "kind", "status", "implementation", "variants", "states", "density"],
+  "properties": {
+    "id": {"type": "string", "minLength": 1},
+    "kind": {"enum": ["component", "pattern"]},
+    "status": {"enum": ["experimental", "approved", "deprecated"]},
+    "implementation": {
+      "type": "object",
+      "required": ["package", "registry_key", "symbol"],
+      "properties": {
+        "package": {"const": "agency_flutter_ui"},
+        "registry_key": {"type": "string", "minLength": 1},
+        "symbol": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "variants": {"type": "object", "additionalProperties": {"type": "string"}},
+    "states": {"type": "object", "additionalProperties": {"enum": ["supported", "unsupported"]}},
+    "density": {"type": "object", "additionalProperties": {"type": "string"}}
+  },
+  "additionalProperties": false
+}

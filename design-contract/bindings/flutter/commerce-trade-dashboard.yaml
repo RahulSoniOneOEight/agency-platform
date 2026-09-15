@@ -1,0 +1,13 @@
+id: commerce.trade-dashboard
+kind: pattern
+status: approved
+implementation:
+  package: agency_flutter_ui
+  registry_key: trade-dashboard
+  symbol: TradeDashboardPattern
+variants: {}
+states: {}
+density:
+  compact: dense
+  normal: balanced
+  spacious: airy

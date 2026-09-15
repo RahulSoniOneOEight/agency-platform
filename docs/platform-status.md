@@ -32,18 +32,30 @@ Implemented on `milestone-b-prototype-platform` / PR #6 pending review/merge:
 - B.1A — canonical direction contract: merged via PR #10.
 - B.1A1 — client input contract: merged via PR #11.
 - B.1C — resource selection and canonical bindings: merged via PR #12.
-- B.1B — client runtime loading: implemented on `milestone-b1b-client-runtime-loading`
-  (PR pending review/merge):
+- B.1B — client runtime loading: merged via PR #13.
   - one shared `apps/prototype_app` runtime that loads generated client bundles
   - `tooling/prototype/build_runtime_bundle.py` composes one deterministic bundle per client
   - generated asset boundary at `apps/prototype_app/assets/generated/<client-id>.json`
   - `?client=<client-id>&direction=<direction-id>` with no silent fallback
-  - canonical B.1A direction vocabulary plus an app-layer canonical pattern adapter
+  - canonical B.1A direction vocabulary preserved at the runtime boundary
   - runtime fixtures, theme seed, and B.1C canonical resource bindings loaded from the bundle
   - direction selector reflects only the client's declared directions
   - governed, visible runtime errors with stable codes
   - deterministic generation plus repository validation of bundle freshness
   - approved canonical Cart, Reorder, and Trade Dashboard Design Contract pattern entries
+- B.1D — Design Contract ↔ Flutter alignment: implemented on
+  `milestone-b1d-design-contract-flutter-alignment` (PR pending review/merge):
+  - machine-readable Flutter binding catalog at `design-contract/bindings/flutter/`
+  - binding schema plus root-aware validation of contract existence, approval, and
+    variant/state/density parity
+  - approved bindings for every pattern and component used by current runtime directions
+  - deterministic checked Dart projection at
+    `apps/prototype_app/lib/registry/generated_design_bindings.dart`
+  - byte-exact generated-projection freshness enforced by repository validation
+  - app resolver (`design_contract_resolver.dart`) performs exact canonical-ID lookups only
+  - hand-maintained canonical pattern adapter removed
+  - component variant/density parity validated end-to-end
+  - repository validation covers all current runtime directions
 
 ## Still deferred to later milestones
 

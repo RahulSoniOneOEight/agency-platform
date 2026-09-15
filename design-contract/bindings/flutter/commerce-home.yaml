@@ -1,0 +1,13 @@
+id: commerce.home
+kind: pattern
+status: approved
+implementation:
+  package: agency_flutter_ui
+  registry_key: home
+  symbol: HomePattern
+variants: {}
+states: {}
+density:
+  compact: dense
+  normal: balanced
+  spacious: airy

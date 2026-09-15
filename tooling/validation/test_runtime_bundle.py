@@ -9,6 +9,10 @@ from pathlib import Path
 
 import yaml
 
+from tooling.design_contract.flutter_bindings import (
+    load_flutter_bindings,
+    runtime_binding_errors,
+)
 from tooling.knowledge.index_design_contract import build_indexes
 from tooling.prototype.build_runtime_bundle import build_runtime_bundle
 from tooling.prototype import validate_runtime_bundle as runtime_bundle_validator
@@ -236,6 +240,22 @@ class RuntimeBundleTests(unittest.TestCase):
                         self.assertIsNotNone(contract, "canonical contract is missing")
                         if contract is not None:
                             self.assertEqual("approved", contract.get("status"))
+
+    def test_generated_bundles_have_approved_flutter_bindings(self):
+        bindings = load_flutter_bindings(ROOT)
+        bundle_paths = sorted(
+            (ROOT / "apps" / "prototype_app" / "assets" / "generated").glob("*.json")
+        )
+        self.assertTrue(bundle_paths)
+
+        errors = []
+        for bundle_path in bundle_paths:
+            bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
+            for direction_id, direction in sorted(bundle.get("directions", {}).items()):
+                for error in runtime_binding_errors(ROOT, direction, bindings):
+                    errors.append(f"{bundle_path.name}:{direction_id}: {error}")
+
+        self.assertEqual([], sorted(errors))
 
     def test_builds_canonical_client_bundle(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -528,22 +548,40 @@ class RuntimeBundleTests(unittest.TestCase):
             ),
         )
 
-    def test_flutter_canonical_pattern_adapter_covers_repository_patterns(self):
-        adapter_path = (
-            ROOT
-            / "apps"
-            / "prototype_app"
-            / "lib"
-            / "registry"
-            / "canonical_pattern_adapter.dart"
+    def test_no_hand_maintained_canonical_pattern_adapter_remains(self):
+        app_lib_dir = ROOT / "apps" / "prototype_app" / "lib"
+        lib_dirs = (
+            app_lib_dir,
+            ROOT / "packages" / "agency_flutter_ui" / "lib",
         )
-        source = adapter_path.read_text(encoding="utf-8")
-        canonical_pattern_ids = sorted(build_indexes(ROOT)["patterns"])
+        self.assertFalse(
+            (app_lib_dir / "registry" / "canonical_pattern_adapter.dart").exists()
+        )
 
-        self.assertTrue(canonical_pattern_ids)
-        for pattern_id in canonical_pattern_ids:
-            with self.subTest(pattern=pattern_id):
-                self.assertIn(f"'{pattern_id}':", source)
+        heuristic_patterns = (
+            "canonicalToRegistry",
+            "toRegistryKey",
+            "replace('commerce.",
+            'replace("commerce.',
+            "replaceFirst('commerce.",
+            'replaceFirst("commerce.',
+            ".split('.').last",
+            '.split(".").last',
+            ".split('.').first",
+            '.split(".").first',
+        )
+        for lib_dir in lib_dirs:
+            for path in sorted(lib_dir.rglob("*.dart")):
+                source = path.read_text(encoding="utf-8")
+                for pattern in heuristic_patterns:
+                    with self.subTest(
+                        file=path.relative_to(ROOT).as_posix(), pattern=pattern
+                    ):
+                        self.assertNotIn(pattern, source)
+
+        for path in sorted((app_lib_dir / "registry").glob("*.dart")):
+            with self.subTest(file=path.name, pattern="substring"):
+                self.assertNotIn("substring(", path.read_text(encoding="utf-8"))
 
     def test_builder_rejects_checkout_ids_absent_from_supplied_root(self):
         with tempfile.TemporaryDirectory() as tmp:

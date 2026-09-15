@@ -43,6 +43,15 @@ void main() {
       );
     });
 
+    test('retains canonical density alongside the internal mapping', () {
+      final direction = PrototypeDirection.fromMap(
+        canonicalDirection(density: 'compact'),
+      );
+
+      expect(direction.canonicalDensity, 'compact');
+      expect(direction.density, AgencyDensity.dense);
+    });
+
     test('rejects legacy density vocabulary', () {
       expect(
         () => PrototypeDirection.fromMap(canonicalDirection(density: 'dense')),

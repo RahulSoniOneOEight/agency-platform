@@ -128,11 +128,13 @@ unchanged in generated bundles and runtime directions:
 - commerce.reorder
 - commerce.trade-dashboard
 
-The Flutter app translates canonical IDs to internal `agency_flutter_ui` registry keys through
-an explicit allowlisted adapter at
-`apps/prototype_app/lib/registry/canonical_pattern_adapter.dart`. Heuristic prefix stripping is
-forbidden, and two canonical IDs must not collide on one internal key. A valid canonical pattern
-ID with no Flutter implementation fails visibly rather than silently creating ad-hoc UI.
+The Flutter app translates canonical IDs to internal `agency_flutter_ui` registry keys through a
+governed binding catalog at `design-contract/bindings/flutter/`, projected deterministically into
+`apps/prototype_app/lib/registry/generated_design_bindings.dart` and resolved by
+`apps/prototype_app/lib/registry/design_contract_resolver.dart`. Resolution is exact-lookup only:
+heuristic prefix stripping and convention-based inference are forbidden, two canonical IDs must not
+collide on one internal key, and a valid canonical ID with no Flutter implementation fails visibly
+rather than silently creating ad-hoc UI.
 
 ## Widgetbook
 

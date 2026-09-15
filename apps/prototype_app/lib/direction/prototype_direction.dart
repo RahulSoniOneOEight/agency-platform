@@ -28,6 +28,7 @@ class PrototypeDirection {
     required this.primaryJourney,
     required this.discoveryModel,
     required this.merchandisingModel,
+    required this.canonicalDensity,
     required this.density,
     required this.transactionModel,
     required this.patterns,
@@ -43,6 +44,7 @@ class PrototypeDirection {
   final String primaryJourney;
   final String discoveryModel;
   final String merchandisingModel;
+  final String canonicalDensity;
   final AgencyDensity density;
   final String transactionModel;
   final List<String> patterns;
@@ -115,6 +117,7 @@ class PrototypeDirection {
       primaryJourney: requiredString('primary_journey'),
       discoveryModel: requiredString('discovery_model'),
       merchandisingModel: requiredString('merchandising_model'),
+      canonicalDensity: densityName,
       density: density,
       transactionModel: requiredString('transaction_model'),
       patterns: requiredList('patterns'),

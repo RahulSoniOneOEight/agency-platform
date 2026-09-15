@@ -62,6 +62,21 @@ class ValidatorContractTests(unittest.TestCase):
         validator = self.load_validator()
         self.assertEqual([], validator.generated_runtime_bundle_errors(ROOT))
 
+    def test_b1d_binding_paths_are_required(self):
+        validator = self.load_validator()
+        for path in (
+            "design-contract/schema/flutter-binding.schema.json",
+            "design-contract/bindings/flutter",
+            "tooling/design_contract/flutter_bindings.py",
+            "tooling/design_contract/generate_flutter_bindings.py",
+            "apps/prototype_app/lib/registry/generated_design_bindings.dart",
+        ):
+            self.assertIn(path, validator.REQUIRED_PATHS)
+
+    def test_current_repository_flutter_bindings_are_valid(self):
+        validator = self.load_validator()
+        self.assertEqual([], validator.flutter_binding_errors(ROOT))
+
     def test_missing_generated_runtime_bundle_is_reported(self):
         validator = self.load_validator()
         with tempfile.TemporaryDirectory() as tmp:
