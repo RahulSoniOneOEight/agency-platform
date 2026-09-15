@@ -7,27 +7,29 @@ void main() {
       'id': 'a',
       'name': 'Search-led Trade',
       'strategic_goal': 'reduce order time',
-      'navigation': 'search-led',
+      'navigation_model': 'search-led',
       'primary_journey': 'search-to-order',
       'discovery_model': 'sku-search',
-      'merchandising': 'availability-and-price',
-      'density': 'dense',
+      'merchandising_model': 'availability-and-price',
+      'density': 'compact',
       'transaction_model': 'checkout-plus-rfq',
-      'patterns': ['search', 'plp', 'pdp', 'rfq'],
-      'components': ['product-card', 'price-display', 'quote-card'],
+      'patterns': ['commerce.search', 'commerce.plp', 'commerce.pdp', 'commerce.rfq'],
+      'components': ['commerce.product-card', 'commerce.price-display', 'commerce.quote-card'],
+      'component_variants': <dynamic>[],
+      'required_resources': <dynamic>[],
     });
     expect(direction.id, 'a');
-    expect(direction.patterns, contains('rfq'));
+    expect(direction.patterns, contains('commerce.rfq'));
     expect(direction.isTrade, isTrue);
   });
 
   test('prototype direction rejects unknown density', () {
     expect(
       () => PrototypeDirection.fromMap({
-        'id': 'a', 'name': 'Bad', 'strategic_goal': 'x', 'navigation': 'x',
-        'primary_journey': 'x', 'discovery_model': 'x', 'merchandising': 'x',
-        'density': 'massive', 'transaction_model': 'checkout',
-        'patterns': ['home'], 'components': ['product-card'],
+        'id': 'a', 'name': 'Bad', 'strategic_goal': 'x',
+        'navigation_model': 'x', 'primary_journey': 'x', 'discovery_model': 'x',
+        'merchandising_model': 'x', 'density': 'massive', 'transaction_model': 'checkout',
+        'patterns': ['commerce.home'], 'components': ['commerce.product-card'],
       }),
       throwsFormatException,
     );
