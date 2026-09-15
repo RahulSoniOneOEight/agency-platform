@@ -1,37 +1,35 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:prototype_app/direction/prototype_direction.dart';
+import 'package:prototype_app/direction/direction_loader.dart';
+import 'package:prototype_app/runtime/prototype_runtime.dart';
+import 'package:prototype_app/runtime/runtime_exception.dart';
+
+import 'support/runtime_fixtures.dart';
+
+Matcher throwsDirectionNotFound() => throwsA(
+      isA<RuntimeException>()
+          .having((error) => error.code, 'code', RuntimeException.directionNotFound),
+    );
 
 void main() {
-  test('prototype direction parses strategy config', () {
-    final direction = PrototypeDirection.fromMap({
-      'id': 'a',
-      'name': 'Search-led Trade',
-      'strategic_goal': 'reduce order time',
-      'navigation_model': 'search-led',
-      'primary_journey': 'search-to-order',
-      'discovery_model': 'sku-search',
-      'merchandising_model': 'availability-and-price',
-      'density': 'compact',
-      'transaction_model': 'checkout-plus-rfq',
-      'patterns': ['commerce.search', 'commerce.plp', 'commerce.pdp', 'commerce.rfq'],
-      'components': ['commerce.product-card', 'commerce.price-display', 'commerce.quote-card'],
-      'component_variants': <dynamic>[],
-      'required_resources': <dynamic>[],
-    });
-    expect(direction.id, 'a');
-    expect(direction.patterns, contains('commerce.rfq'));
-    expect(direction.isTrade, isTrue);
+  test('resolves a declared direction from the runtime', () {
+    final runtime = PrototypeRuntime.fromMap(canonicalBundle());
+
+    expect(DirectionLoader.resolve(runtime, 'a').id, 'a');
+    expect(DirectionLoader.resolve(runtime, 'b').id, 'b');
   });
 
-  test('prototype direction rejects unknown density', () {
-    expect(
-      () => PrototypeDirection.fromMap({
-        'id': 'a', 'name': 'Bad', 'strategic_goal': 'x',
-        'navigation_model': 'x', 'primary_journey': 'x', 'discovery_model': 'x',
-        'merchandising_model': 'x', 'density': 'massive', 'transaction_model': 'checkout',
-        'patterns': ['commerce.home'], 'components': ['commerce.product-card'],
-      }),
-      throwsFormatException,
+  test('direction c is absent for a two-direction client', () {
+    final runtime = PrototypeRuntime.fromMap(
+      canonicalBundle(directionIds: const ['a', 'b']),
     );
+
+    expect(runtime.directions.containsKey('c'), isFalse);
+    expect(() => DirectionLoader.resolve(runtime, 'c'), throwsDirectionNotFound());
+  });
+
+  test('unknown direction never falls back to direction a', () {
+    final runtime = PrototypeRuntime.fromMap(canonicalBundle());
+
+    expect(() => DirectionLoader.resolve(runtime, 'z'), throwsDirectionNotFound());
   });
 }
