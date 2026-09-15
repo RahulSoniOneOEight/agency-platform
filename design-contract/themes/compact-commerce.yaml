@@ -1,0 +1,11 @@
+id: compact-commerce
+status: approved
+semantic_overrides:
+  density:
+    default: compact
+  spacing:
+    section: "{foundation.spacing.6}"
+  radius:
+    card: "{foundation.radius.md}"
+  size:
+    control_height: "{foundation.size.control_height_compact}"

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import math
 import re
 from pathlib import Path
@@ -9,6 +10,9 @@ import yaml
 
 FOUNDATION_TOKENS_RELATIVE = Path("design-contract") / "tokens" / "foundation.yaml"
 SEMANTIC_TOKENS_RELATIVE = Path("design-contract") / "tokens" / "semantic.yaml"
+THEMES_RELATIVE = Path("design-contract") / "themes"
+
+PRESET_STATUSES = ("experimental", "approved", "deprecated")
 
 CANONICAL_GROUPS = (
     "color",
@@ -31,6 +35,15 @@ _COLOR_PATTERN = re.compile(r"^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$")
 _REFERENCE_PATTERN = re.compile(
     r"^\{foundation\.[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*\}$"
 )
+_RESOLUTION_REFERENCE_PATTERN = re.compile(r"^\{foundation\.([A-Za-z0-9_.]+)\}$")
+
+# Raw client brand keys that map onto approved semantic override paths (R2/R8).
+BRAND_OVERRIDE_MAP: dict[str, tuple[str, str]] = {
+    "primary_color": ("color", "primary"),
+    "secondary_color": ("color", "secondary"),
+    "font_family": ("typography", "font_family"),
+    "font_fallback": ("typography", "font_fallback"),
+}
 
 _TYPOGRAPHY_SUBGROUPS = ("size", "line_height", "weight")
 _MOTION_DURATIONS = ("fast_ms", "normal_ms", "slow_ms")
@@ -369,3 +382,240 @@ def validate_token_catalogs(root: Path) -> list[str]:
             errors.append(f"semantic: unexpected validation failure: {exc}")
 
     return sorted(set(errors))
+
+
+def _iter_preset_files(root: Path) -> list[Path]:
+    directory = root / THEMES_RELATIVE
+    if not directory.is_dir():
+        return []
+    return sorted(directory.glob("*.yaml"), key=lambda path: path.name)
+
+
+def _read_preset_yaml(path: Path, label: str):
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        raise ValueError(f"{label}: cannot read {path}: {exc}") from exc
+    try:
+        return _stringify_keys(yaml.safe_load(text))
+    except yaml.YAMLError as exc:
+        raise ValueError(f"{label}: invalid YAML in {path}: {exc}") from exc
+
+
+def load_theme_presets(root: Path) -> dict[str, dict]:
+    """Load theme presets under *root*, keyed by ``id``, in filename-sorted order."""
+    presets: dict[str, dict] = {}
+    for path in _iter_preset_files(root):
+        label = f"theme preset {path.name}"
+        document = _read_preset_yaml(path, label)
+        if not isinstance(document, dict):
+            raise ValueError(f"{label}: expected a mapping at {path}")
+        preset_id = document.get("id")
+        if not isinstance(preset_id, str) or not preset_id:
+            raise ValueError(f"{label}: missing or empty id")
+        presets[preset_id] = document
+    return presets
+
+
+def _override_path_errors(label: str, overrides) -> list[str]:
+    """Validate an override layer against :data:`SEMANTIC_KEYS`; returns errors."""
+    if not isinstance(overrides, dict):
+        return [
+            f"{label}: semantic overrides must be a mapping, got {_describe(overrides)}"
+        ]
+    errors: list[str] = []
+    for group in sorted(overrides):
+        value = overrides[group]
+        if group not in SEMANTIC_KEYS:
+            errors.append(f"{label}: unknown override group '{group}'")
+            continue
+        if not isinstance(value, dict):
+            errors.append(
+                f"{label}: override group '{group}' must be a mapping, "
+                f"got {_describe(value)}"
+            )
+            continue
+        for key in sorted(value):
+            if key not in SEMANTIC_KEYS[group]:
+                errors.append(f"{label}: unknown override key '{group}.{key}'")
+    return errors
+
+
+def validate_theme_presets(root: Path) -> list[str]:
+    """Validate every theme preset under *root*; never raises, returns sorted errors."""
+    errors: list[str] = []
+    seen: dict[str, str] = {}
+    try:
+        paths = _iter_preset_files(root)
+    except Exception as exc:  # pragma: no cover - defensive, never raise
+        return [f"theme presets: unexpected validation failure: {exc}"]
+    for path in paths:
+        name = path.name
+        label = f"theme preset {name}"
+        try:
+            document = _read_preset_yaml(path, label)
+        except ValueError as exc:
+            errors.append(str(exc))
+            continue
+        except Exception as exc:  # pragma: no cover - defensive, never raise
+            errors.append(f"{label}: unexpected validation failure: {exc}")
+            continue
+        if not isinstance(document, dict):
+            errors.append(f"{label}: expected a mapping at {path}")
+            continue
+        preset_id = document.get("id")
+        if not isinstance(preset_id, str) or not preset_id:
+            errors.append(f"{label}: missing or empty id")
+            continue
+        if preset_id in seen:
+            errors.append(f"{label}: duplicate id '{preset_id}'")
+        else:
+            seen[preset_id] = name
+        status = document.get("status")
+        if status not in PRESET_STATUSES:
+            errors.append(
+                f"theme preset {preset_id}: invalid status {status!r}; "
+                f"expected one of {', '.join(PRESET_STATUSES)}"
+            )
+        if "semantic_overrides" not in document:
+            errors.append(f"theme preset {preset_id}: missing semantic_overrides")
+        else:
+            errors.extend(
+                _override_path_errors(
+                    f"theme preset {preset_id}", document["semantic_overrides"]
+                )
+            )
+    return sorted(set(errors))
+
+
+def brand_to_semantic_overrides(brand: dict) -> dict:
+    """Map approved raw client brand keys onto nested semantic override paths."""
+    overrides: dict[str, dict] = {}
+    if not isinstance(brand, dict):
+        return overrides
+    for raw_key, (group, key) in BRAND_OVERRIDE_MAP.items():
+        if raw_key in brand:
+            overrides.setdefault(group, {})[key] = brand[raw_key]
+    return overrides
+
+
+def _deep_merge(base: dict, overlay: dict) -> None:
+    for key, value in overlay.items():
+        if isinstance(value, dict) and isinstance(base.get(key), dict):
+            _deep_merge(base[key], value)
+        else:
+            base[key] = copy.deepcopy(value)
+
+
+def _resolve_foundation_path(
+    path: str, foundation: dict, context: str, visiting: list[str], errors: list[str]
+):
+    label = f"foundation.{path}"
+    if label in visiting:
+        errors.append(
+            f"{context}: cyclic token reference: " + " -> ".join(visiting + [label])
+        )
+        return None
+    current = foundation
+    for part in path.split("."):
+        if not isinstance(current, dict) or part not in current:
+            errors.append(
+                f"{context}: unknown token reference: {{foundation.{path}}}"
+            )
+            return None
+        current = current[part]
+    if isinstance(current, str):
+        match = _RESOLUTION_REFERENCE_PATTERN.match(current)
+        if match:
+            visiting.append(label)
+            resolved = _resolve_foundation_path(
+                match.group(1), foundation, context, visiting, errors
+            )
+            visiting.pop()
+            return resolved
+    return current
+
+
+def _resolve_theme_values(theme: dict, foundation: dict) -> tuple[dict, list[str]]:
+    errors: list[str] = []
+    resolved: dict = {}
+    for group in sorted(theme):
+        group_value = theme[group]
+        if not isinstance(group_value, dict):
+            resolved[group] = copy.deepcopy(group_value)
+            continue
+        resolved_group: dict = {}
+        for key in sorted(group_value):
+            value = group_value[key]
+            if isinstance(value, str):
+                match = _RESOLUTION_REFERENCE_PATTERN.match(value)
+                if match:
+                    value = _resolve_foundation_path(
+                        match.group(1),
+                        foundation,
+                        f"semantic.{group}.{key}",
+                        [],
+                        errors,
+                    )
+            resolved_group[key] = copy.deepcopy(value)
+        resolved[group] = resolved_group
+    return resolved, errors
+
+
+def _sorted_deep_copy(value):
+    if isinstance(value, dict):
+        return {key: _sorted_deep_copy(value[key]) for key in sorted(value)}
+    if isinstance(value, list):
+        return [_sorted_deep_copy(item) for item in value]
+    return copy.deepcopy(value)
+
+
+def resolve_theme(
+    root: Path,
+    preset_id: str,
+    client_brand: dict | None = None,
+    direction_overrides: dict | None = None,
+) -> dict:
+    """Compile foundation + semantic defaults + preset + brand + direction to a theme."""
+    catalog_errors = validate_token_catalogs(root)
+    if catalog_errors:
+        raise ValueError(
+            "invalid token catalogs: " + "; ".join(sorted(catalog_errors))
+        )
+
+    foundation = load_foundation_tokens(root)
+    semantic = load_semantic_tokens(root)
+    presets = load_theme_presets(root)
+
+    if preset_id not in presets:
+        raise ValueError(f"unknown theme preset: {preset_id}")
+    preset = presets[preset_id]
+    if preset.get("status") != "approved":
+        raise ValueError(f"theme preset '{preset_id}' is not approved")
+
+    layers = (
+        ("preset override", preset.get("semantic_overrides")),
+        ("brand override", brand_to_semantic_overrides(client_brand or {})),
+        ("direction override", direction_overrides or {}),
+    )
+    override_errors: list[str] = []
+    for label, overrides in layers:
+        override_errors.extend(_override_path_errors(label, overrides))
+    if override_errors:
+        raise ValueError("; ".join(sorted(override_errors)))
+
+    theme = copy.deepcopy(semantic)
+    theme.pop("version", None)
+    for _label, overrides in layers:
+        _deep_merge(theme, overrides)
+
+    resolved, reference_errors = _resolve_theme_values(theme, foundation)
+    if reference_errors:
+        raise ValueError("; ".join(sorted(set(reference_errors))))
+
+    resolved["version"] = 1
+    semantic_errors = _validate_semantic(resolved)
+    if semantic_errors:
+        raise ValueError("; ".join(sorted(semantic_errors)))
+
+    return _sorted_deep_copy(resolved)

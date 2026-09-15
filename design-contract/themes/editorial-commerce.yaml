@@ -1,0 +1,10 @@
+id: editorial-commerce
+status: approved
+semantic_overrides:
+  density:
+    default: spacious
+  spacing:
+    section: "{foundation.spacing.10}"
+    card: "{foundation.spacing.5}"
+  typography:
+    heading_emphasis: strong

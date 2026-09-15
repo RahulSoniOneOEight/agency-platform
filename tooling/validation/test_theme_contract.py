@@ -8,14 +8,20 @@ from pathlib import Path
 import yaml
 
 from tooling.design_contract.theme_contract import (
+    CANONICAL_GROUPS,
+    brand_to_semantic_overrides,
     load_foundation_tokens,
     load_semantic_tokens,
+    load_theme_presets,
+    resolve_theme,
+    validate_theme_presets,
     validate_token_catalogs,
 )
 
 
 ROOT = Path(__file__).resolve().parents[2]
 _TOKENS = ROOT / "design-contract" / "tokens"
+_THEMES = ROOT / "design-contract" / "themes"
 
 _TEMP_DIRECTORIES: list[tempfile.TemporaryDirectory] = []
 
@@ -62,6 +68,54 @@ def _root_with(foundation=None, semantic=None) -> Path:
 
 def _has_error(errors: list[str], needle: str) -> bool:
     return any(needle in error for error in errors)
+
+
+def _real_preset(name: str) -> dict:
+    return yaml.safe_load((_THEMES / name).read_text(encoding="utf-8"))
+
+
+def _write_preset(root: Path, name: str, document) -> None:
+    directory = root / "design-contract" / "themes"
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / name
+    if isinstance(document, str):
+        path.write_text(document, encoding="utf-8")
+    else:
+        path.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
+
+
+def _root_with_presets(presets, foundation=None, semantic=None) -> Path:
+    root = _root_with(foundation=foundation, semantic=semantic)
+    for name, document in presets.items():
+        _write_preset(root, name, document)
+    return root
+
+
+def _approved_preset(preset_id: str = "test-preset", overrides=None) -> dict:
+    return {
+        "id": preset_id,
+        "status": "approved",
+        "semantic_overrides": {} if overrides is None else overrides,
+    }
+
+
+def _reverse(value):
+    if isinstance(value, dict):
+        return {key: _reverse(value[key]) for key in reversed(list(value))}
+    if isinstance(value, list):
+        return [_reverse(item) for item in value]
+    return value
+
+
+def _walk_strings(value):
+    if isinstance(value, dict):
+        for item in value.values():
+            yield from _walk_strings(item)
+    elif isinstance(value, list):
+        for item in value:
+            yield from _walk_strings(item)
+    elif isinstance(value, str):
+        yield value
 
 
 class CatalogLoadingTests(unittest.TestCase):
@@ -353,6 +407,232 @@ class DeterminismTests(unittest.TestCase):
             return validate_token_catalogs(_root_with(foundation=foundation))
 
         self.assertEqual(build(False), build(True))
+
+
+class ThemePresetLoadingTests(unittest.TestCase):
+    def test_repo_presets_load_and_validate(self):
+        presets = load_theme_presets(ROOT)
+
+        self.assertEqual(
+            sorted(presets),
+            ["compact-commerce", "editorial-commerce", "premium-modern"],
+        )
+        self.assertEqual(presets["premium-modern"]["status"], "approved")
+        self.assertEqual(validate_theme_presets(ROOT), [])
+
+    def test_validate_reports_non_mapping_document(self):
+        root = _root_with_presets({"broken.yaml": "- 1\n"})
+
+        errors = validate_theme_presets(root)
+
+        self.assertTrue(_has_error(errors, "expected a mapping"), errors)
+
+    def test_validate_reports_missing_id(self):
+        root = _root_with_presets(
+            {"missing.yaml": {"status": "approved", "semantic_overrides": {}}}
+        )
+
+        errors = validate_theme_presets(root)
+
+        self.assertTrue(_has_error(errors, "missing or empty id"), errors)
+
+    def test_validate_reports_duplicate_id(self):
+        root = _root_with_presets(
+            {"a.yaml": _approved_preset("dup"), "b.yaml": _approved_preset("dup")}
+        )
+
+        errors = validate_theme_presets(root)
+
+        self.assertTrue(_has_error(errors, "duplicate id 'dup'"), errors)
+
+    def test_validate_reports_invalid_status(self):
+        preset = _approved_preset()
+        preset["status"] = "blessed"
+        root = _root_with_presets({"p.yaml": preset})
+
+        errors = validate_theme_presets(root)
+
+        self.assertTrue(_has_error(errors, "invalid status"), errors)
+
+    def test_validate_reports_missing_semantic_overrides(self):
+        root = _root_with_presets({"p.yaml": {"id": "p", "status": "approved"}})
+
+        errors = validate_theme_presets(root)
+
+        self.assertTrue(_has_error(errors, "missing semantic_overrides"), errors)
+
+    def test_validate_reports_invalid_override_paths(self):
+        preset = _approved_preset("p", {"ProductCard": {"padding": 8}})
+        root = _root_with_presets({"p.yaml": preset})
+
+        errors = validate_theme_presets(root)
+
+        self.assertTrue(
+            _has_error(errors, "unknown override group 'ProductCard'"), errors
+        )
+
+    def test_preset_errors_are_sorted_and_unique(self):
+        preset = _approved_preset("p", {"color": {"nope": "#fff"}, "ProductCard": {}})
+        preset["status"] = "nope"
+        root = _root_with_presets({"p.yaml": preset})
+
+        errors = validate_theme_presets(root)
+
+        self.assertTrue(errors)
+        self.assertEqual(errors, sorted(errors))
+        self.assertEqual(errors, sorted(set(errors)))
+
+
+class ThemeResolutionTests(unittest.TestCase):
+    def test_resolves_brand_and_eliminates_references(self):
+        theme = resolve_theme(ROOT, "premium-modern", {"primary_color": "#1155CC"}, None)
+
+        self.assertEqual(theme["version"], 1)
+        self.assertEqual(theme["color"]["primary"], "#1155CC")
+        self.assertEqual(sorted(theme), sorted(("version",) + CANONICAL_GROUPS))
+        for group in CANONICAL_GROUPS:
+            self.assertIn(group, theme)
+        self.assertFalse(
+            [value for value in _walk_strings(theme) if "{foundation." in value]
+        )
+
+    def test_precedence_preset_brand_direction(self):
+        overrides = {
+            "color": {"primary": "{foundation.color.blue.500}"},
+            "density": {"default": "spacious"},
+        }
+        root = _root_with_presets(
+            {"test-preset.yaml": _approved_preset("test-preset", overrides)}
+        )
+
+        preset_only = resolve_theme(root, "test-preset")
+        self.assertEqual(preset_only["color"]["primary"], "#3B6BFF")
+        self.assertEqual(preset_only["density"]["default"], "spacious")
+
+        brand = resolve_theme(root, "test-preset", {"primary_color": "#1155CC"})
+        self.assertEqual(brand["color"]["primary"], "#1155CC")
+        self.assertEqual(brand["density"]["default"], "spacious")
+
+        direction = resolve_theme(
+            root,
+            "test-preset",
+            {"primary_color": "#1155CC"},
+            {"color": {"primary": "#000000"}, "density": {"default": "compact"}},
+        )
+        self.assertEqual(direction["color"]["primary"], "#000000")
+        self.assertEqual(direction["density"]["default"], "compact")
+
+    def test_brand_to_semantic_overrides_maps_only_known_keys(self):
+        self.assertEqual(
+            brand_to_semantic_overrides(
+                {
+                    "primary_color": "#1155CC",
+                    "secondary_color": "#EF8A23",
+                    "font_family": "Inter",
+                    "font_fallback": "Roboto",
+                    "visual_character": "soft",
+                }
+            ),
+            {
+                "color": {"primary": "#1155CC", "secondary": "#EF8A23"},
+                "typography": {"font_family": "Inter", "font_fallback": "Roboto"},
+            },
+        )
+        self.assertEqual(brand_to_semantic_overrides({}), {})
+        self.assertEqual(brand_to_semantic_overrides({"unknown": 1}), {})
+
+    def test_unknown_reference_raises(self):
+        semantic = copy.deepcopy(_real_catalog("semantic.yaml"))
+        semantic["color"]["primary"] = "{foundation.color.missing.500}"
+        root = _root_with_presets({"p.yaml": _approved_preset("p")}, semantic=semantic)
+
+        with self.assertRaises(ValueError) as ctx:
+            resolve_theme(root, "p")
+
+        self.assertIn("unknown token reference", str(ctx.exception))
+        self.assertIn("{foundation.color.missing.500}", str(ctx.exception))
+
+    def test_cyclic_reference_raises(self):
+        foundation = copy.deepcopy(_real_catalog("foundation.yaml"))
+        foundation["motion"]["easing"] = "{foundation.motion.easing}"
+        root = _root_with_presets(
+            {"p.yaml": _approved_preset("p")}, foundation=foundation
+        )
+
+        with self.assertRaises(ValueError) as ctx:
+            resolve_theme(root, "p")
+
+        self.assertIn("cyclic token reference", str(ctx.exception))
+
+    def test_unknown_preset_raises(self):
+        with self.assertRaises(ValueError) as ctx:
+            resolve_theme(ROOT, "does-not-exist")
+
+        self.assertIn("unknown theme preset: does-not-exist", str(ctx.exception))
+
+    def test_unapproved_preset_raises(self):
+        preset = _approved_preset("draft")
+        preset["status"] = "experimental"
+        root = _root_with_presets({"draft.yaml": preset})
+
+        with self.assertRaises(ValueError) as ctx:
+            resolve_theme(root, "draft")
+
+        self.assertIn("theme preset 'draft' is not approved", str(ctx.exception))
+
+    def test_disallowed_override_paths_raise(self):
+        with self.assertRaises(ValueError) as ctx:
+            resolve_theme(ROOT, "premium-modern", None, {"ProductCard": {"padding": 8}})
+        self.assertIn("ProductCard", str(ctx.exception))
+
+        with self.assertRaises(ValueError) as ctx2:
+            resolve_theme(ROOT, "premium-modern", None, {"color": {"nope": "#fff"}})
+        self.assertIn("color.nope", str(ctx2.exception))
+
+        with self.assertRaises(ValueError) as ctx3:
+            resolve_theme(ROOT, "premium-modern", None, {"color": "#fff"})
+        self.assertIn("must be a mapping", str(ctx3.exception))
+
+    def test_invalid_token_catalogs_raise(self):
+        foundation = copy.deepcopy(_real_catalog("foundation.yaml"))
+        del foundation["breakpoints"]
+        root = _root_with_presets(
+            {"p.yaml": _approved_preset("p")}, foundation=foundation
+        )
+
+        with self.assertRaises(ValueError) as ctx:
+            resolve_theme(root, "p")
+
+        self.assertIn("invalid token catalogs:", str(ctx.exception))
+
+    def test_resolved_theme_is_revalidated(self):
+        semantic = copy.deepcopy(_real_catalog("semantic.yaml"))
+        semantic["color"]["primary"] = "{foundation.typography.size.body}"
+        root = _root_with_presets({"p.yaml": _approved_preset("p")}, semantic=semantic)
+
+        with self.assertRaises(ValueError) as ctx:
+            resolve_theme(root, "p")
+
+        self.assertIn("semantic.color.primary", str(ctx.exception))
+
+    def test_output_is_independent_of_mapping_insertion_order(self):
+        forward_root = _root_with_presets(
+            {"premium-modern.yaml": _real_preset("premium-modern.yaml")}
+        )
+        reversed_root = _root_with_presets(
+            {"premium-modern.yaml": _reverse(_real_preset("premium-modern.yaml"))},
+            foundation=_reverse(_real_catalog("foundation.yaml")),
+            semantic=_reverse(_real_catalog("semantic.yaml")),
+        )
+
+        forward = resolve_theme(
+            forward_root, "premium-modern", {"primary_color": "#1155CC"}, None
+        )
+        reversed_result = resolve_theme(
+            reversed_root, "premium-modern", {"primary_color": "#1155CC"}, None
+        )
+
+        self.assertEqual(forward, reversed_result)
 
 
 if __name__ == "__main__":
