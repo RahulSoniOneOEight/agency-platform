@@ -1,6 +1,7 @@
 import 'package:agency_flutter_ui/agency_flutter_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prototype_app/direction/prototype_direction.dart';
+import 'package:prototype_app/runtime/prototype_runtime.dart';
 
 Map<String, dynamic> canonicalDirection({
   String id = 'a',
@@ -22,6 +23,60 @@ Map<String, dynamic> canonicalDirection({
       {'component': 'commerce.product-card', 'variant': 'b2b'},
     ],
     'required_resources': ['asset.home.hero'],
+  };
+}
+
+Map<String, dynamic> canonicalBundle({
+  List<String> directionIds = const ['a', 'b'],
+}) {
+  return {
+    'version': 1,
+    'client_id': 'prototype-demo',
+    'default_direction': 'a',
+    'directions': {
+      for (final id in directionIds) id: canonicalDirection(id: id),
+    },
+    'fixtures': {
+      'industry': 'electronics-appliances',
+      'seed': 108,
+      'products': [
+        {
+          'id': 'prd-01',
+          'sku': 'SKU-ELE-1000',
+          'name': 'USB-C Hub',
+          'price': 674,
+          'compare_at': 674,
+          'rating': 4.1,
+          'stock': 18,
+          'category': 'category-1',
+        },
+      ],
+      'services': <dynamic>[],
+    },
+    'theme': {'seed_color': '#6750A4'},
+    'resources': {
+      'asset.home.hero': {
+        'candidate_id': 'pexels-42',
+        'source': 'pexels',
+        'type': 'image',
+        'asset': {'url': 'https://example.test/hero.jpg', 'width': 2400},
+        'provider_extension': {'license': 'Pexels'},
+      },
+      'direction_overrides': {
+        'b': {
+          'asset.home.hero': {
+            'candidate_id': 'client-hero',
+            'source': 'client',
+            'type': 'image',
+            'asset': {'path': 'input/assets/hero.jpg'},
+          },
+        },
+      },
+    },
+    'review': {
+      'query_parameter': 'direction',
+      'allowed_directions': directionIds,
+    },
   };
 }
 
@@ -93,6 +148,94 @@ void main() {
       final map = canonicalDirection()..remove('navigation_model');
 
       expect(() => PrototypeDirection.fromMap(map), throwsFormatException);
+    });
+  });
+
+  group('PrototypeRuntime', () {
+    test('parses a valid generated client bundle', () {
+      final runtime = PrototypeRuntime.fromMap(canonicalBundle());
+
+      expect(runtime.clientId, 'prototype-demo');
+      expect(runtime.defaultDirection, 'a');
+      expect(runtime.directions.keys, ['a', 'b']);
+      expect(runtime.allowedDirections, ['a', 'b']);
+      expect(runtime.queryParameter, 'direction');
+      expect(runtime.seedColor, '#6750A4');
+      expect(runtime.fixtures['industry'], 'electronics-appliances');
+
+      final hero = runtime.resource('asset.home.hero');
+      expect(hero, isNotNull);
+      expect(hero!.candidateId, 'pexels-42');
+      expect(hero.source, 'pexels');
+      expect(hero.type, 'image');
+      expect(hero.asset['url'], 'https://example.test/hero.jpg');
+      expect(hero.providerExtension, {'license': 'Pexels'});
+
+      final override = runtime.overridesFor('b')['asset.home.hero'];
+      expect(override, isNotNull);
+      expect(override!.candidateId, 'client-hero');
+      expect(runtime.overridesFor('a'), isEmpty);
+    });
+
+    test('accepts two and three declared directions', () {
+      expect(PrototypeRuntime.fromMap(canonicalBundle()).directions.length, 2);
+      expect(
+        PrototypeRuntime.fromMap(
+          canonicalBundle(directionIds: const ['a', 'b', 'c']),
+        ).directions.length,
+        3,
+      );
+    });
+
+    test('requires the default direction to exist', () {
+      final bundle = canonicalBundle()..['default_direction'] = 'c';
+
+      expect(() => PrototypeRuntime.fromMap(bundle), throwsFormatException);
+    });
+
+    test('requires allowed directions to match declared directions', () {
+      final bundle = canonicalBundle();
+      (bundle['review'] as Map)['allowed_directions'] = ['a'];
+
+      expect(() => PrototypeRuntime.fromMap(bundle), throwsFormatException);
+    });
+
+    test('rejects missing client id and malformed directions', () {
+      final noClient = canonicalBundle()..remove('client_id');
+      expect(() => PrototypeRuntime.fromMap(noClient), throwsFormatException);
+
+      final oneDirection = canonicalBundle(directionIds: const ['a']);
+      expect(() => PrototypeRuntime.fromMap(oneDirection), throwsFormatException);
+    });
+
+    test('rejects malformed resource bindings', () {
+      final bundle = canonicalBundle();
+      (bundle['resources'] as Map)['asset.home.hero'] = {'type': 'image'};
+
+      expect(() => PrototypeRuntime.fromMap(bundle), throwsFormatException);
+    });
+
+    test('rejects unknown override direction ids', () {
+      final bundle = canonicalBundle();
+      (bundle['resources'] as Map)['direction_overrides'] = {
+        'z': {'asset.home.hero': {}},
+      };
+
+      expect(() => PrototypeRuntime.fromMap(bundle), throwsFormatException);
+    });
+
+    test('rejects malformed override groups', () {
+      final bundle = canonicalBundle();
+      (bundle['resources'] as Map)['direction_overrides'] = {'b': []};
+
+      expect(() => PrototypeRuntime.fromMap(bundle), throwsFormatException);
+    });
+
+    test('rejects an invalid theme seed color', () {
+      final bundle = canonicalBundle();
+      bundle['theme'] = {'seed_color': '6750A4'};
+
+      expect(() => PrototypeRuntime.fromMap(bundle), throwsFormatException);
     });
   });
 }
