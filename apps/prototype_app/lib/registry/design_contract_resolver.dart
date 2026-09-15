@@ -1,4 +1,4 @@
-import 'generated_design_bindings.dart';
+﻿import 'generated_design_bindings.dart';
 
 /// Governed canonical-ID resolver for Flutter implementations.
 ///
@@ -8,7 +8,7 @@ import 'generated_design_bindings.dart';
 /// selects a default. Unknown canonical IDs, variants, or densities fail
 /// deterministically.
 abstract final class DesignContractResolver {
-  static DesignBinding binding(String canonicalId) {
+  static DesignBinding _binding(String canonicalId) {
     final descriptor = generatedDesignBindings[canonicalId];
     if (descriptor == null) {
       throw ArgumentError.value(
@@ -21,7 +21,7 @@ abstract final class DesignContractResolver {
   }
 
   static String patternKey(String canonicalId) {
-    final descriptor = binding(canonicalId);
+    final descriptor = _binding(canonicalId);
     if (descriptor.kind != 'pattern') {
       throw ArgumentError.value(
         canonicalId,
@@ -33,7 +33,7 @@ abstract final class DesignContractResolver {
   }
 
   static DesignBinding component(String canonicalId) {
-    final descriptor = binding(canonicalId);
+    final descriptor = _binding(canonicalId);
     if (descriptor.kind != 'component') {
       throw ArgumentError.value(
         canonicalId,
@@ -58,7 +58,7 @@ abstract final class DesignContractResolver {
   }
 
   static String density(String canonicalId, String canonicalDensity) {
-    final descriptor = binding(canonicalId);
+    final descriptor = _binding(canonicalId);
     final resolved = descriptor.density[canonicalDensity];
     if (resolved == null) {
       throw ArgumentError.value(
