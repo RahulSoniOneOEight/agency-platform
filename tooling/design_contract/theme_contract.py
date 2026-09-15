@@ -28,14 +28,39 @@ CANONICAL_GROUPS = (
 
 CANONICAL_DENSITIES = ("compact", "normal", "spacious")
 
-# Semantic groups whose values must be a number or a foundation reference.
-_NUMERIC_SEMANTIC_GROUPS = ("spacing", "radius", "elevation", "size", "breakpoints")
+# Per-group numeric leaves. ``None`` means every key in the group is numeric.
+_NUMERIC_LEAVES: dict[str, tuple[str, ...] | None] = {
+    "spacing": None,
+    "radius": None,
+    "elevation": None,
+    "size": None,
+    "breakpoints": None,
+    "typography": (
+        "display",
+        "headline",
+        "title",
+        "body",
+        "label",
+        "line_height_body",
+        "weight_regular",
+        "weight_emphasis",
+    ),
+    "motion": ("fast_ms", "normal_ms", "slow_ms"),
+}
+
+# Per-group string leaves that must be non-empty literals.
+_STRING_LEAVES: dict[str, tuple[str, ...]] = {
+    "typography": ("font_family", "font_fallback", "heading_emphasis"),
+    "motion": ("easing",),
+}
 
 _COLOR_PATTERN = re.compile(r"^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$")
 _REFERENCE_PATTERN = re.compile(
     r"^\{foundation\.[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*\}$"
 )
-_RESOLUTION_REFERENCE_PATTERN = re.compile(r"^\{foundation\.([A-Za-z0-9_.]+)\}$")
+_RESOLUTION_REFERENCE_PATTERN = re.compile(
+    r"^\{foundation\.([A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*)\}$"
+)
 
 # Raw client brand keys that map onto approved semantic override paths (R2/R8).
 BRAND_OVERRIDE_MAP: dict[str, tuple[str, str]] = {
@@ -307,15 +332,24 @@ def _validate_semantic_value(group: str, key: str, value) -> list[str]:
         if value not in CANONICAL_DENSITIES:
             return [f"{path}: density must be one of compact, normal, spacious"]
         return []
+
+    numeric_leaves = _NUMERIC_LEAVES.get(group, ())
+    if numeric_leaves is None or key in numeric_leaves:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return [
+                f"{path}: expected a number or foundation reference, "
+                f"got {_describe(value)}"
+            ]
+        return _numeric_errors(path, value, minimum=0)
+
+    if key in _STRING_LEAVES.get(group, ()):
+        if not isinstance(value, str) or not value:
+            return [f"{path}: expected a non-empty string, got {_describe(value)}"]
+        return []
+
     if isinstance(value, bool) or not isinstance(value, (int, float, str)):
         return [
-            f"{path}: expected a token reference or literal string, got {_describe(value)}"
-        ]
-    if isinstance(value, (int, float)) and not isinstance(value, bool):
-        return _numeric_errors(path, value, minimum=0)
-    if group in _NUMERIC_SEMANTIC_GROUPS:
-        return [
-            f"{path}: expected a number or foundation reference, got {_describe(value)}"
+            f"{path}: expected a token reference or literal value, got {_describe(value)}"
         ]
     return []
 
@@ -413,6 +447,8 @@ def load_theme_presets(root: Path) -> dict[str, dict]:
         preset_id = document.get("id")
         if not isinstance(preset_id, str) or not preset_id:
             raise ValueError(f"{label}: missing or empty id")
+        if preset_id in presets:
+            raise ValueError(f"{label}: duplicate preset id {preset_id!r}")
         presets[preset_id] = document
     return presets
 
@@ -477,6 +513,8 @@ def validate_theme_presets(root: Path) -> list[str]:
                 f"theme preset {preset_id}: invalid status {status!r}; "
                 f"expected one of {', '.join(PRESET_STATUSES)}"
             )
+        for extra in sorted(set(document) - {"id", "status", "semantic_overrides"}):
+            errors.append(f"theme preset {preset_id}: unknown key '{extra}'")
         if "semantic_overrides" not in document:
             errors.append(f"theme preset {preset_id}: missing semantic_overrides")
         else:

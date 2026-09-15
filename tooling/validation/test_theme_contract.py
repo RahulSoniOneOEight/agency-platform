@@ -66,6 +66,14 @@ def _root_with(foundation=None, semantic=None) -> Path:
     return root
 
 
+def _write_preset(root: Path, name: str, document) -> None:
+    directory = root / "design-contract" / "themes"
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / name).write_text(
+        yaml.safe_dump(document, sort_keys=False), encoding="utf-8"
+    )
+
+
 def _has_error(errors: list[str], needle: str) -> bool:
     return any(needle in error for error in errors)
 
@@ -372,6 +380,82 @@ class StrictnessTests(unittest.TestCase):
         errors = validate_token_catalogs(_root_with(semantic=semantic))
 
         self.assertTrue(_has_error(errors, "semantic.spacing.inline"), errors)
+
+
+class TypeStrictnessTests(unittest.TestCase):
+    def test_preset_type_changing_numeric_leaf_is_rejected(self):
+        root = _root_with()
+        _write_preset(
+            root,
+            "bad.yaml",
+            {
+                "id": "bad",
+                "status": "approved",
+                "semantic_overrides": {"typography": {"display": "big"}},
+            },
+        )
+
+        with self.assertRaises(ValueError):
+            resolve_theme(root, "bad")
+
+    def test_direction_type_changing_motion_leaf_is_rejected(self):
+        root = _root_with()
+        _write_preset(
+            root,
+            "ok.yaml",
+            {"id": "ok", "status": "approved", "semantic_overrides": {}},
+        )
+
+        with self.assertRaises(ValueError):
+            resolve_theme(root, "ok", None, {"motion": {"fast_ms": "soon"}})
+
+    def test_brand_font_family_must_be_a_string(self):
+        root = _root_with()
+        _write_preset(
+            root,
+            "ok.yaml",
+            {"id": "ok", "status": "approved", "semantic_overrides": {}},
+        )
+
+        with self.assertRaises(ValueError):
+            resolve_theme(root, "ok", {"font_family": 8})
+
+    def test_preset_unknown_top_level_key_is_rejected(self):
+        root = _root_with()
+        _write_preset(
+            root,
+            "bad.yaml",
+            {
+                "id": "bad",
+                "status": "approved",
+                "semantic_overrides": {},
+                "extra": 1,
+            },
+        )
+
+        errors = validate_theme_presets(root)
+
+        self.assertTrue(_has_error(errors, "unknown key 'extra'"), errors)
+
+    def test_duplicate_preset_id_is_rejected(self):
+        root = _root_with()
+        _write_preset(
+            root,
+            "a.yaml",
+            {"id": "dup", "status": "approved", "semantic_overrides": {}},
+        )
+        _write_preset(
+            root,
+            "b.yaml",
+            {"id": "dup", "status": "approved", "semantic_overrides": {}},
+        )
+
+        with self.assertRaises(ValueError):
+            load_theme_presets(root)
+        self.assertTrue(
+            _has_error(validate_theme_presets(root), "duplicate id"), 
+            validate_theme_presets(root),
+        )
 
 
 class DeterminismTests(unittest.TestCase):
