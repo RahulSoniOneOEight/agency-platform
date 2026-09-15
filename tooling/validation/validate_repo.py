@@ -1,7 +1,20 @@
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
+
+_ROOT = Path(__file__).resolve().parents[2]
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
+import yaml  # noqa: E402
+
+from tooling.prototype.build_runtime_bundle import compose_runtime_bundle  # noqa: E402
+from tooling.prototype.validate_runtime_bundle import (  # noqa: E402
+    validate_runtime_bundle,
+    validate_runtime_bundle_against_design_contract,
+)
 
 
 REQUIRED_PATHS = (
@@ -61,8 +74,17 @@ REQUIRED_PATHS = (
     "tooling/validation",
     "tooling/validation/test_resource_selection.py",
     "tooling/validation/test_resource_integration.py",
+    "tooling/validation/test_runtime_bundle.py",
     "tooling/visual-review",
     "tooling/workflow/client_input.py",
+    "tooling/prototype/build_runtime_bundle.py",
+    "tooling/prototype/validate_runtime_bundle.py",
+    "apps/prototype_app/assets/generated",
+    "apps/prototype_app/lib/runtime/prototype_runtime.dart",
+    "apps/prototype_app/lib/runtime/runtime_loader.dart",
+    "apps/prototype_app/lib/runtime/runtime_exception.dart",
+    "apps/prototype_app/lib/runtime/resource_binding.dart",
+    "apps/prototype_app/lib/registry/canonical_pattern_adapter.dart",
     "AGENTS.md",
     "REFERENCE_POLICY.md",
     "DESIGN_SYSTEM.md",
@@ -79,16 +101,94 @@ def missing_required_paths(root: Path) -> list[str]:
     return [relative for relative in REQUIRED_PATHS if not (root / relative).exists()]
 
 
+def generated_runtime_bundle_errors(root: Path) -> list[str]:
+    """Return B.1B generated client runtime bundle errors under *root*.
+
+    Every checked client whose prototype manifest exists must have a generated
+    bundle that is valid, approved against the design contract, and identical to
+    a fresh projection of its strategic sources.
+    """
+    errors: list[str] = []
+    projects = root / "client-projects"
+    if not projects.exists():
+        return errors
+
+    output_dir = root / "apps" / "prototype_app" / "assets" / "generated"
+    for manifest_path in sorted(projects.glob("**/prototype/prototype-manifest.yaml")):
+        client_dir = manifest_path.parent.parent
+        try:
+            manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, yaml.YAMLError) as exc:
+            errors.append(f"{manifest_path}: cannot read prototype manifest: {exc}")
+            continue
+        if not isinstance(manifest, dict):
+            errors.append(f"{manifest_path}: prototype manifest must be an object")
+            continue
+
+        client_id = manifest.get("client_id")
+        if not isinstance(client_id, str) or not client_id:
+            errors.append(f"{manifest_path}: client_id must be a non-empty string")
+            continue
+
+        bundle_path = output_dir / f"{client_id}.json"
+        if not bundle_path.exists():
+            errors.append(
+                f"{bundle_path}: missing generated runtime bundle for client {client_id!r}"
+            )
+            continue
+
+        try:
+            bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            errors.append(f"{bundle_path}: cannot parse generated runtime bundle: {exc}")
+            continue
+
+        bundle_errors = validate_runtime_bundle(bundle)
+        bundle_errors.extend(
+            validate_runtime_bundle_against_design_contract(root, bundle)
+        )
+        if bundle_errors:
+            errors.extend(f"{bundle_path}: {error}" for error in sorted(bundle_errors))
+            continue
+
+        try:
+            fresh = compose_runtime_bundle(client_dir)
+            expected = (
+                json.dumps(fresh, indent=2, sort_keys=True, allow_nan=False) + "\n"
+            )
+        except (OSError, UnicodeError, ValueError) as exc:
+            errors.append(f"{bundle_path}: cannot recompose runtime bundle: {exc}")
+            continue
+
+        if bundle_path.read_text(encoding="utf-8") != expected:
+            errors.append(
+                f"{bundle_path}: generated runtime bundle is stale; "
+                "regenerate from source"
+            )
+
+    return errors
+
+
 def main() -> int:
-    root = Path(__file__).resolve().parents[2]
+    root = _ROOT
     missing = missing_required_paths(root)
-    if missing:
-        print("Repository validation failed. Missing required paths:")
-        for path in missing:
-            print(f"- {path}")
+    bundle_errors = generated_runtime_bundle_errors(root)
+    if missing or bundle_errors:
+        print("Repository validation failed.")
+        if missing:
+            print("Missing required paths:")
+            for path in missing:
+                print(f"- {path}")
+        if bundle_errors:
+            print("Generated runtime bundle errors:")
+            for error in bundle_errors:
+                print(f"- {error}")
         return 1
 
-    print(f"Repository validation passed: {len(REQUIRED_PATHS)} required paths present.")
+    print(
+        f"Repository validation passed: {len(REQUIRED_PATHS)} required paths present "
+        "and generated runtime bundles are fresh."
+    )
     return 0
 
 
