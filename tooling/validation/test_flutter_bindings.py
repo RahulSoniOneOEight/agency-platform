@@ -714,18 +714,29 @@ class RepositoryParityTests(unittest.TestCase):
         )
 
     def test_error_ordering_is_stable_under_insertion_order(self):
-        def build_root(order: tuple[str, ...]) -> Path:
+        def build_root(order: tuple[str, ...], reverse_keys: bool = False) -> Path:
             root = _contract_root()
             for contract_id in order:
                 binding = component_binding(contract_id)
                 short = contract_id.split(".")[-1]
                 binding["implementation"]["registry_key"] = short
                 binding["implementation"]["symbol"] = short.title()
+                if reverse_keys:
+                    binding = {
+                        key: (
+                            dict(reversed(list(value.items())))
+                            if isinstance(value, dict)
+                            else value
+                        )
+                        for key, value in reversed(list(binding.items()))
+                    }
                 _write_binding(root, binding)
             return root
 
         first = flutter_binding_errors(build_root(("commerce.aaa", "commerce.bbb")))
-        second = flutter_binding_errors(build_root(("commerce.bbb", "commerce.aaa")))
+        second = flutter_binding_errors(
+            build_root(("commerce.bbb", "commerce.aaa"), reverse_keys=True)
+        )
 
         self.assertEqual(first, second)
         self.assertEqual(sorted(first), first)
