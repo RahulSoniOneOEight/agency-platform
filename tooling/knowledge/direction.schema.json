@@ -49,6 +49,7 @@
     "patterns": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1},
     "components": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1},
     "component_variants": {"type": "array", "items": {"type": "object"}},
+    "theme_overrides": {"type": "object", "additionalProperties": true},
     "required_resources": {"type": "array", "items": {"type": "string"}},
     "strengths": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1},
     "tradeoffs": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1},

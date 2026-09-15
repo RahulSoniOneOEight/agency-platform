@@ -70,6 +70,32 @@ BRAND_OVERRIDE_MAP: dict[str, tuple[str, str]] = {
     "font_fallback": ("typography", "font_fallback"),
 }
 
+# Approved raw client brand visual fields (R2/R8).
+BRAND_VISUAL_FIELDS = (
+    "primary_color",
+    "secondary_color",
+    "font_family",
+    "font_fallback",
+    "visual_character",
+)
+VISUAL_CHARACTERS = ("soft", "sharp", "editorial", "bold", "minimal")
+
+# Direction theme overrides may target only these approved semantic paths (R3/R11).
+DIRECTION_OVERRIDE_ALLOWLIST: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("spacing", "inline"),
+        ("spacing", "control"),
+        ("spacing", "card"),
+        ("spacing", "tile"),
+        ("spacing", "section"),
+        ("radius", "control"),
+        ("radius", "card"),
+        ("size", "control_height"),
+        ("size", "control_height_compact"),
+        ("typography", "heading_emphasis"),
+    }
+)
+
 _TYPOGRAPHY_SUBGROUPS = ("size", "line_height", "weight")
 _MOTION_DURATIONS = ("fast_ms", "normal_ms", "slow_ms")
 
@@ -312,8 +338,10 @@ def _validate_foundation(catalog: dict) -> list[str]:
     return errors
 
 
-def _validate_semantic_value(group: str, key: str, value) -> list[str]:
-    path = f"semantic.{group}.{key}"
+def _validate_semantic_value(
+    group: str, key: str, value, *, prefix: str = "semantic"
+) -> list[str]:
+    path = f"{prefix}.{group}.{key}"
     if isinstance(value, str) and ("{" in value or "}" in value):
         if not _REFERENCE_PATTERN.match(value):
             return [
@@ -537,6 +565,70 @@ def brand_to_semantic_overrides(brand: dict) -> dict:
     return overrides
 
 
+def validate_client_brand_visual(brand: object) -> list[str]:
+    """Validate an approved raw client brand visual mapping; returns sorted errors."""
+    if brand is None:
+        return []
+    if not isinstance(brand, dict):
+        return [f"client brand visual: expected a mapping, got {_describe(brand)}"]
+    errors: list[str] = []
+    for key in sorted(set(brand) - set(BRAND_VISUAL_FIELDS)):
+        errors.append(f"client brand visual: unknown key '{key}'")
+    for key in ("primary_color", "secondary_color"):
+        if key in brand:
+            value = brand[key]
+            if not isinstance(value, str) or not _COLOR_PATTERN.match(value):
+                errors.append(
+                    f"client brand visual.{key}: invalid color {value!r}; "
+                    f"expected #RRGGBB or #AARRGGBB"
+                )
+    for key in ("font_family", "font_fallback"):
+        if key in brand:
+            value = brand[key]
+            if not isinstance(value, str) or not value:
+                errors.append(
+                    f"client brand visual.{key}: expected a non-empty string"
+                )
+    if "visual_character" in brand and brand["visual_character"] not in VISUAL_CHARACTERS:
+        errors.append(
+            f"client brand visual.visual_character: must be one of "
+            f"{', '.join(VISUAL_CHARACTERS)}"
+        )
+    return sorted(set(errors))
+
+
+def validate_direction_theme_overrides(overrides: object) -> list[str]:
+    """Validate a direction theme override layer against the approved allowlist."""
+    if overrides is None:
+        return []
+    if not isinstance(overrides, dict):
+        return [
+            f"direction theme_overrides: expected a mapping, got {_describe(overrides)}"
+        ]
+    errors: list[str] = []
+    for group in sorted(overrides):
+        value = overrides[group]
+        if not isinstance(value, dict):
+            errors.append(
+                f"direction theme_overrides.{group}: must be a mapping, "
+                f"got {_describe(value)}"
+            )
+            continue
+        for key in sorted(value):
+            if (group, key) not in DIRECTION_OVERRIDE_ALLOWLIST:
+                errors.append(
+                    f"direction theme_overrides: '{group}.{key}' is not an approved "
+                    f"override path"
+                )
+                continue
+            errors.extend(
+                _validate_semantic_value(
+                    group, key, value[key], prefix="direction theme_overrides"
+                )
+            )
+    return sorted(set(errors))
+
+
 def _deep_merge(base: dict, overlay: dict) -> None:
     for key, value in overlay.items():
         if isinstance(value, dict) and isinstance(base.get(key), dict):
@@ -637,10 +729,11 @@ def resolve_theme(
         ("direction override", direction_overrides or {}),
     )
     override_errors: list[str] = []
-    for label, overrides in layers:
-        override_errors.extend(_override_path_errors(label, overrides))
+    override_errors.extend(_override_path_errors(layers[0][0], layers[0][1]))
+    override_errors.extend(validate_client_brand_visual(client_brand))
+    override_errors.extend(validate_direction_theme_overrides(direction_overrides))
     if override_errors:
-        raise ValueError("; ".join(sorted(override_errors)))
+        raise ValueError("; ".join(sorted(set(override_errors))))
 
     theme = copy.deepcopy(semantic)
     theme.pop("version", None)

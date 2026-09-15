@@ -24,6 +24,11 @@ transaction_model: rfq-first
 patterns: [commerce.home, commerce.plp, commerce.pdp, commerce.rfq, commerce.trade-dashboard]
 components: [commerce.product-card, commerce.price-display, commerce.quote-card, commerce.credit-summary]
 component_variants: []
+theme_overrides:
+  spacing:
+    section: "{foundation.spacing.10}"
+  typography:
+    heading_emphasis: strong
 required_resources: []
 strengths: [strong negotiated buying flow, supports complex orders]
 tradeoffs: [slower for simple immediate purchases]

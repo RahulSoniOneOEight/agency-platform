@@ -5,7 +5,19 @@
   "properties": {
     "version": {"const": 1},
     "provided": {"type": "boolean"},
-    "facts": {"type": "array", "items": {"type": "object"}}
+    "facts": {"type": "array", "items": {"type": "object"}},
+    "visual": {
+      "type": "object",
+      "properties": {
+        "preset": {"type": "string", "minLength": 1},
+        "primary_color": {"type": "string", "pattern": "^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"},
+        "secondary_color": {"type": "string", "pattern": "^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"},
+        "font_family": {"type": "string", "minLength": 1},
+        "font_fallback": {"type": "string", "minLength": 1},
+        "visual_character": {"enum": ["soft", "sharp", "editorial", "bold", "minimal"]}
+      },
+      "additionalProperties": false
+    }
   },
   "additionalProperties": true
 }

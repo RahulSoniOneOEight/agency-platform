@@ -14,6 +14,8 @@ from tooling.design_contract.theme_contract import (
     load_semantic_tokens,
     load_theme_presets,
     resolve_theme,
+    validate_client_brand_visual,
+    validate_direction_theme_overrides,
     validate_theme_presets,
     validate_token_catalogs,
 )
@@ -458,6 +460,111 @@ class TypeStrictnessTests(unittest.TestCase):
         )
 
 
+class DirectionAndBrandOverrideTests(unittest.TestCase):
+    def _root_with_preset(self, name: str = "premium-modern") -> Path:
+        root = _root_with()
+        _write_preset(
+            root,
+            f"{name}.yaml",
+            {"id": name, "status": "approved", "semantic_overrides": {}},
+        )
+        return root
+
+    def test_allowed_direction_overrides_apply(self):
+        root = self._root_with_preset()
+
+        theme = resolve_theme(
+            root,
+            "premium-modern",
+            None,
+            {
+                "spacing": {"section": "{foundation.spacing.6}"},
+                "radius": {"card": "{foundation.radius.md}"},
+                "typography": {"heading_emphasis": "strong"},
+            },
+        )
+
+        self.assertEqual(24, theme["spacing"]["section"])
+        self.assertEqual(12, theme["radius"]["card"])
+        self.assertEqual("strong", theme["typography"]["heading_emphasis"])
+
+    def test_disallowed_direction_paths_are_rejected(self):
+        root = self._root_with_preset()
+        cases = (
+            {"color": {"primary": "#000000"}},
+            {"ProductCard": {"padding": 8}},
+            {"widgets": {"search": {"radius": 4}}},
+            {"density": {"default": "compact"}},
+            {"motion": {"fast_ms": 100}},
+        )
+
+        for overrides in cases:
+            with self.subTest(overrides=overrides):
+                with self.assertRaises(ValueError):
+                    resolve_theme(root, "premium-modern", None, overrides)
+
+    def test_direction_override_validator_reports_allowlist(self):
+        errors = validate_direction_theme_overrides({"color": {"primary": "#000000"}})
+
+        self.assertTrue(_has_error(errors, "not an approved override path"), errors)
+        self.assertEqual(sorted(errors), errors)
+
+    def test_brand_visual_validation(self):
+        self.assertEqual(
+            [],
+            validate_client_brand_visual(
+                {
+                    "primary_color": "#1155CC",
+                    "font_family": "Inter",
+                    "visual_character": "soft",
+                }
+            ),
+        )
+        self.assertTrue(
+            _has_error(validate_client_brand_visual({"nope": 1}), "unknown key")
+        )
+        self.assertTrue(
+            _has_error(
+                validate_client_brand_visual({"primary_color": "red"}), "invalid color"
+            )
+        )
+        self.assertTrue(
+            _has_error(
+                validate_client_brand_visual({"visual_character": "loud"}),
+                "visual_character",
+            )
+        )
+
+    def test_unknown_brand_key_is_rejected_by_resolve_theme(self):
+        root = self._root_with_preset()
+
+        with self.assertRaises(ValueError):
+            resolve_theme(root, "premium-modern", {"primary-colour": "#000000"})
+
+    def test_brand_beats_preset_and_direction_beats_brand(self):
+        root = _root_with()
+        _write_preset(
+            root,
+            "preset.yaml",
+            {
+                "id": "preset",
+                "status": "approved",
+                "semantic_overrides": {"spacing": {"section": "{foundation.spacing.10}"}},
+            },
+        )
+
+        brand = resolve_theme(root, "preset", {"primary_color": "#1155CC"})
+        self.assertEqual("#1155CC", brand["color"]["primary"])
+
+        with_direction = resolve_theme(
+            root,
+            "preset",
+            {"primary_color": "#1155CC"},
+            {"spacing": {"section": "{foundation.spacing.4}"}},
+        )
+        self.assertEqual(16, with_direction["spacing"]["section"])
+
+
 class DeterminismTests(unittest.TestCase):
     def test_errors_are_sorted_and_unique(self):
         foundation = copy.deepcopy(_real_catalog("foundation.yaml"))
@@ -583,7 +690,7 @@ class ThemeResolutionTests(unittest.TestCase):
     def test_precedence_preset_brand_direction(self):
         overrides = {
             "color": {"primary": "{foundation.color.blue.500}"},
-            "density": {"default": "spacious"},
+            "spacing": {"section": "{foundation.spacing.6}"},
         }
         root = _root_with_presets(
             {"test-preset.yaml": _approved_preset("test-preset", overrides)}
@@ -591,20 +698,20 @@ class ThemeResolutionTests(unittest.TestCase):
 
         preset_only = resolve_theme(root, "test-preset")
         self.assertEqual(preset_only["color"]["primary"], "#3B6BFF")
-        self.assertEqual(preset_only["density"]["default"], "spacious")
+        self.assertEqual(preset_only["spacing"]["section"], 24)
 
         brand = resolve_theme(root, "test-preset", {"primary_color": "#1155CC"})
         self.assertEqual(brand["color"]["primary"], "#1155CC")
-        self.assertEqual(brand["density"]["default"], "spacious")
+        self.assertEqual(brand["spacing"]["section"], 24)
 
         direction = resolve_theme(
             root,
             "test-preset",
             {"primary_color": "#1155CC"},
-            {"color": {"primary": "#000000"}, "density": {"default": "compact"}},
+            {"spacing": {"section": "{foundation.spacing.4}"}},
         )
-        self.assertEqual(direction["color"]["primary"], "#000000")
-        self.assertEqual(direction["density"]["default"], "compact")
+        self.assertEqual(direction["color"]["primary"], "#1155CC")
+        self.assertEqual(direction["spacing"]["section"], 16)
 
     def test_brand_to_semantic_overrides_maps_only_known_keys(self):
         self.assertEqual(
