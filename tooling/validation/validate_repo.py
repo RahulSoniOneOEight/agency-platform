@@ -10,6 +10,14 @@ if str(_ROOT) not in sys.path:
 
 import yaml  # noqa: E402
 
+from tooling.design_contract.flutter_bindings import (  # noqa: E402
+    load_flutter_bindings,
+    runtime_binding_errors,
+    validate_flutter_bindings,
+)
+from tooling.design_contract.generate_flutter_bindings import (  # noqa: E402
+    check_flutter_bindings_fresh,
+)
 from tooling.prototype.build_runtime_bundle import compose_runtime_bundle  # noqa: E402
 from tooling.prototype.validate_runtime_bundle import (  # noqa: E402
     validate_runtime_bundle,
@@ -77,6 +85,12 @@ REQUIRED_PATHS = (
     "tooling/validation/test_runtime_bundle.py",
     "tooling/visual-review",
     "tooling/workflow/client_input.py",
+    "design-contract/schema/flutter-binding.schema.json",
+    "design-contract/bindings/flutter",
+    "tooling/design_contract/flutter_bindings.py",
+    "tooling/design_contract/generate_flutter_bindings.py",
+    "tooling/validation/test_flutter_bindings.py",
+    "apps/prototype_app/lib/registry/generated_design_bindings.dart",
     "tooling/prototype/build_runtime_bundle.py",
     "tooling/prototype/validate_runtime_bundle.py",
     "apps/prototype_app/assets/generated",
@@ -169,11 +183,40 @@ def generated_runtime_bundle_errors(root: Path) -> list[str]:
     return errors
 
 
+def flutter_binding_errors(root: Path) -> list[str]:
+    """Return B.1D Flutter binding catalog, projection, and runtime parity errors.
+
+    Every checked runtime direction must resolve its patterns, components,
+    component variants, and density through approved Flutter bindings, and the
+    checked Dart projection must byte-match a fresh deterministic render.
+    """
+    errors: list[str] = []
+    errors.extend(validate_flutter_bindings(root))
+    errors.extend(check_flutter_bindings_fresh(root))
+
+    bindings = load_flutter_bindings(root)
+    projects = root / "client-projects"
+    if projects.exists():
+        for direction_path in sorted(
+            projects.glob("**/prototype/runtime/direction-*.json")
+        ):
+            try:
+                direction = json.loads(direction_path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+                errors.append(f"{direction_path}: cannot parse runtime direction: {exc}")
+                continue
+            for error in runtime_binding_errors(root, direction, bindings):
+                errors.append(f"{direction_path}: {error}")
+
+    return sorted(set(errors))
+
+
 def main() -> int:
     root = _ROOT
     missing = missing_required_paths(root)
     bundle_errors = generated_runtime_bundle_errors(root)
-    if missing or bundle_errors:
+    binding_errors = flutter_binding_errors(root)
+    if missing or bundle_errors or binding_errors:
         print("Repository validation failed.")
         if missing:
             print("Missing required paths:")
@@ -183,11 +226,15 @@ def main() -> int:
             print("Generated runtime bundle errors:")
             for error in bundle_errors:
                 print(f"- {error}")
+        if binding_errors:
+            print("Flutter design binding errors:")
+            for error in binding_errors:
+                print(f"- {error}")
         return 1
 
     print(
-        f"Repository validation passed: {len(REQUIRED_PATHS)} required paths present "
-        "and generated runtime bundles are fresh."
+        f"Repository validation passed: {len(REQUIRED_PATHS)} required paths present, "
+        "generated runtime bundles are fresh, and Flutter design bindings are valid."
     )
     return 0
 

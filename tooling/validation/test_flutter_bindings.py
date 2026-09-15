@@ -18,6 +18,7 @@ from tooling.design_contract.generate_flutter_bindings import (
     write_flutter_bindings,
 )
 from tooling.knowledge.index_design_contract import build_indexes
+from tooling.validation.validate_repo import flutter_binding_errors
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -583,6 +584,151 @@ class RuntimeBindingErrorTests(unittest.TestCase):
             ),
             errors,
         )
+
+
+def _write_runtime_direction(root: Path, direction: dict, name: str = "direction-a.json") -> None:
+    directory = root / "client-projects" / "acme" / "prototype" / "runtime"
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / name).write_text(json.dumps(direction), encoding="utf-8")
+
+
+def _runtime_direction(**overrides) -> dict:
+    direction = {
+        "patterns": [],
+        "components": [],
+        "component_variants": [],
+        "density": "normal",
+    }
+    direction.update(overrides)
+    return direction
+
+
+class RepositoryParityTests(unittest.TestCase):
+    def test_current_repository_bindings_and_projection_are_valid(self):
+        self.assertEqual([], flutter_binding_errors(ROOT))
+
+    def test_stale_generated_projection_is_reported(self):
+        root = _contract_root()
+        _write_component(root)
+        _write_binding(root, component_binding())
+        generated = write_flutter_bindings(root)
+        generated.write_bytes(generated.read_bytes() + b"\n")
+
+        errors = flutter_binding_errors(root)
+
+        self.assertTrue(any("stale" in error for error in errors), errors)
+
+    def test_missing_runtime_pattern_binding_is_reported(self):
+        root = _contract_root()
+        _write_pattern(root, "commerce.cart")
+        _write_component(root)
+        _write_binding(root, component_binding())
+        write_flutter_bindings(root)
+        _write_runtime_direction(
+            root,
+            _runtime_direction(
+                patterns=["commerce.cart"],
+                components=["commerce.product-card"],
+            ),
+        )
+
+        errors = flutter_binding_errors(root)
+
+        self.assertTrue(
+            any(
+                "references canonical pattern 'commerce.cart' without an approved "
+                "Flutter binding" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_unknown_runtime_variant_is_reported(self):
+        root = _contract_root()
+        _write_component(
+            root,
+            "commerce.product-card",
+            variants=("standard", "b2b"),
+            states=("normal",),
+            density=("compact", "normal"),
+        )
+        _write_binding(
+            root,
+            component_binding(
+                variants={"standard": "standard"},
+                density={"compact": "dense", "normal": "balanced"},
+            ),
+        )
+        write_flutter_bindings(root)
+        _write_runtime_direction(
+            root,
+            _runtime_direction(
+                components=["commerce.product-card"],
+                component_variants=[
+                    {"component": "commerce.product-card", "variant": "b2b"}
+                ],
+            ),
+        )
+
+        errors = flutter_binding_errors(root)
+
+        self.assertTrue(
+            any(
+                "variant 'b2b' for 'commerce.product-card' is not supported by the "
+                "Flutter binding" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_invalid_runtime_density_is_reported(self):
+        root = _contract_root()
+        _write_component(
+            root,
+            "commerce.product-card",
+            variants=("standard",),
+            states=("normal",),
+            density=("compact", "normal"),
+        )
+        _write_binding(
+            root,
+            component_binding(
+                variants={"standard": "standard"},
+                density={"compact": "dense", "normal": "balanced"},
+            ),
+        )
+        write_flutter_bindings(root)
+        _write_runtime_direction(
+            root,
+            _runtime_direction(
+                components=["commerce.product-card"],
+                density="spacious",
+            ),
+        )
+
+        errors = flutter_binding_errors(root)
+
+        self.assertTrue(
+            any("does not support density 'spacious'" in error for error in errors),
+            errors,
+        )
+
+    def test_error_ordering_is_stable_under_insertion_order(self):
+        def build_root(order: tuple[str, ...]) -> Path:
+            root = _contract_root()
+            for contract_id in order:
+                binding = component_binding(contract_id)
+                short = contract_id.split(".")[-1]
+                binding["implementation"]["registry_key"] = short
+                binding["implementation"]["symbol"] = short.title()
+                _write_binding(root, binding)
+            return root
+
+        first = flutter_binding_errors(build_root(("commerce.aaa", "commerce.bbb")))
+        second = flutter_binding_errors(build_root(("commerce.bbb", "commerce.aaa")))
+
+        self.assertEqual(first, second)
+        self.assertEqual(sorted(first), first)
 
 
 class GeneratedProjectionTests(unittest.TestCase):

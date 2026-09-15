@@ -9,6 +9,10 @@ from pathlib import Path
 
 import yaml
 
+from tooling.design_contract.flutter_bindings import (
+    load_flutter_bindings,
+    runtime_binding_errors,
+)
 from tooling.knowledge.index_design_contract import build_indexes
 from tooling.prototype.build_runtime_bundle import build_runtime_bundle
 from tooling.prototype import validate_runtime_bundle as runtime_bundle_validator
@@ -236,6 +240,22 @@ class RuntimeBundleTests(unittest.TestCase):
                         self.assertIsNotNone(contract, "canonical contract is missing")
                         if contract is not None:
                             self.assertEqual("approved", contract.get("status"))
+
+    def test_generated_bundles_have_approved_flutter_bindings(self):
+        bindings = load_flutter_bindings(ROOT)
+        bundle_paths = sorted(
+            (ROOT / "apps" / "prototype_app" / "assets" / "generated").glob("*.json")
+        )
+        self.assertTrue(bundle_paths)
+
+        errors = []
+        for bundle_path in bundle_paths:
+            bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
+            for direction_id, direction in sorted(bundle.get("directions", {}).items()):
+                for error in runtime_binding_errors(ROOT, direction, bindings):
+                    errors.append(f"{bundle_path.name}:{direction_id}: {error}")
+
+        self.assertEqual([], sorted(errors))
 
     def test_builds_canonical_client_bundle(self):
         with tempfile.TemporaryDirectory() as tmp:
