@@ -293,6 +293,17 @@ class RuntimeBundleTests(unittest.TestCase):
                 errors = validate_runtime_bundle(bundle)
                 self.assertTrue(any(expected in error for error in errors), errors)
 
+    def test_validator_reports_non_string_resource_types_without_raising(self):
+        for resource_type in ([], {}):
+            with self.subTest(resource_type=resource_type):
+                bundle = _bundle()
+                bundle["resources"]["asset.home.hero"]["type"] = resource_type
+
+                self.assertEqual(
+                    ["resources.asset.home.hero.type must be a non-empty string"],
+                    validate_runtime_bundle(bundle),
+                )
+
     def test_validator_resolves_required_resources_per_direction(self):
         bundle = _bundle()
         bundle["resources"] = {
@@ -368,6 +379,39 @@ class RuntimeBundleTests(unittest.TestCase):
                     errors,
                 )
 
+    def test_validator_rejects_cyclic_json_containers_deterministically(self):
+        cyclic_list = []
+        cyclic_list.append(cyclic_list)
+        cyclic_map = {}
+        cyclic_map["self"] = cyclic_map
+
+        cases = {
+            "list": (
+                cyclic_list,
+                "runtime bundle.fixtures.cycle.0 must be JSON-compatible "
+                "(cyclic reference)",
+            ),
+            "map": (
+                cyclic_map,
+                "runtime bundle.fixtures.cycle.self must be JSON-compatible "
+                "(cyclic reference)",
+            ),
+        }
+        for label, (cycle, expected) in cases.items():
+            with self.subTest(label=label):
+                bundle = _bundle()
+                bundle["fixtures"]["cycle"] = cycle
+
+                self.assertEqual([expected], validate_runtime_bundle(bundle))
+
+    def test_validator_accepts_shared_acyclic_json_containers(self):
+        shared = {"labels": ["featured"]}
+        bundle = _bundle()
+        bundle["fixtures"]["first"] = shared
+        bundle["fixtures"]["second"] = shared
+
+        self.assertEqual([], validate_runtime_bundle(bundle))
+
     def test_builder_rejects_non_json_yaml_values_with_governed_error(self):
         cases = {
             "non-finite number": lambda manifest, fixtures: fixtures["products"][0].update(
@@ -405,6 +449,26 @@ class RuntimeBundleTests(unittest.TestCase):
                     ValueError, "^invalid runtime bundle: .*JSON-compatible"
                 ):
                     build_runtime_bundle(root, client, root / "output")
+
+    def test_builder_rejects_cyclic_yaml_alias_with_governed_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            client = root / "client-projects" / "acme-client"
+            _write_client(client)
+            fixture_path = client / "prototype" / "fixtures" / "demo.yaml"
+            fixtures = yaml.safe_load(fixture_path.read_text(encoding="utf-8"))
+            cyclic_list = []
+            cyclic_list.append(cyclic_list)
+            fixtures["cycle"] = cyclic_list
+            fixture_path.write_text(
+                yaml.safe_dump(fixtures, sort_keys=False), encoding="utf-8"
+            )
+
+            with self.assertRaisesRegex(
+                ValueError,
+                "^invalid runtime bundle: .*JSON-compatible .*cyclic reference",
+            ):
+                build_runtime_bundle(root, client, root / "output")
 
     def test_builder_rejects_invalid_manifest_review(self):
         with tempfile.TemporaryDirectory() as tmp:

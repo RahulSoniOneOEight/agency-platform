@@ -26,7 +26,11 @@ def _is_number(value: object) -> bool:
     )
 
 
-def _validate_json_value(value: object, path: str) -> list[str]:
+def _validate_json_value(
+    value: object, path: str, active_containers: set[int] | None = None
+) -> list[str]:
+    if active_containers is None:
+        active_containers = set()
     if value is None or isinstance(value, (str, bool, int)):
         return []
     if isinstance(value, float):
@@ -34,22 +38,40 @@ def _validate_json_value(value: object, path: str) -> list[str]:
             return []
         return [f"{path} must be JSON-compatible (finite number required)"]
     if isinstance(value, list):
+        identity = id(value)
+        if identity in active_containers:
+            return [f"{path} must be JSON-compatible (cyclic reference)"]
+        active_containers.add(identity)
         errors: list[str] = []
-        for index, item in enumerate(value):
-            errors.extend(_validate_json_value(item, f"{path}.{index}"))
+        try:
+            for index, item in enumerate(value):
+                errors.extend(
+                    _validate_json_value(item, f"{path}.{index}", active_containers)
+                )
+        finally:
+            active_containers.remove(identity)
         return errors
     if isinstance(value, dict):
+        identity = id(value)
+        if identity in active_containers:
+            return [f"{path} must be JSON-compatible (cyclic reference)"]
+        active_containers.add(identity)
         errors = []
-        for key, item in sorted(
-            value.items(), key=lambda pair: (type(pair[0]).__name__, repr(pair[0]))
-        ):
-            if not isinstance(key, str):
-                errors.append(
-                    f"{path}.<key {key!r}> must be JSON-compatible "
-                    "(object keys must be strings)"
+        try:
+            for key, item in sorted(
+                value.items(), key=lambda pair: (type(pair[0]).__name__, repr(pair[0]))
+            ):
+                if not isinstance(key, str):
+                    errors.append(
+                        f"{path}.<key {key!r}> must be JSON-compatible "
+                        "(object keys must be strings)"
+                    )
+                    continue
+                errors.extend(
+                    _validate_json_value(item, f"{path}.{key}", active_containers)
                 )
-                continue
-            errors.extend(_validate_json_value(item, f"{path}.{key}"))
+        finally:
+            active_containers.remove(identity)
         return errors
     return [f"{path} must be JSON-compatible, got {type(value).__name__}"]
 
@@ -155,6 +177,8 @@ def _validate_binding_group(group: object, path: str) -> list[str]:
             continue
 
         resource_type = binding.get("type")
+        if not isinstance(resource_type, str) or not resource_type:
+            continue
         expected_prefix = _RESOURCE_PREFIXES.get(resource_type, "resource.")
         if isinstance(canonical_id, str) and not canonical_id.startswith(expected_prefix):
             errors.append(
@@ -218,6 +242,8 @@ def validate_runtime_bundle(bundle: dict) -> list[str]:
         return ["runtime bundle must be an object"]
 
     errors = _validate_json_value(bundle, "runtime bundle")
+    if any(error.endswith("(cyclic reference)") for error in errors):
+        return errors
     version = bundle.get("version")
     if not isinstance(version, int) or isinstance(version, bool) or version != 1:
         errors.append("version must equal 1")
