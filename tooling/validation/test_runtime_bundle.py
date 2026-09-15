@@ -1,0 +1,319 @@
+from __future__ import annotations
+
+import copy
+import json
+import tempfile
+import unittest
+from pathlib import Path
+
+import yaml
+
+from tooling.prototype.build_runtime_bundle import build_runtime_bundle
+from tooling.prototype.validate_runtime_bundle import validate_runtime_bundle
+
+
+ROOT = Path(__file__).resolve().parents[2]
+
+
+def _direction(direction_id: str, *, density: str = "compact") -> dict:
+    return {
+        "id": direction_id,
+        "name": f"Direction {direction_id.upper()}",
+        "strategic_goal": "reduce known-item order time",
+        "navigation_model": "search-led",
+        "primary_journey": "search-to-order",
+        "discovery_model": "sku-search",
+        "merchandising_model": "availability-and-price",
+        "density": density,
+        "transaction_model": "checkout-plus-rfq",
+        "patterns": ["commerce.search", "commerce.pdp"],
+        "components": ["commerce.product-card"],
+        "component_variants": [
+            {"component": "commerce.product-card", "variant": "b2b"}
+        ],
+        "required_resources": ["asset.home.hero"],
+    }
+
+
+def _fixtures() -> dict:
+    return {
+        "industry": "electronics-appliances",
+        "seed": 108,
+        "products": [
+            {
+                "id": "prd-01",
+                "sku": "SKU-ELE-1000",
+                "name": "USB-C Hub",
+                "price": 674,
+                "compare_at": 674,
+                "rating": 4.1,
+                "stock": 18,
+                "category": "category-1",
+            }
+        ],
+        "services": [],
+    }
+
+
+def _bundle(direction_ids: tuple[str, ...] = ("a", "b")) -> dict:
+    directions = {direction_id: _direction(direction_id) for direction_id in direction_ids}
+    return {
+        "version": 1,
+        "client_id": "acme-client",
+        "default_direction": "a",
+        "directions": directions,
+        "fixtures": _fixtures(),
+        "theme": {"seed_color": "#6750A4"},
+        "resources": {},
+        "review": {
+            "query_parameter": "direction",
+            "allowed_directions": list(direction_ids),
+        },
+    }
+
+
+def _write_client(client_dir: Path, direction_ids: tuple[str, ...] = ("a", "b")) -> None:
+    runtime_dir = client_dir / "prototype" / "runtime"
+    fixture_dir = client_dir / "prototype" / "fixtures"
+    runtime_dir.mkdir(parents=True)
+    fixture_dir.mkdir(parents=True)
+
+    direction_paths = {}
+    for direction_id in direction_ids:
+        relative_path = f"prototype/runtime/direction-{direction_id}.json"
+        (client_dir / relative_path).write_text(
+            json.dumps(_direction(direction_id), indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        direction_paths[direction_id] = relative_path
+
+    (fixture_dir / "demo.yaml").write_text(
+        yaml.safe_dump(_fixtures(), sort_keys=False), encoding="utf-8"
+    )
+    manifest = {
+        "version": 1,
+        "client_id": "acme-client",
+        "runtime": "apps/prototype_app",
+        "default_direction": "a",
+        "directions": direction_paths,
+        "fixture_pack": "prototype/fixtures/demo.yaml",
+        "theme": {"seed_color": "#6750A4"},
+        "resources": {
+            "asset.home.hero": {
+                "candidate_id": "pexels-42",
+                "source": "pexels",
+                "type": "image",
+                "asset": {
+                    "url": "https://images.pexels.com/photos/42/large.jpeg",
+                    "width": 2400,
+                    "provider_metadata": {"photographer": "Example"},
+                },
+                "provider_extension": {"license": "Pexels"},
+            },
+            "direction_overrides": {
+                "b": {
+                    "asset.home.hero": {
+                        "candidate_id": "client-hero",
+                        "source": "client",
+                        "type": "image",
+                        "asset": {"path": "input/assets/banners/hero.jpg"},
+                    }
+                }
+            },
+        },
+        "review": {
+            "query_parameter": "direction",
+            "allowed_values": list(direction_ids),
+            "show_comparison": True,
+        },
+    }
+    (client_dir / "prototype" / "prototype-manifest.yaml").write_text(
+        yaml.safe_dump(manifest, sort_keys=False), encoding="utf-8"
+    )
+
+
+class RuntimeBundleTests(unittest.TestCase):
+    def test_builds_reference_client_bundle(self):
+        client = ROOT / "client-projects" / "examples" / "prototype-demo"
+        with tempfile.TemporaryDirectory() as tmp:
+            output = build_runtime_bundle(ROOT, client, Path(tmp))
+            bundle = json.loads(output.read_text(encoding="utf-8"))
+
+        self.assertEqual("prototype-demo", bundle["client_id"])
+        self.assertEqual("a", bundle["default_direction"])
+        self.assertEqual({"a", "b", "c"}, set(bundle["directions"]))
+        self.assertEqual(
+            "search-led", bundle["directions"]["a"]["navigation_model"]
+        )
+        self.assertEqual("compact", bundle["directions"]["a"]["density"])
+        self.assertIn("fixtures", bundle)
+        self.assertIn("theme", bundle)
+        self.assertIn("resources", bundle)
+        self.assertEqual(["a", "b", "c"], bundle["review"]["allowed_directions"])
+        self.assertNotIn("allowed_values", bundle["review"])
+        self.assertEqual([], validate_runtime_bundle(bundle))
+
+    def test_builds_two_direction_bundle_deterministically_and_preserves_resources(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            client = root / "client-projects" / "acme-client"
+            _write_client(client)
+            first_dir = root / "first"
+            second_dir = root / "second"
+
+            first = build_runtime_bundle(root, client, first_dir)
+            second = build_runtime_bundle(root, client, second_dir)
+
+            self.assertEqual(first.read_bytes(), second.read_bytes())
+            self.assertTrue(first.read_bytes().endswith(b"\n"))
+            bundle = json.loads(first.read_text(encoding="utf-8"))
+            self.assertEqual(["a", "b"], list(bundle["directions"]))
+            self.assertEqual(["a", "b"], bundle["review"]["allowed_directions"])
+            self.assertTrue(bundle["review"]["show_comparison"])
+            expected_resources = yaml.safe_load(
+                (client / "prototype" / "prototype-manifest.yaml").read_text(encoding="utf-8")
+            )["resources"]
+            self.assertEqual(expected_resources, bundle["resources"])
+
+    def test_validator_accepts_three_directions_and_fixture_shapes(self):
+        bundle = _bundle(("a", "b", "c"))
+        bundle["directions"]["b"]["density"] = "normal"
+        bundle["directions"]["c"]["density"] = "spacious"
+        bundle["fixtures"] = {
+            "industry": "services-booking",
+            "seed": 108,
+            "products": [],
+            "services": [
+                {
+                    "id": "svc-01",
+                    "name": "Initial Consultation",
+                    "price": 499,
+                    "duration_minutes": 30,
+                    "rating": 4.5,
+                }
+            ],
+        }
+        self.assertEqual([], validate_runtime_bundle(bundle))
+
+    def test_validator_reports_bundle_and_direction_contract_errors(self):
+        cases = {
+            "version": ({**_bundle(), "version": 2}, "version"),
+            "unsafe client id": ({**_bundle(), "client_id": "../acme"}, "client_id"),
+            "direction count": (_bundle(("a",)), "2 or 3"),
+            "missing b": (_bundle(("a", "c")), "include a and b"),
+            "default": ({**_bundle(), "default_direction": "c"}, "default_direction"),
+        }
+        mismatch = _bundle()
+        mismatch["directions"]["b"]["id"] = "c"
+        cases["direction id"] = (mismatch, "direction key")
+        bad_density = _bundle()
+        bad_density["directions"]["a"]["density"] = "dense"
+        cases["density"] = (bad_density, "density")
+        missing_field = _bundle()
+        del missing_field["directions"]["a"]["navigation_model"]
+        cases["canonical field"] = (missing_field, "navigation_model")
+        review_order = _bundle()
+        review_order["review"]["allowed_directions"] = ["b", "a"]
+        cases["review order"] = (review_order, "allowed_directions")
+
+        for label, (bundle, expected) in cases.items():
+            with self.subTest(label=label):
+                errors = validate_runtime_bundle(bundle)
+                self.assertTrue(any(expected in error for error in errors), errors)
+
+    def test_validator_reports_malformed_fixture_fields(self):
+        cases = {}
+        for collection, field in (
+            ("products", "sku"),
+            ("services", "duration_minutes"),
+        ):
+            bundle = _bundle()
+            if collection == "services":
+                bundle["fixtures"]["services"] = [
+                    {
+                        "id": "svc-01",
+                        "name": "Consultation",
+                        "price": 499,
+                        "duration_minutes": 30,
+                        "rating": 4.5,
+                    }
+                ]
+            del bundle["fixtures"][collection][0][field]
+            cases[f"{collection}.{field}"] = (bundle, field)
+
+        wrong_root = _bundle()
+        wrong_root["fixtures"] = []
+        cases["fixture root"] = (wrong_root, "fixtures")
+
+        for label, (bundle, expected) in cases.items():
+            with self.subTest(label=label):
+                errors = validate_runtime_bundle(bundle)
+                self.assertTrue(any(expected in error for error in errors), errors)
+
+    def test_validator_reports_invalid_theme_and_resource_bindings(self):
+        cases = {}
+        bad_theme = _bundle()
+        bad_theme["theme"]["seed_color"] = "6750A4"
+        cases["theme"] = (bad_theme, "seed_color")
+
+        unknown_id = _bundle()
+        unknown_id["resources"] = {
+            "home.hero": {
+                "candidate_id": "hero",
+                "source": "client",
+                "type": "image",
+                "asset": {},
+            }
+        }
+        cases["canonical id"] = (unknown_id, "canonical resource id")
+
+        malformed_binding = _bundle()
+        malformed_binding["resources"] = {"asset.home.hero": {"type": "image"}}
+        cases["binding"] = (malformed_binding, "candidate_id")
+
+        bad_override_direction = _bundle()
+        bad_override_direction["resources"] = {"direction_overrides": {"c": {}}}
+        cases["override direction"] = (bad_override_direction, "unknown direction")
+
+        malformed_override = _bundle()
+        malformed_override["resources"] = {"direction_overrides": {"b": []}}
+        cases["override group"] = (malformed_override, "must be an object")
+
+        collision = _bundle()
+        binding = {
+            "candidate_id": "shared-candidate",
+            "source": "client",
+            "type": "image",
+            "asset": {},
+        }
+        collision["resources"] = {
+            "asset.home.hero": copy.deepcopy(binding),
+            "asset.category.hero": copy.deepcopy(binding),
+        }
+        cases["collision"] = (collision, "collision")
+
+        for label, (bundle, expected) in cases.items():
+            with self.subTest(label=label):
+                errors = validate_runtime_bundle(bundle)
+                self.assertTrue(any(expected in error for error in errors), errors)
+
+    def test_builder_rejects_invalid_manifest_review(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            client = root / "client-projects" / "acme-client"
+            _write_client(client)
+            manifest_path = client / "prototype" / "prototype-manifest.yaml"
+            manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+            manifest["review"]["allowed_values"] = ["a"]
+            manifest_path.write_text(
+                yaml.safe_dump(manifest, sort_keys=False), encoding="utf-8"
+            )
+
+            with self.assertRaisesRegex(
+                ValueError, "^invalid runtime bundle: .*allowed_directions"
+            ):
+                build_runtime_bundle(root, client, root / "output")
+
+
+if __name__ == "__main__":
+    unittest.main()
