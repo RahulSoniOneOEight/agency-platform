@@ -24,7 +24,8 @@ CANONICAL_GROUPS = (
 
 CANONICAL_DENSITIES = ("compact", "normal", "spacious")
 
-_NON_NEGATIVE_GROUPS = ("spacing", "radius", "elevation", "size", "breakpoints")
+# Semantic groups whose values must be a number or a foundation reference.
+_NUMERIC_SEMANTIC_GROUPS = ("spacing", "radius", "elevation", "size", "breakpoints")
 
 _COLOR_PATTERN = re.compile(r"^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$")
 _REFERENCE_PATTERN = re.compile(
@@ -242,10 +243,15 @@ _FOUNDATION_VALIDATORS = {
 }
 
 
+def _version_errors(label: str, version) -> list[str]:
+    if isinstance(version, bool) or version != 1:
+        return [f"{label}.version: must equal 1"]
+    return []
+
+
 def _validate_foundation(catalog: dict) -> list[str]:
     errors: list[str] = []
-    if catalog.get("version") != 1:
-        errors.append("foundation.version: must equal 1")
+    errors.extend(_version_errors("foundation", catalog.get("version")))
     declared = set(catalog) - {"version"}
     for group in CANONICAL_GROUPS:
         if group not in catalog:
@@ -260,6 +266,9 @@ def _validate_foundation(catalog: dict) -> list[str]:
             errors.append(
                 f"foundation.{group}: expected a mapping, got {_describe(value)}"
             )
+            continue
+        if not value:
+            errors.append(f"foundation.{group}: must not be empty")
             continue
         errors.extend(_FOUNDATION_VALIDATORS[group](f"foundation.{group}", value))
     return errors
@@ -291,13 +300,16 @@ def _validate_semantic_value(group: str, key: str, value) -> list[str]:
         ]
     if isinstance(value, (int, float)) and not isinstance(value, bool):
         return _numeric_errors(path, value, minimum=0)
+    if group in _NUMERIC_SEMANTIC_GROUPS:
+        return [
+            f"{path}: expected a number or foundation reference, got {_describe(value)}"
+        ]
     return []
 
 
 def _validate_semantic(catalog: dict) -> list[str]:
     errors: list[str] = []
-    if catalog.get("version") != 1:
-        errors.append("semantic.version: must equal 1")
+    errors.extend(_version_errors("semantic", catalog.get("version")))
     declared = set(catalog) - {"version"}
     for group in CANONICAL_GROUPS:
         if group not in catalog:
@@ -310,6 +322,9 @@ def _validate_semantic(catalog: dict) -> list[str]:
         value = catalog[group]
         if not isinstance(value, dict):
             errors.append(f"semantic.{group}: expected a mapping, got {_describe(value)}")
+            continue
+        if not value:
+            errors.append(f"semantic.{group}: must not be empty")
             continue
         required = SEMANTIC_KEYS[group]
         for key in sorted(set(required) - set(value)):

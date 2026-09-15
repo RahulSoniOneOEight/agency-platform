@@ -287,6 +287,39 @@ class SemanticValidationTests(unittest.TestCase):
         self.assertTrue(_has_error(errors, "semantic.color.primary"), errors)
 
 
+class StrictnessTests(unittest.TestCase):
+    def test_boolean_version_is_rejected(self):
+        foundation = {**_real_catalog("foundation.yaml"), "version": True}
+
+        errors = validate_token_catalogs(_root_with(foundation=foundation))
+
+        self.assertTrue(_has_error(errors, "foundation.version: must equal 1"), errors)
+
+    def test_empty_foundation_group_is_rejected(self):
+        foundation = copy.deepcopy(_real_catalog("foundation.yaml"))
+        foundation["spacing"] = {}
+
+        errors = validate_token_catalogs(_root_with(foundation=foundation))
+
+        self.assertTrue(_has_error(errors, "foundation.spacing: must not be empty"), errors)
+
+    def test_empty_semantic_group_is_rejected(self):
+        semantic = copy.deepcopy(_real_catalog("semantic.yaml"))
+        semantic["radius"] = {}
+
+        errors = validate_token_catalogs(_root_with(semantic=semantic))
+
+        self.assertTrue(_has_error(errors, "semantic.radius: must not be empty"), errors)
+
+    def test_plain_string_in_numeric_semantic_group_is_rejected(self):
+        semantic = copy.deepcopy(_real_catalog("semantic.yaml"))
+        semantic["spacing"]["inline"] = "hello"
+
+        errors = validate_token_catalogs(_root_with(semantic=semantic))
+
+        self.assertTrue(_has_error(errors, "semantic.spacing.inline"), errors)
+
+
 class DeterminismTests(unittest.TestCase):
     def test_errors_are_sorted_and_unique(self):
         foundation = copy.deepcopy(_real_catalog("foundation.yaml"))
