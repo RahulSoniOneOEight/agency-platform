@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -16,9 +15,19 @@ from tooling.design_contract.flutter_bindings import (
 
 ROOT = Path(__file__).resolve().parents[2]
 
+_TEMP_DIRECTORIES: list[tempfile.TemporaryDirectory] = []
+
+
+def tearDownModule():
+    for handle in _TEMP_DIRECTORIES:
+        handle.cleanup()
+    _TEMP_DIRECTORIES.clear()
+
 
 def _contract_root() -> Path:
-    return Path(tempfile.mkdtemp())
+    handle = tempfile.TemporaryDirectory()
+    _TEMP_DIRECTORIES.append(handle)
+    return Path(handle.name)
 
 
 def _write_component(
@@ -291,6 +300,61 @@ class FlutterBindingTests(unittest.TestCase):
         self.assertEqual(sorted(errors), errors)
         self.assertTrue(errors)
 
+    def test_cross_catalog_duplicate_id_is_rejected(self):
+        root = _contract_root()
+        _write_component(root, "commerce.duplicated")
+        _write_pattern(root, "commerce.duplicated")
+        _write_binding(root, component_binding("commerce.duplicated"))
+
+        errors = validate_flutter_bindings(root)
+
+        self.assertIn(
+            "binding commerce.duplicated: canonical id is declared in both component "
+            "and pattern catalogs",
+            errors,
+        )
+
+    def test_malformed_canonical_list_is_treated_as_empty(self):
+        root = _contract_root()
+        directory = root / "design-contract" / "components"
+        directory.mkdir(parents=True)
+        (directory / "commerce-product-card.yaml").write_text(
+            yaml.safe_dump(
+                {
+                    "id": "commerce.product-card",
+                    "name": "ProductCard",
+                    "status": "approved",
+                    "variants": "standard",
+                    "states": [],
+                    "density": [],
+                },
+                sort_keys=False,
+            ),
+            encoding="utf-8",
+        )
+        _write_binding(root, component_binding(variants={"standard": "standard"}))
+
+        errors = validate_flutter_bindings(root)
+
+        self.assertIn(
+            "binding commerce.product-card: variant standard is not declared by "
+            "canonical contract",
+            errors,
+        )
+
+    def test_malformed_canonical_yaml_returns_error_without_raising(self):
+        root = _contract_root()
+        directory = root / "design-contract" / "components"
+        directory.mkdir(parents=True)
+        (directory / "broken.yaml").write_text("{ invalid: [", encoding="utf-8")
+
+        errors = validate_flutter_bindings(root)
+
+        self.assertTrue(
+            any(error.startswith("cannot load design contract under") for error in errors),
+            errors,
+        )
+
     def test_structural_schema_rejects_missing_implementation(self):
         root = _contract_root()
         _write_component(root)
@@ -391,6 +455,26 @@ class RuntimeBindingErrorTests(unittest.TestCase):
             any(
                 "components.0 canonical component 'commerce.product-card' binding does "
                 "not support density 'spacious'" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_runtime_component_variant_requires_component_binding(self):
+        root = _contract_root()
+        _write_pattern(root, "commerce.cart")
+        _write_binding(root, pattern_binding("commerce.cart"))
+        direction = self._direction(
+            components=[],
+            component_variants=[{"component": "commerce.cart", "variant": "standard"}],
+        )
+
+        errors = runtime_binding_errors(root, direction)
+
+        self.assertTrue(
+            any(
+                "component_variants.0 canonical id 'commerce.cart' is bound as "
+                "'pattern', not a component" in error
                 for error in errors
             ),
             errors,

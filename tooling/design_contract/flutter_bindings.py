@@ -73,6 +73,12 @@ def _validate_binding(
     if kind not in _KIND_CATALOG:
         return errors
 
+    if binding_id in catalogs["component"] and binding_id in catalogs["pattern"]:
+        errors.append(
+            f"binding {binding_id}: canonical id is declared in both component and "
+            f"pattern catalogs"
+        )
+
     catalog = catalogs[kind]
     contract = catalog.get(binding_id)
     if contract is None:
@@ -103,7 +109,8 @@ def _validate_binding(
                     f"binding {binding_id}: pattern bindings must not declare variants"
                 )
         else:
-            declared = contract.get("variants") or []
+            declared = contract.get("variants")
+            declared = declared if isinstance(declared, list) else []
             for key in sorted(variants):
                 if key not in declared:
                     errors.append(
@@ -118,7 +125,8 @@ def _validate_binding(
                     f"binding {binding_id}: pattern bindings must not declare states"
                 )
         else:
-            declared = contract.get("states") or []
+            declared = contract.get("states")
+            declared = declared if isinstance(declared, list) else []
             for key in sorted(states):
                 if key not in declared:
                     errors.append(
@@ -135,7 +143,8 @@ def _validate_binding(
                         f"runtime density"
                     )
         else:
-            declared = contract.get("density") or []
+            declared = contract.get("density")
+            declared = declared if isinstance(declared, list) else []
             for key in sorted(density):
                 if key not in declared:
                     errors.append(
@@ -184,7 +193,10 @@ def _duplicate_identifier_errors(entries: list[tuple[str, object]]) -> list[str]
 
 def validate_flutter_bindings(root: Path, bindings: dict | None = None) -> list[str]:
     """Return deterministic, stable-sorted binding catalog errors under *root*."""
-    indexes = build_indexes(root)
+    try:
+        indexes = build_indexes(root)
+    except (OSError, UnicodeError, yaml.YAMLError) as exc:
+        return [f"cannot load design contract under {root}: {exc}"]
     catalogs = {
         "component": indexes["components"],
         "pattern": indexes["patterns"],
@@ -293,6 +305,12 @@ def runtime_binding_errors(
                 errors.append(
                     f"{path} references component {component_id!r} without an approved "
                     f"Flutter binding"
+                )
+                continue
+            if binding.get("kind") != "component":
+                errors.append(
+                    f"{path} canonical id {component_id!r} is bound as "
+                    f"{binding.get('kind')!r}, not a component"
                 )
                 continue
             variant_map = binding.get("variants")
