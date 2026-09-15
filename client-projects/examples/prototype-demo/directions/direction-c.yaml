@@ -21,7 +21,7 @@ merchandising:
   emphasis: bulk-and-negotiated-pricing
 density: normal
 transaction_model: rfq-first
-patterns: [commerce.home, commerce.plp, commerce.pdp, commerce.rfq, trade-dashboard]
+patterns: [commerce.home, commerce.plp, commerce.pdp, commerce.rfq, commerce.trade-dashboard]
 components: [commerce.product-card, commerce.price-display, commerce.quote-card, commerce.credit-summary]
 component_variants: []
 required_resources: []

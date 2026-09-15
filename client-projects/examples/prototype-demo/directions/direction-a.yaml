@@ -23,7 +23,7 @@ merchandising:
   emphasis: availability-and-price
 density: compact
 transaction_model: checkout-plus-rfq
-patterns: [commerce.search, commerce.plp, commerce.pdp, cart, commerce.rfq]
+patterns: [commerce.search, commerce.plp, commerce.pdp, commerce.cart, commerce.rfq]
 components: [commerce.product-card, commerce.price-display, commerce.search-field, commerce.quote-card]
 component_variants:
   - component: commerce.product-card

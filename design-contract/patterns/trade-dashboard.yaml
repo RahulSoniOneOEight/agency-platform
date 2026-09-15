@@ -1,0 +1,7 @@
+id: commerce.trade-dashboard
+name: Trade Dashboard
+purpose: Centralize trade account status, repeat ordering, quotes, and procurement actions.
+status: approved
+compatible_components: [commerce.credit-summary, commerce.quote-card, commerce.product-card]
+business_models: [b2b, marketplace]
+use_cases: [account-self-service, repeat-order, bulk-procurement]

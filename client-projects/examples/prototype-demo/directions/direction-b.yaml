@@ -21,7 +21,7 @@ merchandising:
   emphasis: reorder-and-credit
 density: normal
 transaction_model: account-ordering
-patterns: [trade-dashboard, reorder, cart]
+patterns: [commerce.trade-dashboard, commerce.reorder, commerce.cart]
 components: [commerce.credit-summary, commerce.quote-card, commerce.product-card]
 component_variants: []
 required_resources: []

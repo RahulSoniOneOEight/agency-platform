@@ -1,0 +1,7 @@
+id: commerce.reorder
+name: Reorder
+purpose: Help returning buyers review and repeat prior product orders efficiently.
+status: approved
+compatible_components: [commerce.product-card, commerce.price-display, commerce.search-field]
+business_models: [b2b, b2c, marketplace]
+use_cases: [repeat-order, account-ordering]

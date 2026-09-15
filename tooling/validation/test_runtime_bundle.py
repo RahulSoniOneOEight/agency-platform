@@ -12,6 +12,7 @@ import yaml
 from tooling.knowledge.index_design_contract import build_indexes
 from tooling.prototype.build_runtime_bundle import build_runtime_bundle
 from tooling.prototype import validate_runtime_bundle as runtime_bundle_validator
+from tooling.prototype.project_direction import project_direction
 
 
 validate_runtime_bundle = runtime_bundle_validator.validate_runtime_bundle
@@ -169,6 +170,24 @@ def _write_client(client_dir: Path, direction_ids: tuple[str, ...] = ("a", "b"))
 
 
 class RuntimeBundleTests(unittest.TestCase):
+    def test_prototype_demo_strategic_and_projected_pattern_ids_are_canonical(self):
+        pattern_ids = set(build_indexes(ROOT)["patterns"])
+        legacy_short_ids = {"cart", "reorder", "trade-dashboard"}
+        directions_dir = (
+            ROOT / "client-projects" / "examples" / "prototype-demo" / "directions"
+        )
+
+        for direction_path in sorted(directions_dir.glob("direction-*.yaml")):
+            strategic = yaml.safe_load(direction_path.read_text(encoding="utf-8"))
+            projected = project_direction(strategic)
+            for label, patterns in (
+                ("strategic", strategic["patterns"]),
+                ("projected", projected["patterns"]),
+            ):
+                with self.subTest(direction=direction_path.stem, artifact=label):
+                    self.assertTrue(legacy_short_ids.isdisjoint(patterns), patterns)
+                    self.assertEqual([], sorted(set(patterns) - pattern_ids))
+
     def test_builds_canonical_client_bundle(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
