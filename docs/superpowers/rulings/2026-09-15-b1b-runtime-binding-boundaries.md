@@ -6,13 +6,13 @@
 
 ## Ruling
 
-Generated bundles preserve canonical B.1A pattern IDs unchanged. Flutter owns an explicit adapter from those canonical IDs to the existing internal widget registry keys.
+Generated bundles preserve canonical B.1A pattern IDs unchanged. The authoritative Flutter adapter belongs at the app boundary in `apps/prototype_app/lib/registry/canonical_pattern_adapter.dart`, immediately before `PrototypeRegistry` dispatches to internal `agency_flutter_ui` registry keys. It must be an explicit allowlisted canonical-to-internal map; identity entries are allowed, heuristic prefix stripping is forbidden, and two canonical IDs must not map to the same internal key.
 
-Within `resources`, `direction_overrides` is reserved structural metadata. It is not parsed as a base `ResourceBinding`; only canonical base resource entries are.
+Within `resources`, only the top-level `direction_overrides` key is excluded from the base binding map. Every base canonical entry is parsed as a `ResourceBinding`; every nested `resources.direction_overrides.<direction-id>.<canonical-resource-id>` entry is preserved and also parsed as a `ResourceBinding`. Override direction IDs must exist in the bundle's `directions`; malformed override groups or nested bindings fail bundle parsing. Selecting or merging base and override bindings remains outside B.1B.
 
 ## Rationale
 
-Canonical IDs are the cross-boundary contract and must remain stable independently of Flutter implementation names. Keeping translation in Flutter isolates internal registry details while preserving deterministic generated artifacts. Treating `direction_overrides` as structural metadata also preserves the B.1C resource shape and prevents a control object from being mistaken for a semantic resource binding.
+Canonical IDs are the cross-boundary contract and remain independent of Flutter implementation names. An app-layer allowlist isolates internal widget keys while preserving deterministic artifacts. Typed parsing of both resource levels preserves the complete B.1C shape without treating its structural key as a resource.
 
 ## Rejected Alternative
 
@@ -21,8 +21,9 @@ Rewriting canonical pattern IDs during bundle generation to match Flutter regist
 ## Consequences
 
 - Bundle generation copies canonical pattern IDs without renaming them.
-- Flutter maintains and tests the canonical-to-internal pattern adapter.
-- Resource parsing excludes `resources.direction_overrides` from the base binding map and handles it only as reserved structural metadata.
-- Unknown canonical pattern IDs and malformed resource structures remain explicit validation or runtime errors rather than implicit rewrites.
+- Adapter tests cover every supported canonical ID, assert mapping uniqueness, and require unsupported but valid canonical IDs to fail visibly as missing Flutter implementations.
+- Upstream validation rejects malformed or noncanonical IDs; that contract error remains distinct from a valid canonical ID lacking a Flutter implementation.
+- Resource tests cover base and nested bindings, unknown override direction IDs, and malformed nested bindings.
+- Existing docs and tests that describe short internal registry keys as canonical must be reconciled during B.1B implementation and documentation.
 
-This ruling preserves, rather than changes, the approved B.1B architecture.
+This clarification preserves the approved architecture: canonical generation stays in Python, app-specific translation stays in Flutter, shared UI registry keys remain internal, and B.1B only parses and exposes B.1C bindings.
