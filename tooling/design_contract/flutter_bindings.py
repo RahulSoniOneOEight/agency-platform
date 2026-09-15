@@ -151,6 +151,13 @@ def _validate_binding(
                         f"binding {binding_id}: density {key} is not declared by "
                         f"canonical contract"
                     )
+            # Density translation must be total for a component: every canonical
+            # density the contract declares must map to an explicit internal value.
+            for missing in sorted(set(declared) - set(density)):
+                errors.append(
+                    f"binding {binding_id}: density map must cover all canonical "
+                    f"densities; missing {missing}"
+                )
 
     if kind == "component":
         requires = contract.get("requires")

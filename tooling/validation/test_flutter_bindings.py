@@ -12,9 +12,17 @@ from tooling.design_contract.flutter_bindings import (
     runtime_binding_errors,
     validate_flutter_bindings,
 )
+from tooling.knowledge.index_design_contract import build_indexes
 
 
 ROOT = Path(__file__).resolve().parents[2]
+FLUTTER_LIB = ROOT / "packages" / "agency_flutter_ui" / "lib"
+
+
+def _flutter_source() -> str:
+    return "\n".join(
+        path.read_text(encoding="utf-8") for path in sorted(FLUTTER_LIB.rglob("*.dart"))
+    )
 
 _TEMP_DIRECTORIES: list[tempfile.TemporaryDirectory] = []
 
@@ -377,8 +385,59 @@ class FlutterBindingTests(unittest.TestCase):
         self.assertIn("commerce.product-card", bindings)
         self.assertEqual("component", bindings["commerce.product-card"]["kind"])
 
+    def test_component_density_map_must_be_total(self):
+        root = _contract_root()
+        _write_component(
+            root,
+            variants=("standard",),
+            states=("normal",),
+            density=("compact", "normal", "spacious"),
+        )
+        _write_binding(
+            root,
+            component_binding(density={"compact": "dense", "normal": "balanced"}),
+        )
+
+        errors = validate_flutter_bindings(root)
+
+        self.assertIn(
+            "binding commerce.product-card: density map must cover all canonical "
+            "densities; missing spacious",
+            errors,
+        )
+
     def test_repository_binding_catalog_is_valid(self):
         self.assertEqual([], validate_flutter_bindings(ROOT))
+
+    def test_every_repository_pattern_has_an_approved_binding(self):
+        bindings = load_flutter_bindings(ROOT)
+        canonical_patterns = set(build_indexes(ROOT)["patterns"])
+        bound_patterns = {
+            binding_id
+            for binding_id, binding in bindings.items()
+            if binding.get("kind") == "pattern" and binding.get("status") == "approved"
+        }
+
+        self.assertTrue(canonical_patterns)
+        self.assertEqual(sorted(canonical_patterns - bound_patterns), [])
+
+    def test_binding_symbols_exist_in_flutter_source(self):
+        source = _flutter_source()
+        for binding_id, binding in sorted(load_flutter_bindings(ROOT).items()):
+            symbol = binding["implementation"]["symbol"]
+            with self.subTest(binding=binding_id):
+                self.assertIn(f"class {symbol}", source)
+
+    def test_pattern_binding_registry_keys_exist_in_pattern_registry(self):
+        registry_source = (
+            FLUTTER_LIB / "patterns" / "pattern_registry.dart"
+        ).read_text(encoding="utf-8")
+        for binding_id, binding in sorted(load_flutter_bindings(ROOT).items()):
+            if binding.get("kind") != "pattern":
+                continue
+            registry_key = binding["implementation"]["registry_key"]
+            with self.subTest(binding=binding_id):
+                self.assertIn(f"'{registry_key}':", registry_source)
 
     def test_current_runtime_directions_have_complete_approved_bindings(self):
         bindings = load_flutter_bindings(ROOT)
