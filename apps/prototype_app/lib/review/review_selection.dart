@@ -66,6 +66,14 @@ class _ReviewSelectionState extends State<ReviewSelection> {
   Widget build(BuildContext context) {
     final directionIds = ReviewScreenAvailability.orderedDirections(widget.runtime);
     final screens = ReviewScreenAvailability.screens(widget.runtime);
+    if (screens.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Text('No governed screens are available for this client.'),
+        ),
+      );
+    }
     final previewScreenId =
         (_previewScreenId != null && screens.contains(_previewScreenId))
             ? _previewScreenId!
@@ -212,7 +220,9 @@ class _ReviewSelectionState extends State<ReviewSelection> {
           alignment: Alignment.centerLeft,
           child: OutlinedButton.icon(
             key: ReviewSelection.resetScreenButtonKey(screenId),
-            onPressed: () => _confirmReset(screenId, screenLabel),
+            onPressed: widget.controller.state.screenSelections[screenId] == null
+                ? null
+                : () => _confirmReset(screenId, screenLabel),
             icon: const Icon(Icons.restart_alt),
             label: const Text('Reset screen mix'),
           ),
