@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../domain/product_card.dart';
 import '../domain/product_models.dart';
 import '../primitives/agency_search_field.dart';
+import '../themes/agency_theme_tokens.dart';
 import 'pattern_shell.dart';
 
 class SearchPattern extends StatelessWidget {
@@ -12,13 +13,14 @@ class SearchPattern extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = AgencyThemeTokens.of(context);
     return AgencyPatternShell(
       title: 'Search',
       children: [
         AgencySearchField(hintText: hintText),
         Wrap(
-          spacing: 12,
-          runSpacing: 12,
+          spacing: tokens.tileGap,
+          runSpacing: tokens.tileGap,
           children: products
               .take(6)
               .map((p) => SizedBox(width: 220, child: ProductCard(product: p, variant: ProductCardVariant.compact)))

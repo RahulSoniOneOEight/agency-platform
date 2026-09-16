@@ -359,6 +359,8 @@ class AgencyThemeTokens extends ThemeExtension<AgencyThemeTokens> {
     required this.sectionSpacing,
     required this.cardSpacing,
     required this.tileGap,
+    required this.inlineSpacing,
+    required this.controlSpacing,
     required this.controlRadius,
     required this.cardRadius,
     required this.overlayElevation,
@@ -376,6 +378,8 @@ class AgencyThemeTokens extends ThemeExtension<AgencyThemeTokens> {
   final double sectionSpacing;
   final double cardSpacing;
   final double tileGap;
+  final double inlineSpacing;
+  final double controlSpacing;
   final double controlRadius;
   final double cardRadius;
   final double overlayElevation;
@@ -394,6 +398,8 @@ class AgencyThemeTokens extends ThemeExtension<AgencyThemeTokens> {
       sectionSpacing: theme.spacing['section']!,
       cardSpacing: theme.spacing['card']!,
       tileGap: theme.spacing['tile']!,
+      inlineSpacing: theme.spacing['inline']!,
+      controlSpacing: theme.spacing['control']!,
       controlRadius: theme.radius['control']!,
       cardRadius: theme.radius['card']!,
       overlayElevation: theme.elevation['overlay']!,
@@ -436,6 +442,8 @@ class AgencyThemeTokens extends ThemeExtension<AgencyThemeTokens> {
     double? sectionSpacing,
     double? cardSpacing,
     double? tileGap,
+    double? inlineSpacing,
+    double? controlSpacing,
     double? controlRadius,
     double? cardRadius,
     double? overlayElevation,
@@ -453,6 +461,8 @@ class AgencyThemeTokens extends ThemeExtension<AgencyThemeTokens> {
       sectionSpacing: sectionSpacing ?? this.sectionSpacing,
       cardSpacing: cardSpacing ?? this.cardSpacing,
       tileGap: tileGap ?? this.tileGap,
+      inlineSpacing: inlineSpacing ?? this.inlineSpacing,
+      controlSpacing: controlSpacing ?? this.controlSpacing,
       controlRadius: controlRadius ?? this.controlRadius,
       cardRadius: cardRadius ?? this.cardRadius,
       overlayElevation: overlayElevation ?? this.overlayElevation,
@@ -477,6 +487,8 @@ class AgencyThemeTokens extends ThemeExtension<AgencyThemeTokens> {
       sectionSpacing: _lerpDouble(sectionSpacing, other.sectionSpacing, t),
       cardSpacing: _lerpDouble(cardSpacing, other.cardSpacing, t),
       tileGap: _lerpDouble(tileGap, other.tileGap, t),
+      inlineSpacing: _lerpDouble(inlineSpacing, other.inlineSpacing, t),
+      controlSpacing: _lerpDouble(controlSpacing, other.controlSpacing, t),
       controlRadius: _lerpDouble(controlRadius, other.controlRadius, t),
       cardRadius: _lerpDouble(cardRadius, other.cardRadius, t),
       overlayElevation: _lerpDouble(overlayElevation, other.overlayElevation, t),
@@ -503,6 +515,8 @@ class AgencyThemeTokens extends ThemeExtension<AgencyThemeTokens> {
           sectionSpacing == other.sectionSpacing &&
           cardSpacing == other.cardSpacing &&
           tileGap == other.tileGap &&
+          inlineSpacing == other.inlineSpacing &&
+          controlSpacing == other.controlSpacing &&
           controlRadius == other.controlRadius &&
           cardRadius == other.cardRadius &&
           overlayElevation == other.overlayElevation &&
@@ -521,6 +535,8 @@ class AgencyThemeTokens extends ThemeExtension<AgencyThemeTokens> {
         sectionSpacing,
         cardSpacing,
         tileGap,
+        inlineSpacing,
+        controlSpacing,
         controlRadius,
         cardRadius,
         overlayElevation,

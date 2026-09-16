@@ -3,6 +3,7 @@ import '../domain/product_models.dart';
 import '../domain/quote_card.dart';
 import '../primitives/agency_button.dart';
 import '../primitives/agency_surface.dart';
+import '../themes/agency_theme_tokens.dart';
 import 'pattern_shell.dart';
 
 class RfqPattern extends StatelessWidget {
@@ -12,6 +13,7 @@ class RfqPattern extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = AgencyThemeTokens.of(context);
     return AgencyPatternShell(
       title: 'Request a quote',
       subtitle: 'Build a trade request and send it for negotiated pricing.',
@@ -22,7 +24,7 @@ class RfqPattern extends StatelessWidget {
                   children: [
                     Expanded(child: Text(product.name)),
                     Text(product.sku ?? product.id),
-                    const SizedBox(width: 12),
+                    SizedBox(width: tokens.controlSpacing),
                     const Text('Qty 10'),
                   ],
                 ),

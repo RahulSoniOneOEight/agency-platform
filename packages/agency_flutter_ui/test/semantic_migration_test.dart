@@ -96,6 +96,18 @@ const AgencyProduct product = AgencyProduct(
   stock: 24,
 );
 
+const AgencyProduct listProductA = AgencyProduct(
+  id: 'l1',
+  name: 'Hub',
+  price: AgencyPrice(current: 999),
+);
+
+const AgencyProduct listProductB = AgencyProduct(
+  id: 'l2',
+  name: 'Arm',
+  price: AgencyPrice(current: 1299),
+);
+
 Future<void> pumpThemed(WidgetTester tester, ThemeData theme, Widget child) async {
   await tester.pumpWidget(
     MaterialApp(theme: theme, home: Scaffold(body: child)),
@@ -128,6 +140,16 @@ BorderRadius? productCardImageRadius(WidgetTester tester) {
         (c.decoration! as BoxDecoration).borderRadius != null,
   );
   return (image.decoration! as BoxDecoration).borderRadius as BorderRadius;
+}
+
+BorderRadius? firstProductCardRadius(WidgetTester tester) {
+  final ink = tester.widget<InkWell>(
+    find.descendant(
+      of: find.byType(ProductCard).first,
+      matching: find.byType(InkWell),
+    ),
+  );
+  return ink.borderRadius;
 }
 
 Set<double> boxHeights(WidgetTester tester, Type ancestor) {
@@ -259,5 +281,64 @@ void main() {
       const AgencyPatternShell(title: 'Explore', children: [Text('a'), Text('b')]),
     );
     expect(boxHeights(tester, AgencyPatternShell), contains(48.0));
+  });
+
+  testWidgets('AgencyButton secondary and text stay intrinsic width',
+      (tester) async {
+    await pumpThemed(
+      tester,
+      themeA,
+      AgencyButton(
+        label: 'Request quote',
+        variant: AgencyButtonVariant.secondary,
+        onPressed: () {},
+      ),
+    );
+    final outlined = tester.widget<OutlinedButton>(find.byType(OutlinedButton));
+    final outlinedMin =
+        outlined.style!.minimumSize!.resolve(const <WidgetState>{})!;
+    expect(outlinedMin.width, 0);
+    expect(outlinedMin.height, 44);
+
+    await pumpThemed(
+      tester,
+      themeA,
+      AgencyButton(
+        label: 'More',
+        variant: AgencyButtonVariant.text,
+        onPressed: () {},
+      ),
+    );
+    final text = tester.widget<TextButton>(find.byType(TextButton));
+    final textMin = text.style!.minimumSize!.resolve(const <WidgetState>{})!;
+    expect(textMin.width, 0);
+    expect(textMin.height, 44);
+  });
+
+  testWidgets('PlpPattern renders theme tile gap and card radius',
+      (tester) async {
+    await pumpThemed(
+      tester,
+      themeA,
+      const PlpPattern(products: [listProductA, listProductB]),
+    );
+    final cardsA = find.byType(ProductCard);
+    expect(cardsA, findsNWidgets(2));
+    final gapA =
+        tester.getTopLeft(cardsA.at(1)).dx - tester.getTopRight(cardsA.at(0)).dx;
+    expect(gapA, 12);
+    expect(firstProductCardRadius(tester), BorderRadius.circular(20));
+
+    await pumpThemed(
+      tester,
+      themeB,
+      const PlpPattern(products: [listProductA, listProductB]),
+    );
+    final cardsB = find.byType(ProductCard);
+    expect(cardsB, findsNWidgets(2));
+    final gapB =
+        tester.getTopLeft(cardsB.at(1)).dx - tester.getTopRight(cardsB.at(0)).dx;
+    expect(gapB, 24);
+    expect(firstProductCardRadius(tester), BorderRadius.circular(40));
   });
 }
