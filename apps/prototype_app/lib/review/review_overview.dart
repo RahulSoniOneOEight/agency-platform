@@ -27,6 +27,31 @@ class ReviewOverview extends StatelessWidget {
   final PrototypeRuntime runtime;
   final ReviewController controller;
 
+  /// Explicit confirmation before the (irreversible) round advancement.
+  Future<void> _confirmAdvanceRound(BuildContext context) async {
+    final round = controller.state.reviewRound;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Advance review round?'),
+        content: Text('Move from round $round to round ${round + 1}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Advance'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed ?? false) {
+      await controller.advanceRound();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -58,7 +83,7 @@ class ReviewOverview extends StatelessWidget {
               alignment: Alignment.centerLeft,
               child: FilledButton.icon(
                 key: advanceRoundButtonKey,
-                onPressed: controller.advanceRound,
+                onPressed: () => _confirmAdvanceRound(context),
                 icon: const Icon(Icons.skip_next),
                 label: const Text('Advance review round'),
               ),

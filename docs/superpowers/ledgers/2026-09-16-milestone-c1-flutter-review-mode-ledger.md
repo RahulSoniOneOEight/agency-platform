@@ -117,7 +117,7 @@
 | 3 | Governed screen registry + comparison host | ACCEPTED | `c16f18b` + `e423a3b` |
 | 4 | Deterministic review entry point | ACCEPTED | `940d7d1` + `bf483a1` |
 | 5 | Review shell + Overview/Directions/Screens | ACCEPTED | `6edef59` + `398ca46` |
-| 6 | Overall selection + per-screen mix | PENDING | — |
+| 6 | Overall selection + per-screen mix | ACCEPTED | `c85d9f0` + `7615bd2` |
 | 7 | Comments + review-round controls | PENDING | — |
 | 8 | Architecture regressions + full verification + PR | PENDING | — |
 
@@ -153,3 +153,7 @@
   exit path, `load()` wired at the composition root, Directions doc fix, compact-width Screens test
   (compact fixture spacing keeps the shared ProductCard inside its grid cell). 156 full tests green.
   ACCEPTED.
+- 2026-09-16 — Task 6 implemented (`c85d9f0`, 7 tests): `ReviewSelection` overall direction radio
+  (explicit `No selection yet`, runtime directions only, reset) + per-screen mix editors sourced from
+  the governed screen registry. Review found no blockers; corrections `7615bd2`:
+  `ReviewController.clearScreenDirection` + UI deselect handling. 165 full tests green. ACCEPTED.

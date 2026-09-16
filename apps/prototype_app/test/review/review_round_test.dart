@@ -90,8 +90,41 @@ void main() {
       await tester.tap(find.byKey(ReviewOverview.advanceRoundButtonKey));
       await tester.pumpAndSettle();
 
+      expect(find.text('Advance review round?'), findsOneWidget);
+      await tester.tap(find.widgetWithText(FilledButton, 'Advance'));
+      await tester.pumpAndSettle();
+
       expect(controller.state.reviewRound, 2);
       expect(find.text('Review round: 2'), findsOneWidget);
+    });
+
+    testWidgets('the advance action can be cancelled', (tester) async {
+      await pumpOverview(tester);
+
+      await tester.tap(find.byKey(ReviewOverview.advanceRoundButtonKey));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(controller.state.reviewRound, 1);
+      expect(find.text('Review round: 1'), findsOneWidget);
+    });
+
+    testWidgets('overview renders without overflow at phone width',
+        (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ReviewOverview(runtime: runtime, controller: controller),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
     });
   });
 
@@ -120,23 +153,24 @@ void main() {
     testWidgets('offers exactly the three C.1 statuses', (tester) async {
       await pumpOverview(tester);
 
+      final rendered = tester
+          .widgetList<Text>(
+            find.descendant(
+              of: find.byKey(ReviewOverview.statusControlKey),
+              matching: find.byType(Text),
+            ),
+          )
+          .map((text) => text.data)
+          .toSet();
+
       expect(
-        ReviewStatus.values,
-        equals(const [
-          ReviewStatus.inReview,
-          ReviewStatus.needsRevision,
-          ReviewStatus.readyForFinalReview,
-        ]),
+        rendered,
+        equals(<String>{
+          'in_review',
+          'needs_revision',
+          'ready_for_final_review',
+        }),
       );
-      for (final status in ReviewStatus.values) {
-        expect(
-          find.descendant(
-            of: find.byKey(ReviewOverview.statusControlKey),
-            matching: find.text(reviewStatusToWire(status)),
-          ),
-          findsOneWidget,
-        );
-      }
     });
   });
 

@@ -177,6 +177,23 @@ void main() {
     expect(await repository.load('prototype-demo'), isNull);
   });
 
+  testWidgets('rejects blank screen text even with a screen selected',
+      (tester) async {
+    await pumpComments(tester);
+
+    await chooseDropdown(
+      tester,
+      ReviewComments.screenFieldKey,
+      ReviewScreenRegistry.labelFor('commerce.search'),
+    );
+    await tester.enterText(find.byKey(ReviewComments.screenTextFieldKey), '   ');
+    await tester.tap(find.byKey(ReviewComments.addScreenButtonKey));
+    await tester.pumpAndSettle();
+
+    expect(controller.state.comments, isEmpty);
+    expect(await repository.load('prototype-demo'), isNull);
+  });
+
   testWidgets('generates unique ids that avoid existing review ids',
       (tester) async {
     await controller.addComment(
