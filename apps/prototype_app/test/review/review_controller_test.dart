@@ -237,5 +237,35 @@ void main() {
       await controller.clearScreenDirection('search');
       expect(notifications, 0);
     });
+
+    test('load adopts a valid persisted state', () async {
+      await repository.save(buildState(selectedDirection: 'b'));
+      final validating = ReviewController(
+        clientId: 'prototype-demo',
+        repository: repository,
+        validate: (state) => <String>[],
+      );
+
+      await validating.load();
+
+      expect(validating.state.selectedDirection, 'b');
+      expect(validating.loadErrors, isEmpty);
+    });
+
+    test('load never adopts invalid persisted state', () async {
+      await repository.save(buildState(reviewRound: 0));
+      final validating = ReviewController(
+        clientId: 'prototype-demo',
+        repository: repository,
+        validate: (state) => state.reviewRound < 1
+            ? <String>['invalid review round: ${state.reviewRound}']
+            : <String>[],
+      );
+
+      await validating.load();
+
+      expect(validating.state.reviewRound, 1);
+      expect(validating.loadErrors, ['invalid review round: 0']);
+    });
   });
 }

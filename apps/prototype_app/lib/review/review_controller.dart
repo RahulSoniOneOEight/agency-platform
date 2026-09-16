@@ -10,7 +10,9 @@ final class ReviewController extends ChangeNotifier {
     required this.clientId,
     required ReviewRepository repository,
     ReviewState? initialState,
+    List<String> Function(ReviewState state)? validate,
   })  : _repository = repository,
+        _validate = validate,
         _state = initialState ?? initialReviewState(clientId);
 
   static ReviewState initialReviewState(String clientId) {
@@ -27,17 +29,35 @@ final class ReviewController extends ChangeNotifier {
 
   final String clientId;
   final ReviewRepository _repository;
+  final List<String> Function(ReviewState state)? _validate;
 
   ReviewState _state;
+  List<String> _loadErrors = const [];
 
   ReviewState get state => _state;
 
+  /// Validation findings from the most recent [load] of persisted state.
+  List<String> get loadErrors => _loadErrors;
+
   Future<void> load() async {
     final persisted = await _repository.load(clientId);
-    if (persisted != null) {
-      _state = persisted;
-      notifyListeners();
+    if (persisted == null) {
+      return;
     }
+    final validator = _validate;
+    if (validator != null) {
+      final errors = validator(persisted);
+      if (errors.isNotEmpty) {
+        // Never adopt persisted state that fails validation; keep the initial
+        // state and surface the findings instead of silently using bad data.
+        _loadErrors = List<String>.unmodifiable(errors);
+        notifyListeners();
+        return;
+      }
+    }
+    _loadErrors = const [];
+    _state = persisted;
+    notifyListeners();
   }
 
   Future<void> selectDirection(String? directionId) async {

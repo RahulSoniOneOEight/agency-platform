@@ -118,8 +118,8 @@
 | 4 | Deterministic review entry point | ACCEPTED | `940d7d1` + `bf483a1` |
 | 5 | Review shell + Overview/Directions/Screens | ACCEPTED | `6edef59` + `398ca46` |
 | 6 | Overall selection + per-screen mix | ACCEPTED | `c85d9f0` + `7615bd2` |
-| 7 | Comments + review-round controls | PENDING | — |
-| 8 | Architecture regressions + full verification + PR | PENDING | — |
+| 7 | Comments + review-round controls | ACCEPTED | `2e89648` + `01f3e91` |
+| 8 | Architecture regressions + full verification + PR | ACCEPTED | `da66506` + final commit |
 
 ## Progress log
 
@@ -157,3 +157,19 @@
   (explicit `No selection yet`, runtime directions only, reset) + per-screen mix editors sourced from
   the governed screen registry. Review found no blockers; corrections `7615bd2`:
   `ReviewController.clearScreenDirection` + UI deselect handling. 165 full tests green. ACCEPTED.
+- 2026-09-16 — Task 7 implemented (`2e89648`, 12 tests): `ReviewComments` (general/screen forms,
+  governed screen + runtime direction options, UI-boundary blank/screen validation, unique
+  `review-<n>` IDs, comment list) + Overview advance-round action and three-status control. Review
+  found no blockers; corrections `01f3e91`: confirmation dialog for round advance (cancel test),
+  phone-width Overview verified overflow-free, blank-screen-text test, rendered status-set assertion.
+  180 full tests green. ACCEPTED.
+- 2026-09-16 — Task 8 implemented (`da66506`, 11 tests): architecture regression suite proving same-app,
+  read-only runtime, no runtime mutation by review actions, no `refinement-notes`/`approved-experience`
+  in `lib/review`, direction-resolved client theme, governed screen IDs, and no silent selection.
+  Final whole-branch review: no blockers, merge-ready. Review Minor #1 (validator never invoked
+  outside tests) fixed by wiring `validateReviewState` into `ReviewController.load(...)` via an
+  optional validator (invalid persisted state is never adopted; `loadErrors` surfaced) and the
+  composition root. 193 full tests; Python 283; repo validation 98 paths; all validators + freshness
+  green; Flutter analyze/tests 191/42/1; web build green. Branch pushed; PR opened; not merged.
+- FINAL: R1-R11 recorded; model-routing deviation R4 (only `explore`/`general` subagents available;
+  fresh `general` implementer + reviewer per task + final whole-branch review).
