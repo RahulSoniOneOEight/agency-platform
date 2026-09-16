@@ -183,6 +183,107 @@ class ValidatorContractTests(unittest.TestCase):
         self.assertTrue(any("theme_overrides" in error for error in errors), errors)
         self.assertEqual(sorted(errors), errors)
 
+    def test_current_repository_refinement_notes_are_valid(self):
+        validator = self.load_validator()
+        self.assertEqual([], validator.refinement_note_errors(ROOT))
+
+    def test_b1f_paths_are_required(self):
+        validator = self.load_validator()
+        for path in (
+            "client-projects/schema/refinement-notes.schema.json",
+            "tooling/prototype/refinement_notes.py",
+            "tooling/validation/test_refinement_notes.py",
+        ):
+            self.assertIn(path, validator.REQUIRED_PATHS)
+
+    def test_missing_refinement_notes_is_not_an_error(self):
+        validator = self.load_validator()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "client-projects" / "acme" / "prototype").mkdir(parents=True)
+
+            self.assertEqual([], validator.refinement_note_errors(root))
+
+    def test_invalid_refinement_note_is_reported_with_path(self):
+        validator = self.load_validator()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            note = (
+                root
+                / "client-projects"
+                / "acme"
+                / "prototype"
+                / "refinement-notes.yaml"
+            )
+            note.parent.mkdir(parents=True)
+            note.write_text(
+                "version: 1\nchanges:\n  - id: x\n    change: c\n"
+                "    classification: custom\n    status: done\n",
+                encoding="utf-8",
+            )
+
+            errors = validator.refinement_note_errors(root)
+
+        self.assertTrue(errors)
+        self.assertTrue(
+            all(
+                error.startswith(
+                    "client-projects/acme/prototype/refinement-notes.yaml: "
+                )
+                for error in errors
+            ),
+            errors,
+        )
+        self.assertEqual(sorted(errors), errors)
+
+    def test_duplicate_refinement_note_id_is_reported(self):
+        validator = self.load_validator()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            note = (
+                root
+                / "client-projects"
+                / "acme"
+                / "prototype"
+                / "refinement-notes.yaml"
+            )
+            note.parent.mkdir(parents=True)
+            note.write_text(
+                "version: 1\nchanges:\n"
+                "  - id: dup\n    change: a\n    classification: reject\n    status: observed\n"
+                "  - id: dup\n    change: b\n    classification: reject\n    status: observed\n",
+                encoding="utf-8",
+            )
+
+            errors = validator.refinement_note_errors(root)
+
+        self.assertTrue(any("duplicate change id" in error for error in errors), errors)
+
+    def test_refinement_note_errors_are_ordered_by_path(self):
+        validator = self.load_validator()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for name in ("zzz", "aaa"):
+                note = (
+                    root
+                    / "client-projects"
+                    / name
+                    / "prototype"
+                    / "refinement-notes.yaml"
+                )
+                note.parent.mkdir(parents=True)
+                note.write_text(
+                    "version: 1\nchanges:\n  - id: x\n    change: c\n"
+                    "    classification: custom\n    status: done\n",
+                    encoding="utf-8",
+                )
+
+            errors = validator.refinement_note_errors(root)
+
+        self.assertTrue(errors)
+        self.assertEqual(sorted(errors), errors)
+        self.assertTrue(errors[0].startswith("client-projects/aaa/"), errors)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -26,6 +26,9 @@ from tooling.design_contract.theme_contract import (  # noqa: E402
     validate_theme_presets,
     validate_token_catalogs,
 )
+from tooling.prototype.refinement_notes import (  # noqa: E402
+    validate_refinement_notes,
+)
 from tooling.prototype.validate_runtime_bundle import (  # noqa: E402
     validate_runtime_bundle,
     validate_runtime_bundle_against_design_contract,
@@ -92,6 +95,9 @@ REQUIRED_PATHS = (
     "tooling/validation/test_runtime_bundle.py",
     "tooling/visual-review",
     "tooling/workflow/client_input.py",
+    "client-projects/schema/refinement-notes.schema.json",
+    "tooling/prototype/refinement_notes.py",
+    "tooling/validation/test_refinement_notes.py",
     "design-contract/schema/flutter-binding.schema.json",
     "design-contract/schema/foundation-tokens.schema.json",
     "design-contract/schema/semantic-tokens.schema.json",
@@ -223,6 +229,28 @@ def theme_contract_errors(root: Path) -> list[str]:
     return sorted(set(errors))
 
 
+def refinement_note_errors(root: Path) -> list[str]:
+    """Return B.1F refinement-note errors for optional per-client note files.
+
+    The note file is optional metadata: its absence is never an error, and it is
+    never consumed by runtime or theme compilation.
+    """
+    errors: list[str] = []
+    projects = root / "client-projects"
+    if not projects.exists():
+        return errors
+
+    note_paths = sorted(
+        projects.glob("**/prototype/refinement-notes.yaml"),
+        key=lambda path: path.as_posix(),
+    )
+    for note_path in note_paths:
+        relative = note_path.relative_to(root).as_posix()
+        for error in validate_refinement_notes(root, note_path):
+            errors.append(f"{relative}: {error}")
+    return sorted(set(errors))
+
+
 def flutter_binding_errors(root: Path) -> list[str]:
     """Return B.1D Flutter binding catalog, projection, and runtime parity errors.
 
@@ -257,7 +285,8 @@ def main() -> int:
     bundle_errors = generated_runtime_bundle_errors(root)
     binding_errors = flutter_binding_errors(root)
     theme_errors = theme_contract_errors(root)
-    if missing or bundle_errors or binding_errors or theme_errors:
+    note_errors = refinement_note_errors(root)
+    if missing or bundle_errors or binding_errors or theme_errors or note_errors:
         print("Repository validation failed.")
         if missing:
             print("Missing required paths:")
@@ -275,12 +304,16 @@ def main() -> int:
             print("Token/theme contract errors:")
             for error in theme_errors:
                 print(f"- {error}")
+        if note_errors:
+            print("Visual refinement note errors:")
+            for error in note_errors:
+                print(f"- {error}")
         return 1
 
     print(
         f"Repository validation passed: {len(REQUIRED_PATHS)} required paths present, "
-        "generated runtime bundles are fresh, Flutter design bindings are valid, and "
-        "token/theme contracts are valid."
+        "generated runtime bundles are fresh, Flutter design bindings are valid, "
+        "token/theme contracts are valid, and refinement notes are valid."
     )
     return 0
 
