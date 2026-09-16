@@ -6,6 +6,7 @@ from pathlib import Path
 
 import yaml
 from jsonschema import Draft202012Validator
+from jsonschema.exceptions import SchemaError
 
 from tooling.knowledge.index_design_contract import build_indexes
 
@@ -65,8 +66,27 @@ def _change_label(document: object, index: int) -> str:
     return "change <unknown>"
 
 
-def _canonical_message(message: str) -> str:
-    """Sort quoted property names so messages do not depend on key insertion order."""
+def _describe_value(value: object) -> str:
+    """Render a value deterministically (mapping keys sorted, no insertion order)."""
+    if isinstance(value, dict):
+        items = ", ".join(
+            f"{_describe_value(key)}: {_describe_value(item)}"
+            for key, item in sorted(value.items(), key=lambda pair: repr(pair[0]))
+        )
+        return "{" + items + "}"
+    if isinstance(value, list):
+        return "[" + ", ".join(_describe_value(item) for item in value) + "]"
+    return repr(value)
+
+
+def _canonical_message(message: str, instance: object = None) -> str:
+    """Canonicalize messages so they do not depend on mapping key insertion order."""
+    if isinstance(instance, (dict, list)):
+        raw = repr(instance)
+        canonical = _describe_value(instance)
+        if raw != canonical and raw in message:
+            message = message.replace(raw, canonical)
+
     match = _ADDITIONAL_PROPERTIES_RE.match(message)
     if match is None:
         return message
@@ -79,9 +99,14 @@ def _canonical_message(message: str) -> str:
 
 
 def _schema_errors(document: object, schema: dict) -> list[str]:
-    validator = Draft202012Validator(schema)
+    try:
+        validator = Draft202012Validator(schema)
+        raw_errors = list(validator.iter_errors(document))
+    except SchemaError as exc:
+        return [f"refinement notes schema is invalid: {exc.message}"]
+
     errors: list[str] = []
-    for error in validator.iter_errors(document):
+    for error in raw_errors:
         parts = list(error.path)
         if len(parts) >= 2 and parts[0] == "changes" and isinstance(parts[1], int):
             label = _change_label(document, parts[1])
@@ -90,7 +115,9 @@ def _schema_errors(document: object, schema: dict) -> list[str]:
             label = "refinement notes"
             subpath = ".".join(str(part) for part in parts)
         prefix = f"{subpath}: " if subpath else ""
-        errors.append(f"{label}: {prefix}{_canonical_message(error.message)}")
+        errors.append(
+            f"{label}: {prefix}{_canonical_message(error.message, error.instance)}"
+        )
     return errors
 
 
@@ -119,7 +146,7 @@ def _catalog_errors(root: Path, document: object) -> list[str]:
         return []
     try:
         indexes = build_indexes(root)
-    except (OSError, UnicodeError, yaml.YAMLError) as exc:
+    except Exception as exc:  # noqa: BLE001 - validator must never raise
         return [f"cannot load design contract under {root}: {exc}"]
     errors: list[str] = []
     for index, item in enumerate(changes):

@@ -455,6 +455,18 @@ version: 1
         )
         self.assertTrue(validate_refinement_notes(first_root, first))
 
+    def test_mapping_valued_type_error_is_insertion_order_independent(self):
+        first_root = _root()
+        first = _write_note(first_root, "version: 1\nchanges: {zzz: 1, aaa: 2}\n")
+        second_root = _root()
+        second = _write_note(second_root, "version: 1\nchanges: {aaa: 2, zzz: 1}\n")
+
+        first_errors = validate_refinement_notes(first_root, first)
+        second_errors = validate_refinement_notes(second_root, second)
+
+        self.assertTrue(first_errors)
+        self.assertEqual(first_errors, second_errors)
+
 
 if __name__ == "__main__":
     unittest.main()
