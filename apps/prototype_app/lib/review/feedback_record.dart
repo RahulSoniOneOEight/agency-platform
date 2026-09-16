@@ -171,6 +171,8 @@ final class FeedbackEvent {
     required this.at,
     this.round,
     this.batchId,
+    this.cause,
+    this.evidence,
   });
 
   final FeedbackEventType type;
@@ -178,6 +180,15 @@ final class FeedbackEvent {
   final DateTime at;
   final int? round;
   final String? batchId;
+
+  /// Regression cause recorded by a system-failure reopen (C.7).
+  ///
+  /// Only present on a `reopened` event produced by
+  /// `ReviewCoordinator.reopenAddressedForRegression`.
+  final String? cause;
+
+  /// Evidence reference that identified the regression (C.7).
+  final String? evidence;
 
   factory FeedbackEvent.fromJson(Map<String, dynamic> json) {
     final typeValue = json['type'];
@@ -206,16 +217,26 @@ final class FeedbackEvent {
     if (batchId != null && (batchId is! String || batchId.trim().isEmpty)) {
       throw const FormatException('Invalid feedback event batch id');
     }
+    final cause = json['cause'];
+    if (cause != null && (cause is! String || cause.trim().isEmpty)) {
+      throw const FormatException('Invalid feedback event cause');
+    }
+    final evidence = json['evidence'];
+    if (evidence != null && (evidence is! String || evidence.trim().isEmpty)) {
+      throw const FormatException('Invalid feedback event evidence');
+    }
     return FeedbackEvent(
       type: feedbackEventTypeFromWire(typeValue),
       actorId: actorId,
       at: at,
       round: round as int?,
       batchId: batchId as String?,
+      cause: cause as String?,
+      evidence: evidence as String?,
     );
   }
 
-  /// Deterministic serialization; `round`/`batch_id` only when present.
+  /// Deterministic serialization; optional keys only when present.
   Map<String, dynamic> toJson() {
     return {
       'type': feedbackEventTypeToWire(type),
@@ -223,6 +244,8 @@ final class FeedbackEvent {
       'at': at.toUtc().toIso8601String(),
       if (round != null) 'round': round,
       if (batchId != null) 'batch_id': batchId,
+      if (cause != null) 'cause': cause,
+      if (evidence != null) 'evidence': evidence,
     };
   }
 
@@ -234,12 +257,21 @@ final class FeedbackEvent {
         other.actorId == actorId &&
         other.at.toUtc() == at.toUtc() &&
         other.round == round &&
-        other.batchId == batchId;
+        other.batchId == batchId &&
+        other.cause == cause &&
+        other.evidence == evidence;
   }
 
   @override
-  int get hashCode =>
-      Object.hash(type, actorId, at.toUtc().microsecondsSinceEpoch, round, batchId);
+  int get hashCode => Object.hash(
+        type,
+        actorId,
+        at.toUtc().microsecondsSinceEpoch,
+        round,
+        batchId,
+        cause,
+        evidence,
+      );
 }
 
 const Object _unset = Object();

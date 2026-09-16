@@ -10,6 +10,7 @@ import 'package:prototype_app/review/persistence/file_refinement_batch_repositor
 import 'package:prototype_app/review/persistence/file_review_index_repository.dart';
 import 'package:prototype_app/review/persistence/review_index.dart';
 import 'package:prototype_app/review/persistence/review_persistence_layout.dart';
+import 'package:prototype_app/review/refinement_batch.dart';
 import 'package:prototype_app/review/review_actor.dart';
 import 'package:prototype_app/review/review_domain_error.dart';
 
@@ -41,6 +42,20 @@ FeedbackRecord feedback(String id, {bool blocking = true}) {
         round: 1,
       ),
     ],
+  );
+}
+
+RefinementBatch batch(String id) {
+  return RefinementBatch.draft(
+    id: id,
+    clientId: 'prototype-demo',
+    reviewRound: 1,
+    feedbackIds: const ['feedback-1'],
+    intendedScope: IntendedScope(screens: const ['commerce.home']),
+    proposedBy: 'opencode',
+    proposed: ChangeClassification.contractImpacting,
+    createdBy: 'reviewer-123',
+    createdAt: DateTime.utc(2026, 9, 17, 10),
   );
 }
 
@@ -235,11 +250,7 @@ void main() {
     test('rebuilds a missing index from immutable records', () async {
       await feedbackRepository.create('prototype-demo', feedback('feedback-1'));
       await approvalRepository.create('prototype-demo', approval(1));
-      await batchRepository.create(
-        'prototype-demo',
-        'batch-1',
-        <String, Object?>{'id': 'batch-1'},
-      );
+      await batchRepository.create('prototype-demo', batch('batch-1'));
 
       final rebuilt = await indexRepository.loadOrRebuild('prototype-demo');
 
@@ -266,26 +277,48 @@ void main() {
     });
   });
 
-  group('refinement batch adapter skeleton', () {
-    test('stores stable batch file identity and lists ids', () async {
-      await batchRepository.create(
-        'prototype-demo',
-        'batch-1',
-        <String, Object?>{'id': 'batch-1', 'status': 'draft'},
-      );
+  group('file refinement batch repository', () {
+    test('stores stable batch file identity and lists records', () async {
+      final draft = batch('batch-1');
+      await batchRepository.create('prototype-demo', draft);
+
+      final file = layout.refinementBatchFile('prototype-demo', 'batch-1');
+      expect(file.existsSync(), isTrue);
 
       expect(
         await batchRepository.load('prototype-demo', 'batch-1'),
-        {'id': 'batch-1', 'status': 'draft'},
+        draft,
       );
-      expect(await batchRepository.listIds('prototype-demo'), ['batch-1']);
+      expect(await batchRepository.load('prototype-demo', 'missing'), isNull);
+      expect(
+        (await batchRepository.list('prototype-demo')).map((b) => b.id),
+        ['batch-1'],
+      );
       await expectLater(
-        () => batchRepository.create(
-          'prototype-demo',
-          'batch-1',
-          <String, Object?>{'id': 'batch-1'},
-        ),
+        () => batchRepository.create('prototype-demo', batch('batch-1')),
         throwsStateError,
+      );
+    });
+
+    test('rejects a stale replacement without overwriting', () async {
+      final current = batch('batch-1');
+      await batchRepository.create('prototype-demo', current);
+
+      final stale = current.copyWith(updatedAt: DateTime.utc(2026, 9, 17, 11));
+      await expectLater(
+        () => batchRepository.replace('prototype-demo', stale, current),
+        throwsStateError,
+      );
+      expect(
+        await batchRepository.load('prototype-demo', 'batch-1'),
+        current,
+      );
+
+      final next = current.copyWith(updatedAt: DateTime.utc(2026, 9, 17, 12));
+      await batchRepository.replace('prototype-demo', current, next);
+      expect(
+        await batchRepository.load('prototype-demo', 'batch-1'),
+        next,
       );
     });
   });

@@ -9,6 +9,7 @@ import 'package:prototype_app/prototype_app.dart';
 import 'package:prototype_app/registry/prototype_registry.dart';
 import 'package:prototype_app/review/memory_approval_repository.dart';
 import 'package:prototype_app/review/memory_feedback_repository.dart';
+import 'package:prototype_app/review/memory_refinement_batch_repository.dart';
 import 'package:prototype_app/review/memory_review_repository.dart';
 import 'package:prototype_app/review/review_actor.dart';
 import 'package:prototype_app/review/review_comparison_host.dart';
@@ -260,11 +261,18 @@ void main() {
 
   // 4. B.1F refinement notes remain non-runtime for the review domain.
   group('B.1F refinement notes', () {
-    test('the review domain never references refinement metadata', () {
+    test('the review domain never references B.1F refinement-note metadata', () {
+      // C.7 legitimately introduces RefinementBatch, so this guard pins the
+      // B.1F *refinement-notes* artifact rather than the bare word.
+      const needles = <String>[
+        'refinement-notes',
+        'refinement_notes',
+        'refinement note',
+      ];
       final offenders = <String>[];
       for (final file in _domainReviewSourceFiles()) {
         final source = file.readAsStringSync().toLowerCase();
-        if (source.contains('refinement')) {
+        if (needles.any(source.contains)) {
           offenders.add(file.path);
         }
       }
@@ -431,6 +439,7 @@ void main() {
               controller: controller,
               feedbackRepository: MemoryFeedbackRepository(),
               approvalRepository: MemoryApprovalRepository(),
+              refinementBatchRepository: MemoryRefinementBatchRepository(),
             ),
             actor: _reviewer,
           ),

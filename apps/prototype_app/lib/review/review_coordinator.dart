@@ -4,6 +4,9 @@ import 'feedback_record.dart';
 import 'feedback_repository.dart';
 import 'review_actor.dart';
 import 'review_controller.dart';
+import 'refinement_batch.dart';
+import 'refinement_batch_repository.dart';
+import 'refinement_execution_result.dart';
 import 'review_domain_error.dart';
 import 'review_screen_registry.dart';
 import 'review_section_registry.dart';
@@ -29,13 +32,16 @@ final class ReviewCoordinator {
     required ReviewController controller,
     required FeedbackRepository feedbackRepository,
     required ApprovalRepository approvalRepository,
+    required RefinementBatchRepository refinementBatchRepository,
   })  : _controller = controller,
         _feedback = feedbackRepository,
-        _approvals = approvalRepository;
+        _approvals = approvalRepository,
+        _batches = refinementBatchRepository;
 
   final ReviewController _controller;
   final FeedbackRepository _feedback;
   final ApprovalRepository _approvals;
+  final RefinementBatchRepository _batches;
 
   String get clientId => _controller.clientId;
 
@@ -201,7 +207,11 @@ final class ReviewCoordinator {
     required ReviewActor actor,
     required String feedbackId,
   }) async {
-    _requireReviewer(actor, 'resolve feedback');
+    if (!actor.isReviewer) {
+      throw const UnauthorizedFeedbackResolution(
+        'reviewer role required to resolve feedback',
+      );
+    }
     final current = await _requireFeedback(feedbackId);
     if (current.status != FeedbackStatus.addressed) {
       throw InvalidFeedbackTransition(
@@ -238,7 +248,11 @@ final class ReviewCoordinator {
     required ReviewActor actor,
     required String feedbackId,
   }) async {
-    _requireReviewer(actor, 'reopen feedback');
+    if (!actor.isReviewer) {
+      throw const UnauthorizedFeedbackResolution(
+        'reviewer role required to reopen feedback',
+      );
+    }
     final current = await _requireFeedback(feedbackId);
     if (current.status == FeedbackStatus.open) {
       throw const InvalidFeedbackTransition('feedback is already open');
@@ -286,7 +300,11 @@ final class ReviewCoordinator {
     required String feedbackId,
     required bool blocking,
   }) async {
-    _requireReviewer(actor, 'change blocking classification');
+    if (!actor.isReviewer) {
+      throw const UnauthorizedBlockingChange(
+        'reviewer role required to change blocking classification',
+      );
+    }
     final current = await _requireFeedback(feedbackId);
     if (current.blocking == blocking) {
       return current;
@@ -382,6 +400,24 @@ final class ReviewCoordinator {
         '${blockers.map((record) => record.id).join(', ')}.',
       );
     }
+    final unresolvedContract = await _unresolvedContractImpactingBatches();
+    if (unresolvedContract.isNotEmpty) {
+      reasons.add(
+        'Contract-impacting refinement batches must be completed: '
+        '${unresolvedContract.map((batch) => batch.id).join(', ')}.',
+      );
+    }
+    final existingApprovals = await _approvals.list(clientId);
+    if (existingApprovals.isNotEmpty) {
+      final latest = existingApprovals.last;
+      if (await _hasContractImpactingBatch() &&
+          state.reviewRound <= latest.reviewRound) {
+        reasons.add(
+          'A contract-impacting change requires a new review round before '
+          'approval (last approval round ${latest.reviewRound}).',
+        );
+      }
+    }
     try {
       _controller.normalizeAndValidateCandidate();
     } on StateError catch (error) {
@@ -435,8 +471,26 @@ final class ReviewCoordinator {
         'blocking feedback must be resolved before approval',
       );
     }
-    // No C.7 batch dependency exists yet; when batches land they must be
-    // checked here so an unresolved dependency blocks approval.
+    // C.7 refinement dependency gate (ledger M2): an unresolved
+    // contract-impacting refinement batch blocks approval.
+    final unresolvedContract = await _unresolvedContractImpactingBatches();
+    if (unresolvedContract.isNotEmpty) {
+      throw ContractImpactRequiresNewRound(
+        'contract-impacting refinement batch '
+        '${unresolvedContract.first.id} must be completed before approval',
+      );
+    }
+    // Contract-impacting changes require a new review round: an existing
+    // approval at round R cannot be followed by a new approval at round <= R
+    // while a contract-impacting change exists.
+    final existingApprovals = await _approvals.list(clientId);
+    if (existingApprovals.isNotEmpty &&
+        await _hasContractImpactingBatch() &&
+        state.reviewRound <= existingApprovals.last.reviewRound) {
+      throw ContractImpactRequiresNewRound(
+        'contract-impacting change requires a new review round before approval',
+      );
+    }
     try {
       _controller.normalizeAndValidateCandidate();
     } on StateError catch (error) {
@@ -476,6 +530,356 @@ final class ReviewCoordinator {
 
     await _approvals.create(clientId, snapshot);
     return snapshot;
+  }
+
+  // ---------------------------------------------------------------------------
+  // C.7 refinement batches
+  // ---------------------------------------------------------------------------
+
+  /// All refinement batches for this client, in deterministic id order.
+  Future<List<RefinementBatch>> allBatches() => _batches.list(clientId);
+
+  /// Loads a single refinement batch, or `null` when it does not exist.
+  Future<RefinementBatch?> loadBatch(String batchId) =>
+      _batches.load(clientId, batchId);
+
+  /// Creates a reviewer-owned `draft` batch from eligible open feedback.
+  ///
+  /// OpenCode can never auto-create a batch; only a reviewer may call this.
+  /// Every linked feedback id must exist and be `open`. The proposed
+  /// classification defaults to `contract_impacting` (R7 uncertainty rule) and
+  /// must be confirmed by a reviewer before the batch can become `ready`.
+  Future<RefinementBatch> createDraftBatch({
+    required ReviewActor actor,
+    required String id,
+    required List<String> feedbackIds,
+    required IntendedScope intendedScope,
+    ChangeClassification proposed = ChangeClassification.contractImpacting,
+    String proposedBy = 'opencode',
+  }) async {
+    _requireReviewer(actor, 'create a refinement batch');
+    final batchId = id.trim();
+    if (batchId.isEmpty) {
+      throw const FormatException('Refinement batch id is required');
+    }
+    if (await _batches.load(clientId, batchId) != null) {
+      throw DuplicateBatchId('refinement batch already exists: $batchId');
+    }
+    await _requireEligibleFeedback(feedbackIds);
+    final now = DateTime.now().toUtc();
+    final batch = RefinementBatch.draft(
+      id: batchId,
+      clientId: clientId,
+      reviewRound: _controller.state.reviewRound,
+      feedbackIds: feedbackIds,
+      intendedScope: intendedScope,
+      proposedBy: proposedBy,
+      proposed: proposed,
+      createdBy: actor.id,
+      createdAt: now,
+    );
+    await _batches.create(clientId, batch);
+    return batch;
+  }
+
+  /// Edits linked feedback/scope while the batch is still `draft`.
+  Future<RefinementBatch> updateDraftBatch({
+    required ReviewActor actor,
+    required String batchId,
+    List<String>? feedbackIds,
+    IntendedScope? intendedScope,
+  }) async {
+    _requireReviewer(actor, 'update a refinement batch');
+    final current = await _requireBatch(batchId);
+    if (feedbackIds != null) {
+      await _requireEligibleFeedback(feedbackIds);
+    }
+    final next = current.editDraft(
+      actorId: actor.id,
+      at: DateTime.now().toUtc(),
+      feedbackIds: feedbackIds,
+      intendedScope: intendedScope,
+    );
+    await _batches.replace(clientId, current, next);
+    return next;
+  }
+
+  /// Records the reviewer-confirmed change classification; draft only.
+  Future<RefinementBatch> confirmBatchClassification({
+    required ReviewActor actor,
+    required String batchId,
+    required ChangeClassification confirmed,
+  }) async {
+    _requireReviewer(actor, 'confirm a batch change classification');
+    final current = await _requireBatch(batchId);
+    final next = current.confirmClassification(
+      actorId: actor.id,
+      at: DateTime.now().toUtc(),
+      confirmed: confirmed,
+    );
+    await _batches.replace(clientId, current, next);
+    return next;
+  }
+
+  /// Freezes scope and classification and hands the batch to execution.
+  Future<RefinementBatch> markBatchReady({
+    required ReviewActor actor,
+    required String batchId,
+  }) async {
+    _requireReviewer(actor, 'mark a refinement batch ready');
+    final current = await _requireBatch(batchId);
+    final next = current.markReady(
+      actorId: actor.id,
+      at: DateTime.now().toUtc(),
+    );
+    await _batches.replace(clientId, current, next);
+    return next;
+  }
+
+  /// Starts execution of a `ready` batch; agent/OpenCode authority.
+  Future<RefinementBatch> startBatch({
+    required ReviewActor actor,
+    required String batchId,
+    String? agent,
+    String? model,
+  }) async {
+    _requireAgent(actor, 'start a refinement batch');
+    final current = await _requireBatch(batchId);
+    final next = current.start(
+      actorId: actor.id,
+      at: DateTime.now().toUtc(),
+      agent: agent ?? actor.id,
+      model: model,
+    );
+    await _batches.replace(clientId, current, next);
+    return next;
+  }
+
+  /// Records an OpenCode execution result for an `in_progress` batch.
+  ///
+  /// A passing result moves the batch to `readyForReview` and then moves every
+  /// linked `open` feedback to `addressed` with an `addressed` event carrying
+  /// [batchId]. A failing result moves the batch to `validationFailed` and
+  /// leaves linked feedback `open`. The authoritative batch is persisted before
+  /// any feedback write, so a batch persistence failure can never produce a
+  /// false addressed transition.
+  Future<RefinementBatch> recordBatchValidation({
+    required ReviewActor actor,
+    required String batchId,
+    required RefinementExecutionResult result,
+    String? model,
+  }) async {
+    _requireAgent(actor, 'record batch validation');
+    final current = await _requireBatch(batchId);
+    if (current.status != RefinementBatchStatus.inProgress) {
+      throw BatchNotReady(
+        'refinement batch $batchId is not in progress '
+        '(currently ${refinementBatchStatusToWire(current.status)})',
+      );
+    }
+    if (result.passed) {
+      if (result.checks.isEmpty || !result.checks.any((check) => check.passed)) {
+        throw BatchValidationRequired(
+          'refinement batch $batchId requires at least one passed validation check',
+        );
+      }
+      if (await _hasVisualLinkedFeedback(current) && result.evidence.isEmpty) {
+        throw BatchValidationRequired(
+          'refinement batch $batchId requires screenshot/evidence for visual feedback',
+        );
+      }
+    }
+    final next = current.recordValidation(
+      actorId: actor.id,
+      at: DateTime.now().toUtc(),
+      validation: result.batchValidation,
+      execution: result.execution(agent: actor.id, model: model),
+      evidence: result.evidence,
+    );
+    await _batches.replace(clientId, current, next);
+    if (result.passed) {
+      await _markLinkedFeedbackAddressed(current, actor);
+    }
+    return next;
+  }
+
+  /// Completes a batch after reviewer review; completed batches are frozen.
+  Future<RefinementBatch> completeBatch({
+    required ReviewActor actor,
+    required String batchId,
+  }) async {
+    _requireReviewer(actor, 'complete a refinement batch');
+    final current = await _requireBatch(batchId);
+    final next = current.complete(
+      actorId: actor.id,
+      at: DateTime.now().toUtc(),
+    );
+    await _batches.replace(clientId, current, next);
+    return next;
+  }
+
+  /// Reopens an already-addressed item invalidated by a later regression.
+  ///
+  /// This is the deterministic, append-only system-failure path (not reviewer
+  /// reopen authority): it records the regression [cause], [evidence], and the
+  /// [batchId] that identified it. Only the agent may trigger it, and only for
+  /// `addressed` feedback.
+  Future<FeedbackRecord> reopenAddressedForRegression({
+    required ReviewActor actor,
+    required String feedbackId,
+    required String cause,
+    required String evidence,
+    required String batchId,
+  }) async {
+    if (!actor.isAgent) {
+      throw const UnauthorizedFeedbackResolution(
+        'only the system agent may reopen feedback for a regression',
+      );
+    }
+    final regressionCause = cause.trim();
+    final regressionEvidence = evidence.trim();
+    final regressionBatchId = batchId.trim();
+    if (regressionCause.isEmpty ||
+        regressionEvidence.isEmpty ||
+        regressionBatchId.isEmpty) {
+      throw const FormatException(
+        'regression reopen requires a cause, evidence, and batch id',
+      );
+    }
+    final current = await _requireFeedback(feedbackId);
+    if (current.status != FeedbackStatus.addressed) {
+      throw InvalidFeedbackTransition(
+        'regression reopen requires addressed feedback '
+        '(currently ${feedbackStatusToWire(current.status)})',
+      );
+    }
+    final next = current.copyWith(
+      status: FeedbackStatus.open,
+      resolvedRound: null,
+      history: _append(
+        current,
+        FeedbackEvent(
+          type: FeedbackEventType.reopened,
+          actorId: actor.id,
+          at: DateTime.now().toUtc(),
+          round: _controller.state.reviewRound,
+          batchId: regressionBatchId,
+          cause: regressionCause,
+          evidence: regressionEvidence,
+        ),
+      ),
+    );
+
+    final state = _controller.state;
+    final reconcile =
+        current.blocking && state.status == ReviewStatus.readyForFinalReview;
+    final int? nextRound = reconcile ? state.reviewRound + 1 : null;
+    if (reconcile) {
+      _validateCandidate(
+        reviewRound: nextRound,
+        status: ReviewStatus.needsRevision,
+      );
+    }
+
+    await _feedback.replace(clientId, current, next);
+    if (reconcile) {
+      await _controller.applyState(
+        reviewRound: nextRound,
+        status: ReviewStatus.needsRevision,
+      );
+    }
+    return next;
+  }
+
+  Future<List<RefinementBatch>> _unresolvedContractImpactingBatches() async {
+    final batches = await _batches.list(clientId);
+    return <RefinementBatch>[
+      for (final batch in batches)
+        if (batch.changeClassification.confirmed ==
+                ChangeClassification.contractImpacting &&
+            batch.status != RefinementBatchStatus.completed)
+          batch,
+    ];
+  }
+
+  Future<bool> _hasContractImpactingBatch() async {
+    final batches = await _batches.list(clientId);
+    return batches.any(
+      (batch) =>
+          batch.changeClassification.confirmed ==
+          ChangeClassification.contractImpacting,
+    );
+  }
+
+  Future<bool> _hasVisualLinkedFeedback(RefinementBatch batch) async {
+    for (final feedbackId in batch.feedbackIds) {
+      final record = await _feedback.load(clientId, feedbackId);
+      if (record != null && record.visualAttachment != null) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  Future<void> _markLinkedFeedbackAddressed(
+    RefinementBatch batch,
+    ReviewActor actor,
+  ) async {
+    final round = _controller.state.reviewRound;
+    for (final feedbackId in batch.feedbackIds) {
+      final record = await _feedback.load(clientId, feedbackId);
+      if (record == null || record.status != FeedbackStatus.open) {
+        continue;
+      }
+      final next = record.copyWith(
+        status: FeedbackStatus.addressed,
+        history: _append(
+          record,
+          FeedbackEvent(
+            type: FeedbackEventType.addressed,
+            actorId: actor.id,
+            at: DateTime.now().toUtc(),
+            round: round,
+            batchId: batch.id,
+          ),
+        ),
+      );
+      await _feedback.replace(clientId, record, next);
+    }
+  }
+
+  Future<void> _requireEligibleFeedback(List<String> feedbackIds) async {
+    if (feedbackIds.isEmpty) {
+      throw const InvalidBatchTransition(
+        'a refinement batch requires at least one feedback id',
+      );
+    }
+    for (final feedbackId in feedbackIds) {
+      final record = await _feedback.load(clientId, feedbackId);
+      if (record == null) {
+        throw FeedbackNotFound('unknown feedback id: $feedbackId');
+      }
+      if (record.status != FeedbackStatus.open) {
+        throw InvalidBatchTransition(
+          'feedback $feedbackId is not eligible for refinement '
+          '(status ${feedbackStatusToWire(record.status)})',
+        );
+      }
+    }
+  }
+
+  Future<RefinementBatch> _requireBatch(String batchId) async {
+    final batch = await _batches.load(clientId, batchId);
+    if (batch == null) {
+      throw BatchNotFound('unknown refinement batch id: $batchId');
+    }
+    return batch;
+  }
+
+  void _requireAgent(ReviewActor actor, String action) {
+    if (!actor.isAgent) {
+      throw UnauthorizedReviewAction('agent role required to $action');
+    }
   }
 
   /// Validates normalized visual evidence against governed screen/section IDs.

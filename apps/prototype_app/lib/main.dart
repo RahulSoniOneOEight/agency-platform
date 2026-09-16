@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'prototype_app.dart';
 import 'review/memory_approval_repository.dart';
 import 'review/memory_feedback_repository.dart';
+import 'review/memory_refinement_batch_repository.dart';
 import 'review/memory_review_repository.dart';
 import 'review/review_actor.dart';
 import 'review/review_controller.dart';
@@ -120,6 +121,7 @@ class _PrototypeBootstrapState extends State<PrototypeBootstrap> {
       controller: controller,
       feedbackRepository: MemoryFeedbackRepository(),
       approvalRepository: MemoryApprovalRepository(),
+      refinementBatchRepository: MemoryRefinementBatchRepository(),
     );
     _reviewCoordinator = coordinator;
     return coordinator;

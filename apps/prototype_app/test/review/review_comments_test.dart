@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prototype_app/review/memory_approval_repository.dart';
+import 'package:prototype_app/review/memory_refinement_batch_repository.dart';
 import 'package:prototype_app/review/memory_feedback_repository.dart';
 import 'package:prototype_app/review/memory_review_repository.dart';
 import 'package:prototype_app/review/review_actor.dart';
@@ -57,6 +58,7 @@ void main() {
       controller: controller,
       feedbackRepository: MemoryFeedbackRepository(),
       approvalRepository: MemoryApprovalRepository(),
+      refinementBatchRepository: MemoryRefinementBatchRepository(),
     );
   });
 

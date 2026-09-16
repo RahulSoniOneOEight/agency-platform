@@ -5,8 +5,16 @@ import 'package:agency_flutter_ui/agency_flutter_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prototype_app/fixtures/fixture_repository.dart';
+import 'package:prototype_app/review/feedback_record.dart';
+import 'package:prototype_app/review/memory_approval_repository.dart';
+import 'package:prototype_app/review/memory_feedback_repository.dart';
+import 'package:prototype_app/review/memory_refinement_batch_repository.dart';
 import 'package:prototype_app/review/memory_review_repository.dart';
+import 'package:prototype_app/review/refinement_batch.dart';
+import 'package:prototype_app/review/refinement_execution_result.dart';
+import 'package:prototype_app/review/review_actor.dart';
 import 'package:prototype_app/review/review_comparison_host.dart';
+import 'package:prototype_app/review/review_coordinator.dart';
 import 'package:prototype_app/review/review_comparison_layout.dart';
 import 'package:prototype_app/review/review_controller.dart';
 import 'package:prototype_app/review/review_direction_comparison.dart';
@@ -55,6 +63,22 @@ Future<void> _pumpScreenComparison(
   );
   await tester.pumpAndSettle();
 }
+
+const _reviewer = ReviewActor(
+  id: 'reviewer-123',
+  name: 'Rahul',
+  role: ReviewRole.reviewer,
+);
+const _agent = ReviewActor(
+  id: 'opencode',
+  name: 'OpenCode',
+  role: ReviewRole.agent,
+);
+const _approver = ReviewActor(
+  id: 'approver-456',
+  name: 'Priya',
+  role: ReviewRole.approver,
+);
 
 void main() {
   final runtime = _loadReferenceRuntime();
@@ -459,6 +483,109 @@ void main() {
       final persisted = await repository.load('prototype-demo');
       expect(persisted!.selectedDirection, 'a');
       expect(persisted.screenSelections, isEmpty);
+    });
+  });
+
+  group('reference client · C.7 refinement loop', () {
+    late ReviewController controller;
+    late ReviewCoordinator coordinator;
+    late MemoryFeedbackRepository feedback;
+
+    setUp(() {
+      controller = _freshController(runtime);
+      feedback = MemoryFeedbackRepository();
+      coordinator = ReviewCoordinator(
+        controller: controller,
+        feedbackRepository: feedback,
+        approvalRepository: MemoryApprovalRepository(),
+        refinementBatchRepository: MemoryRefinementBatchRepository(),
+      );
+    });
+
+    test('refines a governed screen feedback to addressed, then approves',
+        () async {
+      await controller.selectDirection('a');
+      await coordinator.createFeedback(
+        actor: _reviewer,
+        id: 'feedback-201',
+        scope: FeedbackScope.section,
+        text: 'Tighten the search field spacing',
+        target: const FeedbackTarget(
+          screen: 'commerce.search',
+          section: 'search.search-field',
+        ),
+        blocking: true,
+      );
+
+      await coordinator.createDraftBatch(
+        actor: _reviewer,
+        id: 'batch-201',
+        feedbackIds: const ['feedback-201'],
+        intendedScope: IntendedScope(
+          screens: const ['commerce.search'],
+          sections: const ['search.search-field'],
+        ),
+        proposed: ChangeClassification.implementationOnly,
+      );
+      await coordinator.confirmBatchClassification(
+        actor: _reviewer,
+        batchId: 'batch-201',
+        confirmed: ChangeClassification.implementationOnly,
+      );
+      await coordinator.markBatchReady(actor: _reviewer, batchId: 'batch-201');
+      await coordinator.startBatch(actor: _agent, batchId: 'batch-201');
+      final reviewed = await coordinator.recordBatchValidation(
+        actor: _agent,
+        batchId: 'batch-201',
+        result: RefinementExecutionResult(
+          status: RefinementExecutionStatus.passed,
+          commitSha: 'abc123',
+          checks: const [
+            ValidationCheck(
+              name: 'flutter test test/review',
+              passed: true,
+              details: 'all green',
+            ),
+          ],
+        ),
+      );
+
+      expect(reviewed.status, RefinementBatchStatus.readyForReview);
+      final addressed = (await coordinator.loadFeedback('feedback-201'))!;
+      expect(addressed.status, FeedbackStatus.addressed);
+      expect(addressed.status, isNot(FeedbackStatus.resolved));
+
+      await coordinator.resolveFeedback(
+        actor: _reviewer,
+        feedbackId: 'feedback-201',
+      );
+      await coordinator.completeBatch(actor: _reviewer, batchId: 'batch-201');
+      await coordinator.closeCurrentRound(actor: _reviewer);
+      final snapshot = await coordinator.createApproval(
+        reviewer: _reviewer,
+        approver: _approver,
+        sourceCommitSha: 'abc123',
+      );
+
+      expect(snapshot.version, 1);
+      expect(snapshot.reviewRound, 1);
+      expect((await coordinator.loadBatch('batch-201'))!.status,
+          RefinementBatchStatus.completed);
+
+      // C.3 section mixing still persists normally alongside the C.7 flow.
+      await controller.setSectionDirection(
+        'commerce.plp',
+        'plp.product-grid',
+        'c',
+      );
+      final persisted = controller.state.toJson();
+      expect(persisted['version'], 2);
+      expect(
+        (persisted['screen_selections'] as Map<String, dynamic>)['commerce.plp'],
+        {
+          'sections': {'plp.product-grid': 'c'},
+        },
+      );
     });
   });
 }

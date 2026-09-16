@@ -33,7 +33,11 @@ final class InvalidFeedbackTarget extends ReviewDomainError {
 }
 
 /// An action attempted by an actor without the required review authority.
-final class UnauthorizedReviewAction extends ReviewDomainError {
+///
+/// Non-final so the more specific [UnauthorizedFeedbackResolution] and
+/// [UnauthorizedBlockingChange] failures remain `isA<UnauthorizedReviewAction>()`
+/// while exposing their own stable codes.
+class UnauthorizedReviewAction extends ReviewDomainError {
   const UnauthorizedReviewAction(super.message);
 
   @override
@@ -134,4 +138,96 @@ final class UnsupportedVisualProviderPayload extends ReviewDomainError {
 
   @override
   String get code => 'unsupported_visual_provider_payload';
+}
+
+/// A referenced refinement batch does not exist.
+final class BatchNotFound extends ReviewDomainError {
+  const BatchNotFound(super.message);
+
+  @override
+  String get code => 'batch_not_found';
+}
+
+/// A refinement batch id that is already persisted.
+final class DuplicateBatchId extends ReviewDomainError {
+  const DuplicateBatchId(super.message);
+
+  @override
+  String get code => 'duplicate_batch_id';
+}
+
+/// A batch's linked feedback, scope, or confirmed classification is frozen.
+///
+/// Scope, linked feedback ids, and the reviewer-confirmed classification become
+/// immutable once the batch reaches `ready`; newly discovered feedback must
+/// enter a different batch.
+final class BatchScopeFrozen extends ReviewDomainError {
+  const BatchScopeFrozen(super.message);
+
+  @override
+  String get code => 'batch_scope_frozen';
+}
+
+/// Execution or validation was requested for a batch that is not ready.
+final class BatchNotReady extends ReviewDomainError {
+  const BatchNotReady(super.message);
+
+  @override
+  String get code => 'batch_not_ready';
+}
+
+/// A completed refinement batch cannot be reopened or edited in place.
+final class BatchAlreadyCompleted extends ReviewDomainError {
+  const BatchAlreadyCompleted(super.message);
+
+  @override
+  String get code => 'batch_already_completed';
+}
+
+/// A refinement batch lifecycle transition the state machine does not allow.
+final class InvalidBatchTransition extends ReviewDomainError {
+  const InvalidBatchTransition(super.message);
+
+  @override
+  String get code => 'invalid_batch_transition';
+}
+
+/// `ready_for_review` was requested without the required validation evidence.
+final class BatchValidationRequired extends ReviewDomainError {
+  const BatchValidationRequired(super.message);
+
+  @override
+  String get code => 'batch_validation_required';
+}
+
+/// A refinement batch's required validation failed.
+final class BatchValidationFailed extends ReviewDomainError {
+  const BatchValidationFailed(super.message);
+
+  @override
+  String get code => 'batch_validation_failed';
+}
+
+/// Feedback resolution/reopen was attempted outside reviewer authority.
+final class UnauthorizedFeedbackResolution extends UnauthorizedReviewAction {
+  const UnauthorizedFeedbackResolution(super.message);
+
+  @override
+  String get code => 'unauthorized_feedback_resolution';
+}
+
+/// A blocking-classification change was attempted outside reviewer authority.
+final class UnauthorizedBlockingChange extends UnauthorizedReviewAction {
+  const UnauthorizedBlockingChange(super.message);
+
+  @override
+  String get code => 'unauthorized_blocking_change';
+}
+
+/// A batch reached `ready` without a reviewer-confirmed change classification.
+final class ContractClassificationUnconfirmed extends ReviewDomainError {
+  const ContractClassificationUnconfirmed(super.message);
+
+  @override
+  String get code => 'contract_classification_unconfirmed';
 }

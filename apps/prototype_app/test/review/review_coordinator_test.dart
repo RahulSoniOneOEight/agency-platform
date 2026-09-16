@@ -4,6 +4,7 @@ import 'package:prototype_app/review/approval_snapshot.dart';
 import 'package:prototype_app/review/feedback_record.dart';
 import 'package:prototype_app/review/memory_approval_repository.dart';
 import 'package:prototype_app/review/memory_feedback_repository.dart';
+import 'package:prototype_app/review/memory_refinement_batch_repository.dart';
 import 'package:prototype_app/review/memory_review_repository.dart';
 import 'package:prototype_app/review/review_actor.dart';
 import 'package:prototype_app/review/review_controller.dart';
@@ -101,6 +102,7 @@ void main() {
       controller: controller,
       feedbackRepository: feedback,
       approvalRepository: approvals,
+      refinementBatchRepository: MemoryRefinementBatchRepository(),
     );
   });
 
@@ -810,6 +812,7 @@ void main() {
         controller: customController,
         feedbackRepository: MemoryFeedbackRepository(),
         approvalRepository: MemoryApprovalRepository(),
+        refinementBatchRepository: MemoryRefinementBatchRepository(),
       );
       await customController
           .applyState(status: ReviewStatus.readyForFinalReview);
@@ -831,6 +834,7 @@ void main() {
         controller: controller,
         feedbackRepository: feedback,
         approvalRepository: _FailingApprovalRepository(),
+        refinementBatchRepository: MemoryRefinementBatchRepository(),
       );
       await create(id: 'feedback-nb', blocking: false);
       await coordinator.closeCurrentRound(actor: reviewer);

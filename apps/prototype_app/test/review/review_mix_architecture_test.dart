@@ -228,10 +228,17 @@ void main() {
   });
 
   group('B.1F refinement notes remain non-runtime', () {
-    test('lib/review never references refinement notes', () {
+    test('lib/review never references B.1F refinement-note metadata', () {
+      // C.7 legitimately introduces RefinementBatch, so this guard pins the
+      // B.1F *refinement-notes* artifact rather than the bare word.
+      const needles = <String>[
+        'refinement-notes',
+        'refinement_notes',
+        'refinement note',
+      ];
       final offenders = <String>[
         for (final file in _domainReviewSourceFiles())
-          if (file.readAsStringSync().toLowerCase().contains('refinement'))
+          if (needles.any(file.readAsStringSync().toLowerCase().contains))
             file.path,
       ];
       expect(offenders, isEmpty,

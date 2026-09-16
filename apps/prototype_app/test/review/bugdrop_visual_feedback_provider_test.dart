@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prototype_app/review/bugdrop_visual_feedback_provider.dart';
 import 'package:prototype_app/review/memory_approval_repository.dart';
+import 'package:prototype_app/review/memory_refinement_batch_repository.dart';
 import 'package:prototype_app/review/memory_feedback_repository.dart';
 import 'package:prototype_app/review/memory_review_repository.dart';
 import 'package:prototype_app/review/review_actor.dart';
@@ -158,6 +159,7 @@ void main() {
         controller: controller,
         feedbackRepository: feedback,
         approvalRepository: approvals,
+        refinementBatchRepository: MemoryRefinementBatchRepository(),
       );
       expect(coordinator.clientId, 'prototype-demo');
       final stateBefore = controller.state;
