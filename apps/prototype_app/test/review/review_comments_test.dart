@@ -40,6 +40,7 @@ void main() {
     controller = ReviewController(
       clientId: runtime.clientId,
       repository: repository,
+      runtime: runtime,
     );
   });
 

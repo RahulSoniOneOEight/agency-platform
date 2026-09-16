@@ -167,9 +167,10 @@ void main() {
       final controller = ReviewController(
         clientId: runtime.clientId,
         repository: MemoryReviewRepository(),
+        runtime: runtime,
       );
       await controller.selectDirection('b');
-      await controller.selectScreenDirection('commerce.search', 'c');
+      await controller.setScreenDirection('commerce.search', 'a');
       await controller.addComment(
         const ReviewComment(
           id: 'review-1',
@@ -203,7 +204,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(controller.state.selectedDirection, 'b');
-      expect(controller.state.screenSelections['commerce.search']!.direction, 'c');
+      expect(controller.state.screenSelections['commerce.search']!.direction, 'a');
       expect(controller.state.reviewRound, 2);
 
       expect(runtime.directions.keys.toSet(), equals(directionsBefore.keys.toSet()));
@@ -353,6 +354,7 @@ void main() {
       final controller = ReviewController(
         clientId: 'prototype-demo',
         repository: MemoryReviewRepository(),
+        runtime: _threeDirectionRuntime(),
       );
 
       expect(controller.state.selectedDirection, isNull);
@@ -366,6 +368,7 @@ void main() {
       final controller = ReviewController(
         clientId: runtime.clientId,
         repository: MemoryReviewRepository(),
+        runtime: runtime,
       );
 
       await tester.pumpWidget(

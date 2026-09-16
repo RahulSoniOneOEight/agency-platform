@@ -153,6 +153,7 @@ PrototypeRuntime _comparisonRuntime({Map<String, Map<String, Object?>>? directio
 ReviewController _freshController(PrototypeRuntime runtime) => ReviewController(
       clientId: runtime.clientId,
       repository: MemoryReviewRepository(),
+      runtime: runtime,
     );
 
 Future<void> _pumpScreenComparison(

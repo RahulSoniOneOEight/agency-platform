@@ -30,6 +30,7 @@ PrototypeRuntime _loadReferenceRuntime() {
 ReviewController _freshController(PrototypeRuntime runtime) => ReviewController(
       clientId: runtime.clientId,
       repository: MemoryReviewRepository(),
+      runtime: runtime,
     );
 
 Future<void> _pumpScreenComparison(

@@ -41,6 +41,7 @@ void main() {
     controller = ReviewController(
       clientId: runtime.clientId,
       repository: repository,
+      runtime: runtime,
     );
   });
 
@@ -111,17 +112,17 @@ void main() {
 
   testWidgets('choosing a screen mix updates only that screen and persists',
       (tester) async {
-    await controller.selectScreenDirection('commerce.home', 'a');
+    await controller.setScreenDirection('commerce.home', 'a');
     await pumpSelection(tester);
     expect(controller.state.screenSelections, {
       'commerce.home': ReviewScreenDecision(direction: 'a'),
     });
 
     final searchGroup = find.byKey(ReviewSelection.screenGroupKey('commerce.search'));
-    await tester.tap(find.descendant(of: searchGroup, matching: find.text('C')));
+    await tester.tap(find.descendant(of: searchGroup, matching: find.text('B')));
     await tester.pumpAndSettle();
 
-    expect(controller.state.screenSelections['commerce.search']!.direction, 'c');
+    expect(controller.state.screenSelections['commerce.search']!.direction, 'b');
     expect(controller.state.screenSelections['commerce.home']!.direction, 'a');
     expect(
       controller.state.screenSelections.keys.toSet(),
@@ -130,26 +131,26 @@ void main() {
 
     final persisted = await repository.load('prototype-demo');
     expect(persisted, isNotNull);
-    expect(persisted!.screenSelections['commerce.search']!.direction, 'c');
+    expect(persisted!.screenSelections['commerce.search']!.direction, 'b');
     expect(persisted.screenSelections['commerce.home']!.direction, 'a');
   });
 
   testWidgets('clear selection resets overall direction but keeps the mix',
       (tester) async {
     await controller.selectDirection('b');
-    await controller.selectScreenDirection('commerce.search', 'c');
+    await controller.setScreenDirection('commerce.search', 'a');
     await pumpSelection(tester);
 
     await tester.tap(find.text('Clear selection'));
     await tester.pumpAndSettle();
 
     expect(controller.state.selectedDirection, isNull);
-    expect(controller.state.screenSelections['commerce.search']!.direction, 'c');
+    expect(controller.state.screenSelections['commerce.search']!.direction, 'a');
 
     final persisted = await repository.load('prototype-demo');
     expect(persisted, isNotNull);
     expect(persisted!.selectedDirection, isNull);
-    expect(persisted.screenSelections['commerce.search']!.direction, 'c');
+    expect(persisted.screenSelections['commerce.search']!.direction, 'a');
   });
 
   testWidgets('direction options come only from the runtime directions',
@@ -167,7 +168,10 @@ void main() {
         .segments
         .map((segment) => segment.value)
         .toSet();
-    expect(searchSegments, equals(runtime.allowedDirections.toSet()));
+    // Screen options are restricted to directions that expose the screen:
+    // commerce.search is declared by a and b only.
+    expect(searchSegments, equals(<String>{'a', 'b'}));
+    expect(searchSegments.difference(runtime.directions.keys.toSet()), isEmpty);
   });
 
   testWidgets('selecting a screen direction does not mutate runtime directions',
@@ -180,10 +184,10 @@ void main() {
 
     await pumpSelection(tester);
     final searchGroup = find.byKey(ReviewSelection.screenGroupKey('commerce.search'));
-    await tester.tap(find.descendant(of: searchGroup, matching: find.text('C')));
+    await tester.tap(find.descendant(of: searchGroup, matching: find.text('B')));
     await tester.pumpAndSettle();
 
-    expect(controller.state.screenSelections['commerce.search']!.direction, 'c');
+    expect(controller.state.screenSelections['commerce.search']!.direction, 'b');
     expect(runtime.directions.keys.toSet(), equals(patternsSnapshot.keys.toSet()));
     for (final id in patternsSnapshot.keys) {
       expect(identical(runtime.directions[id], instances[id]), isTrue);
@@ -192,8 +196,8 @@ void main() {
   });
 
   testWidgets('deselecting a screen mix clears only that screen', (tester) async {
-    await controller.selectScreenDirection('commerce.search', 'b');
-    await controller.selectScreenDirection('commerce.home', 'a');
+    await controller.setScreenDirection('commerce.search', 'b');
+    await controller.setScreenDirection('commerce.home', 'a');
     await pumpSelection(tester);
 
     final searchGroup = find.byKey(ReviewSelection.screenGroupKey('commerce.search'));
@@ -215,6 +219,7 @@ void main() {
     controller = ReviewController(
       clientId: runtime.clientId,
       repository: repository,
+      runtime: runtime,
       initialState: ReviewState(
         version: ReviewState.currentVersion,
         clientId: runtime.clientId,
@@ -234,5 +239,22 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(controller.state.screenSelections['commerce.search']!.direction, isNull);
+  });
+
+  testWidgets('only offers directions that expose the screen', (tester) async {
+    await pumpSelection(tester);
+
+    final homeSegments = tester
+        .widget<SegmentedButton<String>>(
+          find.byKey(ReviewSelection.screenGroupKey('commerce.home')),
+        )
+        .segments
+        .map((segment) => segment.value)
+        .toList();
+
+    // commerce.home is declared only by direction a; offering b/c would now be
+    // rejected by the validating controller.
+    expect(homeSegments, equals(<String>['a']));
+    expect(tester.takeException(), isNull);
   });
 }

@@ -96,31 +96,35 @@ class ReviewSelection extends StatelessWidget {
                   style: Theme.of(context).textTheme.labelLarge,
                 ),
                 const SizedBox(height: 4),
-                SegmentedButton<String>(
-                  key: screenGroupKey(screenId),
-                  segments: [
+                Builder(builder: (context) {
+                  final available = [
                     for (final id in directionIds)
-                      ButtonSegment<String>(
-                        value: id,
-                        label: Text(id.toUpperCase()),
-                      ),
-                  ],
-                  selected: state.screenSelections.containsKey(screenId)
-                      ? <String>{
-                          if (state.screenSelections[screenId]!.direction != null)
-                            state.screenSelections[screenId]!.direction!,
-                        }
-                      : const <String>{},
-                  emptySelectionAllowed: true,
-                  showSelectedIcon: false,
-                  onSelectionChanged: (selection) {
-                    if (selection.isEmpty) {
-                      controller.clearScreenDirection(screenId);
-                    } else {
-                      controller.selectScreenDirection(screenId, selection.first);
-                    }
-                  },
-                ),
+                      if (runtime.directions[id]!.patterns.contains(screenId)) id,
+                  ];
+                  final current = state.screenSelections[screenId]?.direction;
+                  return SegmentedButton<String>(
+                    key: screenGroupKey(screenId),
+                    segments: [
+                      for (final id in available)
+                        ButtonSegment<String>(
+                          value: id,
+                          label: Text(id.toUpperCase()),
+                        ),
+                    ],
+                    selected: (current != null && available.contains(current))
+                        ? <String>{current}
+                        : const <String>{},
+                    emptySelectionAllowed: true,
+                    showSelectedIcon: false,
+                    onSelectionChanged: (selection) {
+                      if (selection.isEmpty) {
+                        controller.clearScreenDirection(screenId);
+                      } else {
+                        controller.setScreenDirection(screenId, selection.first);
+                      }
+                    },
+                  );
+                }),
                 const SizedBox(height: 16),
               ],
             ],

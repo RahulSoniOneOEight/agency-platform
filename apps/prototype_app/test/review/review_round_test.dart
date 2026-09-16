@@ -39,6 +39,7 @@ void main() {
     controller = ReviewController(
       clientId: runtime.clientId,
       repository: repository,
+      runtime: runtime,
     );
   });
 
@@ -59,7 +60,7 @@ void main() {
     test('increments deterministically and preserves selections and comments',
         () async {
       await controller.selectDirection('b');
-      await controller.selectScreenDirection('commerce.search', 'c');
+      await controller.setScreenDirection('commerce.search', 'a');
       await controller.addComment(
         const ReviewComment(
           id: 'review-1',
@@ -75,7 +76,7 @@ void main() {
       expect(controller.state.reviewRound, 2);
       expect(controller.state.selectedDirection, 'b');
       expect(controller.state.screenSelections, {
-        'commerce.search': ReviewScreenDecision(direction: 'c'),
+        'commerce.search': ReviewScreenDecision(direction: 'a'),
       });
       expect(controller.state.comments.single.text, 'keep me');
       expect(controller.state.status, ReviewStatus.inReview);

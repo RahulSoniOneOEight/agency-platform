@@ -7,9 +7,7 @@ import 'prototype_app.dart';
 import 'review/memory_review_repository.dart';
 import 'review/review_controller.dart';
 import 'review/review_route.dart';
-import 'review/review_screen_registry.dart';
 import 'review/review_shell.dart';
-import 'review/review_state_validator.dart';
 import 'runtime/prototype_runtime.dart';
 import 'runtime/runtime_exception.dart';
 import 'runtime/runtime_loader.dart';
@@ -90,11 +88,7 @@ class _PrototypeBootstrapState extends State<PrototypeBootstrap> {
     final controller = ReviewController(
       clientId: runtime.clientId,
       repository: MemoryReviewRepository(),
-      validate: (state) => validateReviewState(
-        state,
-        runtime,
-        screenIds: ReviewScreenRegistry.screenIdsFor(runtime),
-      ),
+      runtime: runtime,
     );
     unawaited(controller.load());
     _reviewController = controller;

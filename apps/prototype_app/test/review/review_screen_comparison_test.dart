@@ -44,6 +44,7 @@ void main() {
     controller = ReviewController(
       clientId: runtime.clientId,
       repository: MemoryReviewRepository(),
+      runtime: runtime,
     );
   });
 
@@ -51,6 +52,7 @@ void main() {
     return ReviewController(
       clientId: runtime.clientId,
       repository: MemoryReviewRepository(),
+      runtime: runtime,
       initialState: ReviewState(
         version: ReviewState.currentVersion,
         clientId: runtime.clientId,
@@ -249,6 +251,7 @@ void main() {
     controller = ReviewController(
       clientId: runtime.clientId,
       repository: MemoryReviewRepository(),
+      runtime: runtime,
     );
 
     await pumpSurface(tester, const Size(1200, 800));

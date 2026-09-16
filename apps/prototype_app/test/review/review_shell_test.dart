@@ -39,6 +39,7 @@ PrototypeRuntime buildReviewRuntime({Map<String, Object?>? theme}) {
 ReviewController buildController(PrototypeRuntime runtime) => ReviewController(
       clientId: runtime.clientId,
       repository: MemoryReviewRepository(),
+      runtime: runtime,
     );
 
 Widget wrap(PrototypeRuntime runtime, ReviewController controller) => MaterialApp(
