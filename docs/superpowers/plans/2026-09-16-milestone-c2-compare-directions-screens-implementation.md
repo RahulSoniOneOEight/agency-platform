@@ -87,7 +87,8 @@ Tests under `apps/prototype_app/test/review/`:
   - `class ReviewDirectionSummary extends StatelessWidget` rendering a neutral card for one
     `PrototypeDirection` (id, name, strategic goal, primary journey, discovery model,
     merchandising model, transaction model, canonical density, governed patterns/components).
-  - `static Key selectButtonKey(String directionId)` and `static const Key summaryKeyPrefix`.
+  - `static Key cardKey(String directionId)` and
+    `static Key selectButtonKey(String directionId)`.
   - An explicit `onSelect` callback (nullable) so selection stays at the call site.
 
 - [ ] **Step 1: Write failing tests** — pump one `PrototypeDirection` from a test runtime and assert
