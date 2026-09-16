@@ -144,7 +144,7 @@
 | 5 | Flutter ThemeData + AgencyThemeTokens | ACCEPTED | `9dc5daf` + `4545b6d` |
 | 6 | High-value UI migration | ACCEPTED | `0931fa3` + `a7892f3` |
 | 7 | Repository validation + CI freshness | ACCEPTED | `3a12ca4` + `4ed59b0` |
-| 8 | Docs + full verification + PR | PENDING | — |
+| 8 | Docs + full verification + PR | ACCEPTED | `c0353d5` + `068a4d6` |
 
 ## Progress log
 
@@ -192,3 +192,15 @@
   `validate_repo.py`; freshness single-sourced; CI runs `test_theme_contract`; required paths
   extended. Review found no blockers; corrections `4ed59b0`: docstring, `.yml` direction scan,
   all approved presets required, test rename. 246 tests green. ACCEPTED.
+- 2026-09-16 — Task 8 docs (`c0353d5`): `docs/token-theme-contract.md` plus client-runtime,
+  prototype-platform, and platform-status updates. Full verification green (Python 249 tests,
+  repo validation 95 paths, all validators, freshness checks; Flutter analyze/tests for all three
+  packages; web build).
+- 2026-09-16 — Final whole-branch review: no blockers. Major #1 (hand-maintained Flutter default
+  theme = second source of truth) fixed in `068a4d6`: `resolve_default_theme` + generated
+  `packages/agency_flutter_ui/lib/themes/generated_agency_default_theme.dart` with byte-exact
+  freshness in repo validation; also preset manifest/brand equality check and `heading_emphasis`
+  enum. Remaining Minor items (dead `AgencyTokens`/`AgencyDensity`, `density.multiplier` unused,
+  font fallback approval, untracked `pubspec.lock`/`git`) recorded as deferred.
+- 2026-09-16 — FINAL: 249 Python tests, all validators + both freshness checks, 42+63+1 Flutter
+  tests, web build green. Branch pushed; PR opened against `main`; not merged.
