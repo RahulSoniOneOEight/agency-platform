@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import contextlib
 import importlib.util
+import io
 import json
 import tempfile
 import unittest
@@ -195,6 +197,41 @@ class ValidatorContractTests(unittest.TestCase):
             "tooling/validation/test_refinement_notes.py",
         ):
             self.assertIn(path, validator.REQUIRED_PATHS)
+        self.assertFalse(
+            [
+                path
+                for path in validator.REQUIRED_PATHS
+                if path.endswith("refinement-notes.yaml")
+            ],
+            "the optional refinement note file must never be a required path",
+        )
+
+    def test_main_reports_refinement_note_errors(self):
+        validator = self.load_validator()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            note = (
+                root
+                / "client-projects"
+                / "acme"
+                / "prototype"
+                / "refinement-notes.yaml"
+            )
+            note.parent.mkdir(parents=True)
+            note.write_text(
+                "version: 1\nchanges:\n  - id: x\n    change: c\n"
+                "    classification: custom\n    status: done\n",
+                encoding="utf-8",
+            )
+
+            buffer = io.StringIO()
+            with contextlib.redirect_stdout(buffer):
+                code = validator.main(root)
+
+        self.assertEqual(1, code)
+        output = buffer.getvalue()
+        self.assertIn("Visual refinement note errors:", output)
+        self.assertIn("client-projects/acme/prototype/refinement-notes.yaml:", output)
 
     def test_missing_refinement_notes_is_not_an_error(self):
         validator = self.load_validator()

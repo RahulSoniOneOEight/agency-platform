@@ -279,8 +279,8 @@ def flutter_binding_errors(root: Path) -> list[str]:
     return sorted(set(errors))
 
 
-def main() -> int:
-    root = _ROOT
+def main(root: Path | None = None) -> int:
+    root = root if root is not None else _ROOT
     missing = missing_required_paths(root)
     bundle_errors = generated_runtime_bundle_errors(root)
     binding_errors = flutter_binding_errors(root)

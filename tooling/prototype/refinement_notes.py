@@ -169,7 +169,8 @@ def validate_refinement_notes(root: Path, path: Path) -> list[str]:
     try:
         document = load_refinement_notes(path)
     except ValueError as exc:
-        return [str(exc)]
+        # Keep messages host-portable: callers prefix the path they care about.
+        return [str(exc).replace(str(path), path.name)]
     try:
         schema = _load_schema(root)
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
