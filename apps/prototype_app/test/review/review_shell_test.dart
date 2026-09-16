@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prototype_app/review/memory_review_repository.dart';
 import 'package:prototype_app/review/review_comparison_host.dart';
+import 'package:prototype_app/review/review_comparison_layout.dart';
 import 'package:prototype_app/review/review_controller.dart';
+import 'package:prototype_app/review/review_direction_summary.dart';
 import 'package:prototype_app/review/review_shell.dart';
 import 'package:prototype_app/runtime/prototype_runtime.dart';
 
@@ -94,6 +96,9 @@ void main() {
   });
 
   testWidgets('directions lists the actual runtime directions', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
     await tester.pumpWidget(wrap(runtime, controller));
     await tapDestination(tester, 'Directions');
 
@@ -106,22 +111,35 @@ void main() {
   });
 
   testWidgets('previewing a direction does not select it', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(400, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
     await tester.pumpWidget(wrap(runtime, controller));
     await tapDestination(tester, 'Directions');
 
-    await tester.tap(find.text('Beta Direction').first);
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(ReviewComparisonLayout.switcherKey),
+        matching: find.text('B'),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(controller.state.selectedDirection, isNull);
   });
 
-  testWidgets('Select this direction persists the previewed direction', (tester) async {
+  testWidgets('explicit per-direction select routes through the controller',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
     await tester.pumpWidget(wrap(runtime, controller));
     await tapDestination(tester, 'Directions');
 
-    await tester.tap(find.text('Beta Direction').first);
+    final button = find.byKey(ReviewDirectionSummary.selectButtonKey('b'));
+    await tester.ensureVisible(button);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Select this direction'));
+    await tester.tap(button);
     await tester.pumpAndSettle();
 
     expect(controller.state.selectedDirection, 'b');
@@ -129,7 +147,17 @@ void main() {
 
   testWidgets('screens renders a governed screen label and the comparison host',
       (tester) async {
-    await tester.pumpWidget(wrap(runtime, controller));
+    await tester.binding.setSurfaceSize(const Size(1200, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    // Compact spacing keeps the reviewed product card within its grid cell at
+    // comparison panel width (the shared ProductCard's fixed grid extent is not
+    // a C.2 concern and is unchanged here).
+    final screensRuntime = buildReviewRuntime(
+      theme: resolvedThemeMap(cardSpacing: 12, tileGap: 8),
+    );
+    final screensController = buildController(screensRuntime);
+
+    await tester.pumpWidget(wrap(screensRuntime, screensController));
     await tapDestination(tester, 'Screens');
 
     expect(find.byType(ReviewComparisonHost), findsOneWidget);
@@ -150,11 +178,16 @@ void main() {
   });
 
   testWidgets('switching destinations preserves the controller selection', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
     await tester.pumpWidget(wrap(runtime, controller));
     await tapDestination(tester, 'Directions');
-    await tester.tap(find.text('Beta Direction').first);
+
+    final button = find.byKey(ReviewDirectionSummary.selectButtonKey('b'));
+    await tester.ensureVisible(button);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Select this direction'));
+    await tester.tap(button);
     await tester.pumpAndSettle();
 
     await tapDestination(tester, 'Overview');

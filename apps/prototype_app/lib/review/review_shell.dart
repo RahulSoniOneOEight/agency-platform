@@ -4,9 +4,9 @@ import '../fixtures/fixture_repository.dart';
 import '../runtime/prototype_runtime.dart';
 import 'review_comments.dart';
 import 'review_controller.dart';
-import 'review_directions.dart';
+import 'review_direction_comparison.dart';
 import 'review_overview.dart';
-import 'review_screens.dart';
+import 'review_screen_comparison.dart';
 import 'review_selection.dart';
 
 /// Width at or above which the review destinations are presented as a rail.
@@ -122,9 +122,12 @@ class _ReviewShellState extends State<ReviewShell> {
     return switch (index) {
       0 =>
         ReviewOverview(runtime: widget.runtime, controller: widget.controller),
-      1 => ReviewDirections(
+      1 => ReviewDirectionComparison(
           runtime: widget.runtime, controller: widget.controller),
-      2 => ReviewScreens(runtime: widget.runtime, fixtures: _fixtures),
+      2 => ReviewScreenComparison(
+          runtime: widget.runtime,
+          fixtures: _fixtures,
+          controller: widget.controller),
       3 =>
         ReviewSelection(runtime: widget.runtime, controller: widget.controller),
       _ =>
