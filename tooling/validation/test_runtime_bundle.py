@@ -1105,6 +1105,14 @@ class ResolvedThemeBundleTests(unittest.TestCase):
         )
 
     def test_refinement_note_target_cannot_redefine_runtime_theme_authority(self):
+        classifications = (
+            "semantic_token",
+            "client_override",
+            "direction_override",
+            "reusable_candidate",
+            "implementation_detail",
+            "reject",
+        )
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             client = root / "client-projects" / "acme-client"
@@ -1115,29 +1123,32 @@ class ResolvedThemeBundleTests(unittest.TestCase):
             baseline_direction_themes = copy.deepcopy(
                 baseline_bundle["direction_themes"]
             )
-
-            note_path = client / "prototype" / "refinement-notes.yaml"
-            note_path.write_text(
-                """version: 1
-changes:
-  - id: repaint-primary
-    change: make the primary brand colour hotter in Nowa
-    classification: client_override
-    status: observed
-    target: theme.color.primary
-""",
-                encoding="utf-8",
-            )
-
-            after_bundle, after_bytes = _compose_bundle_bytes(root, client)
             fresh_theme = resolve_theme(
                 root, "premium-modern", {"preset": "premium-modern"}, None
             )
 
-        self.assertEqual(baseline_bytes, after_bytes)
-        self.assertEqual(baseline_theme, after_bundle["theme"])
-        self.assertEqual(fresh_theme, after_bundle["theme"])
-        self.assertEqual(baseline_direction_themes, after_bundle["direction_themes"])
+            note_path = client / "prototype" / "refinement-notes.yaml"
+            for classification in classifications:
+                with self.subTest(classification=classification):
+                    note_path.write_text(
+                        "version: 1\n"
+                        "changes:\n"
+                        "  - id: repaint-primary\n"
+                        "    change: make the primary brand colour hotter in Nowa\n"
+                        f"    classification: {classification}\n"
+                        "    status: observed\n"
+                        "    target: theme.color.primary\n",
+                        encoding="utf-8",
+                    )
+
+                    after_bundle, after_bytes = _compose_bundle_bytes(root, client)
+
+                    self.assertEqual(baseline_bytes, after_bytes)
+                    self.assertEqual(baseline_theme, after_bundle["theme"])
+                    self.assertEqual(fresh_theme, after_bundle["theme"])
+                    self.assertEqual(
+                        baseline_direction_themes, after_bundle["direction_themes"]
+                    )
 
     def test_bundle_theme_matches_fresh_resolve(self):
         with tempfile.TemporaryDirectory() as tmp:
