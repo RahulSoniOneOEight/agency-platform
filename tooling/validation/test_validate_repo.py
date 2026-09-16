@@ -60,7 +60,7 @@ class ValidatorContractTests(unittest.TestCase):
         ):
             self.assertIn(path, validator.REQUIRED_PATHS)
 
-    def test_current_repository_generated_runtime_bundles_are_fresh(self):
+    def test_current_repository_generated_runtime_bundles_are_valid(self):
         validator = self.load_validator()
         self.assertEqual([], validator.generated_runtime_bundle_errors(ROOT))
 

@@ -99,6 +99,8 @@ REQUIRED_PATHS = (
     "design-contract/tokens/foundation.yaml",
     "design-contract/tokens/semantic.yaml",
     "design-contract/themes/premium-modern.yaml",
+    "design-contract/themes/compact-commerce.yaml",
+    "design-contract/themes/editorial-commerce.yaml",
     "tooling/design_contract/theme_contract.py",
     "tooling/design_contract/generate_resolved_themes.py",
     "tooling/validation/test_theme_contract.py",
@@ -134,11 +136,12 @@ def missing_required_paths(root: Path) -> list[str]:
 
 
 def generated_runtime_bundle_errors(root: Path) -> list[str]:
-    """Return B.1B generated client runtime bundle errors under *root*.
+    """Return B.1B generated client runtime bundle structural errors under *root*.
 
     Every checked client whose prototype manifest exists must have a generated
-    bundle that is valid, approved against the design contract, and identical to
-    a fresh projection of its strategic sources.
+    bundle that exists, parses, and is valid against the runtime contract and the
+    design contract. Freshness against a fresh compile is enforced separately by
+    ``theme_contract_errors`` (single source of truth).
     """
     errors: list[str] = []
     projects = root / "client-projects"
@@ -198,9 +201,13 @@ def theme_contract_errors(root: Path) -> list[str]:
 
     projects = root / "client-projects"
     if projects.exists():
-        for direction_path in sorted(
-            projects.glob("**/directions/direction-*.yaml")
-        ):
+        direction_paths = sorted(
+            [
+                *projects.glob("**/directions/direction-*.yaml"),
+                *projects.glob("**/directions/direction-*.yml"),
+            ]
+        )
+        for direction_path in direction_paths:
             try:
                 direction = yaml.safe_load(direction_path.read_text(encoding="utf-8"))
             except (OSError, UnicodeError, yaml.YAMLError) as exc:
