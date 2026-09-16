@@ -87,11 +87,42 @@ void main() {
     expect(themeB.data.colorScheme.primary, primaryB);
   });
 
+  testWidgets('forwards the requested direction into the reused pattern', (tester) async {
+    final runtime = PrototypeRuntime.fromMap(
+      canonicalBundle(
+        names: const {'a': 'Alpha Direction', 'b': 'Beta Direction'},
+        patterns: const {
+          'a': ['commerce.home'],
+          'b': ['commerce.home'],
+        },
+      ),
+    );
+    final fixtures = fixturesFor(runtime);
+
+    await tester.pumpWidget(
+      wrap(runtime, fixtures, directionId: 'a', screenId: 'commerce.home'),
+    );
+
+    expect(
+      tester.widget<HomePattern>(find.byType(HomePattern)).title,
+      'Alpha Direction',
+    );
+  });
+
   testWidgets('throws ArgumentError for an unknown direction id', (tester) async {
     final runtime = buildRuntime();
     final fixtures = fixturesFor(runtime);
 
     await tester.pumpWidget(wrap(runtime, fixtures, directionId: 'Z'));
+
+    expect(tester.takeException(), isA<ArgumentError>());
+  });
+
+  testWidgets('throws ArgumentError for an unknown screen id', (tester) async {
+    final runtime = buildRuntime();
+    final fixtures = fixturesFor(runtime);
+
+    await tester.pumpWidget(wrap(runtime, fixtures, screenId: 'commerce.unknown'));
 
     expect(tester.takeException(), isA<ArgumentError>());
   });
