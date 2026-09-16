@@ -253,6 +253,35 @@ changes:
             errors,
         )
 
+    def test_nowa_local_component_and_pattern_identities_are_rejected(self):
+        root = _root()
+        _write_component(root, "commerce.product-card")
+        _write_pattern(root, "commerce.cart")
+        path = _write_note(
+            root,
+            """version: 1
+changes:
+  - id: nowa-local
+    component: nowa.heroCard
+    pattern: nowa.heroRow
+    change: rearrange only inside Nowa
+    classification: reusable_candidate
+    status: proposed
+""",
+        )
+
+        errors = validate_refinement_notes(root, path)
+
+        self.assertEqual(
+            [
+                "change 'nowa-local': component: unknown canonical component id "
+                "'nowa.heroCard'",
+                "change 'nowa-local': pattern: unknown canonical pattern id "
+                "'nowa.heroRow'",
+            ],
+            errors,
+        )
+
     def test_repository_canonical_ids_are_accepted(self):
         root = _root()
         path = _write_note(
@@ -449,11 +478,13 @@ version: 1
 """,
         )
 
-        self.assertEqual(
-            validate_refinement_notes(first_root, first),
-            validate_refinement_notes(second_root, second),
-        )
-        self.assertTrue(validate_refinement_notes(first_root, first))
+        first_errors = validate_refinement_notes(first_root, first)
+        second_errors = validate_refinement_notes(second_root, second)
+
+        self.assertTrue(first_errors)
+        self.assertEqual(first_errors, second_errors)
+        self.assertEqual(sorted(first_errors), first_errors)
+        self.assertEqual(sorted(second_errors), second_errors)
 
     def test_mapping_valued_type_error_is_insertion_order_independent(self):
         first_root = _root()

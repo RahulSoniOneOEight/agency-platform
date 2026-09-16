@@ -31,6 +31,7 @@ from tooling.prototype.build_runtime_bundle import (
 from tooling.prototype import validate_runtime_bundle as runtime_bundle_validator
 from tooling.prototype.project_direction import project_direction
 from tooling.prototype.refinement_notes import validate_refinement_notes
+from tooling.validation.validate_repo import refinement_note_errors
 
 
 validate_runtime_bundle = runtime_bundle_validator.validate_runtime_bundle
@@ -1016,6 +1017,24 @@ class RuntimeBundleTests(unittest.TestCase):
             [], validate_refinement_notes(ROOT, _EXAMPLE_REFINEMENT_NOTES)
         )
 
+    def test_complete_client_without_refinement_notes_passes_runtime_and_note_validation(
+        self,
+    ):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            client = root / "client-projects" / "acme-client"
+            _write_client(client)
+
+            note_path = client / "prototype" / "refinement-notes.yaml"
+            self.assertFalse(note_path.exists())
+            self.assertEqual([], refinement_note_errors(root))
+
+            output = build_runtime_bundle(root, client, root / "output")
+            bundle = json.loads(output.read_text(encoding="utf-8"))
+
+        self.assertEqual("acme-client", bundle["client_id"])
+        self.assertEqual([], validate_runtime_bundle(bundle))
+
 
 def _walk_strings(value):
     if isinstance(value, dict):
@@ -1084,6 +1103,41 @@ class ResolvedThemeBundleTests(unittest.TestCase):
         self.assertEqual(
             "spacious", bundle["direction_themes"]["c"]["density"]["default"]
         )
+
+    def test_refinement_note_target_cannot_redefine_runtime_theme_authority(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            client = root / "client-projects" / "acme-client"
+            _write_client(client)
+
+            baseline_bundle, baseline_bytes = _compose_bundle_bytes(root, client)
+            baseline_theme = copy.deepcopy(baseline_bundle["theme"])
+            baseline_direction_themes = copy.deepcopy(
+                baseline_bundle["direction_themes"]
+            )
+
+            note_path = client / "prototype" / "refinement-notes.yaml"
+            note_path.write_text(
+                """version: 1
+changes:
+  - id: repaint-primary
+    change: make the primary brand colour hotter in Nowa
+    classification: client_override
+    status: observed
+    target: theme.color.primary
+""",
+                encoding="utf-8",
+            )
+
+            after_bundle, after_bytes = _compose_bundle_bytes(root, client)
+            fresh_theme = resolve_theme(
+                root, "premium-modern", {"preset": "premium-modern"}, None
+            )
+
+        self.assertEqual(baseline_bytes, after_bytes)
+        self.assertEqual(baseline_theme, after_bundle["theme"])
+        self.assertEqual(fresh_theme, after_bundle["theme"])
+        self.assertEqual(baseline_direction_themes, after_bundle["direction_themes"])
 
     def test_bundle_theme_matches_fresh_resolve(self):
         with tempfile.TemporaryDirectory() as tmp:
