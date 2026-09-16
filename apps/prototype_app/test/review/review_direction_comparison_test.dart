@@ -5,6 +5,7 @@ import 'package:prototype_app/review/review_comparison_layout.dart';
 import 'package:prototype_app/review/review_controller.dart';
 import 'package:prototype_app/review/review_direction_comparison.dart';
 import 'package:prototype_app/review/review_direction_summary.dart';
+import 'package:prototype_app/review/review_state.dart';
 import 'package:prototype_app/runtime/prototype_runtime.dart';
 
 import '../support/runtime_fixtures.dart';
@@ -24,6 +25,22 @@ void main() {
       repository: MemoryReviewRepository(),
     );
   });
+
+  ReviewController controllerWith(String? selectedDirection) {
+    return ReviewController(
+      clientId: runtime.clientId,
+      repository: MemoryReviewRepository(),
+      initialState: ReviewState(
+        version: ReviewState.currentVersion,
+        clientId: runtime.clientId,
+        reviewRound: 1,
+        status: ReviewStatus.inReview,
+        selectedDirection: selectedDirection,
+        screenSelections: const <String, String>{},
+        comments: const <ReviewComment>[],
+      ),
+    );
+  }
 
   Future<void> pumpComparison(WidgetTester tester, Size size) async {
     await tester.binding.setSurfaceSize(size);
@@ -80,6 +97,67 @@ void main() {
     expect(find.byKey(ReviewDirectionSummary.cardKey('a')), findsOneWidget);
     expect(find.byKey(ReviewDirectionSummary.cardKey('c')), findsNothing);
     expect(find.byKey(ReviewDirectionSummary.cardKey('b')), findsNothing);
+  });
+
+  testWidgets('restored selection seeds the compact preview', (tester) async {
+    // Default direction 'a' is deliberately not the first declared direction.
+    runtime = buildRuntime(directionIds: const ['c', 'a', 'b']);
+    controller = controllerWith('c');
+
+    await pumpComparison(tester, const Size(400, 800));
+
+    expect(find.byKey(ReviewDirectionSummary.cardKey('c')), findsOneWidget);
+    expect(find.byKey(ReviewDirectionSummary.cardKey('a')), findsNothing);
+  });
+
+  testWidgets('runtime default is used only when no selection exists',
+      (tester) async {
+    runtime = buildRuntime(directionIds: const ['c', 'a', 'b']);
+    controller = controllerWith(null);
+
+    await pumpComparison(tester, const Size(400, 800));
+
+    expect(find.byKey(ReviewDirectionSummary.cardKey('a')), findsOneWidget);
+    expect(find.byKey(ReviewDirectionSummary.cardKey('c')), findsNothing);
+    expect(controller.state.selectedDirection, isNull);
+  });
+
+  testWidgets('a selection restored after the first build seeds the preview',
+      (tester) async {
+    runtime = buildRuntime(directionIds: const ['c', 'a', 'b']);
+    controller = controllerWith(null);
+
+    await pumpComparison(tester, const Size(400, 800));
+    expect(find.byKey(ReviewDirectionSummary.cardKey('a')), findsOneWidget);
+
+    await controller.selectDirection('c');
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(ReviewDirectionSummary.cardKey('c')), findsOneWidget);
+    expect(find.byKey(ReviewDirectionSummary.cardKey('a')), findsNothing);
+  });
+
+  testWidgets('a user preview wins over a later selection and never selects',
+      (tester) async {
+    await pumpComparison(tester, const Size(400, 800));
+
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(ReviewComparisonLayout.switcherKey),
+        matching: find.text('B'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(controller.state.selectedDirection, isNull);
+    expect(find.byKey(ReviewDirectionSummary.cardKey('b')), findsOneWidget);
+
+    await controller.selectDirection('c');
+    await tester.pumpAndSettle();
+
+    expect(controller.state.selectedDirection, 'c');
+    expect(find.byKey(ReviewDirectionSummary.cardKey('b')), findsOneWidget);
+    expect(find.byKey(ReviewDirectionSummary.cardKey('c')), findsNothing);
   });
 
   testWidgets('works with a two-direction runtime', (tester) async {

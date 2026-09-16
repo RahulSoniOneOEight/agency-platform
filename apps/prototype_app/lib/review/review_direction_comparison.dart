@@ -4,6 +4,7 @@ import '../runtime/prototype_runtime.dart';
 import 'review_comparison_layout.dart';
 import 'review_controller.dart';
 import 'review_direction_summary.dart';
+import 'review_preview.dart';
 
 /// Neutral comparison surface for the runtime's actual client directions.
 ///
@@ -30,14 +31,45 @@ class ReviewDirectionComparison extends StatefulWidget {
 
 class _ReviewDirectionComparisonState extends State<ReviewDirectionComparison> {
   late int _activeIndex;
+  bool _userPreviewed = false;
 
   @override
   void initState() {
     super.initState();
-    final index = widget.runtime.allowedDirections.indexOf(
-      widget.runtime.defaultDirection,
+    _activeIndex = _previewIndex();
+    widget.controller.addListener(_handleControllerChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_handleControllerChanged);
+    super.dispose();
+  }
+
+  int _previewIndex() {
+    final direction = resolvePreviewDirection(
+      widget.runtime,
+      widget.controller.state,
     );
-    _activeIndex = index < 0 ? 0 : index;
+    final index = widget.runtime.allowedDirections.indexOf(direction);
+    return index < 0 ? 0 : index;
+  }
+
+  void _handleControllerChanged() {
+    if (_userPreviewed) {
+      return;
+    }
+    final index = _previewIndex();
+    if (index != _activeIndex) {
+      setState(() => _activeIndex = index);
+    }
+  }
+
+  void _previewDirection(int index) {
+    setState(() {
+      _userPreviewed = true;
+      _activeIndex = index;
+    });
   }
 
   @override
@@ -87,8 +119,7 @@ class _ReviewDirectionComparisonState extends State<ReviewDirectionComparison> {
               child: ReviewComparisonLayout(
                 panels: panels,
                 activeIndex: _activeIndex,
-                onActiveIndexChanged: (index) =>
-                    setState(() => _activeIndex = index),
+                onActiveIndexChanged: _previewDirection,
                 allowModeToggle: true,
               ),
             ),

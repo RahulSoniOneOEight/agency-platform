@@ -7,6 +7,7 @@ import 'package:prototype_app/review/review_comparison_host.dart';
 import 'package:prototype_app/review/review_comparison_layout.dart';
 import 'package:prototype_app/review/review_controller.dart';
 import 'package:prototype_app/review/review_screen_comparison.dart';
+import 'package:prototype_app/review/review_state.dart';
 import 'package:prototype_app/runtime/prototype_runtime.dart';
 
 import '../support/runtime_fixtures.dart';
@@ -44,6 +45,22 @@ void main() {
       repository: MemoryReviewRepository(),
     );
   });
+
+  ReviewController controllerWith(String? selectedDirection) {
+    return ReviewController(
+      clientId: runtime.clientId,
+      repository: MemoryReviewRepository(),
+      initialState: ReviewState(
+        version: ReviewState.currentVersion,
+        clientId: runtime.clientId,
+        reviewRound: 1,
+        status: ReviewStatus.inReview,
+        selectedDirection: selectedDirection,
+        screenSelections: const <String, String>{},
+        comments: const <ReviewComment>[],
+      ),
+    );
+  }
 
   Future<void> pumpSurface(WidgetTester tester, Size size) async {
     await tester.binding.setSurfaceSize(size);
@@ -135,6 +152,63 @@ void main() {
     expect(find.byKey(ReviewComparisonLayout.switcherKey), findsOneWidget);
     expect(find.byKey(ReviewComparisonLayout.panelKey('a')), findsOneWidget);
     expect(find.byKey(ReviewComparisonLayout.panelKey('b')), findsNothing);
+    expect(find.byKey(ReviewComparisonLayout.panelKey('c')), findsNothing);
+  });
+
+  testWidgets('restored selection seeds the compact preview', (tester) async {
+    controller = controllerWith('c');
+
+    await pumpSurface(tester, const Size(400, 800));
+
+    expect(find.byKey(ReviewComparisonLayout.panelKey('c')), findsOneWidget);
+    expect(find.byKey(ReviewComparisonLayout.panelKey('a')), findsNothing);
+  });
+
+  testWidgets('runtime default is used only when no selection exists',
+      (tester) async {
+    controller = controllerWith(null);
+
+    await pumpSurface(tester, const Size(400, 800));
+
+    expect(find.byKey(ReviewComparisonLayout.panelKey('a')), findsOneWidget);
+    expect(find.byKey(ReviewComparisonLayout.panelKey('c')), findsNothing);
+    expect(controller.state.selectedDirection, isNull);
+  });
+
+  testWidgets('a selection restored after the first build seeds the preview',
+      (tester) async {
+    controller = controllerWith(null);
+
+    await pumpSurface(tester, const Size(400, 800));
+    expect(find.byKey(ReviewComparisonLayout.panelKey('a')), findsOneWidget);
+
+    await controller.selectDirection('c');
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(ReviewComparisonLayout.panelKey('c')), findsOneWidget);
+    expect(find.byKey(ReviewComparisonLayout.panelKey('a')), findsNothing);
+  });
+
+  testWidgets('a user preview wins over a later selection and never selects',
+      (tester) async {
+    await pumpSurface(tester, const Size(400, 800));
+
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(ReviewComparisonLayout.switcherKey),
+        matching: find.text('B'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(controller.state.selectedDirection, isNull);
+    expect(find.byKey(ReviewComparisonLayout.panelKey('b')), findsOneWidget);
+
+    await controller.selectDirection('c');
+    await tester.pumpAndSettle();
+
+    expect(controller.state.selectedDirection, 'c');
+    expect(find.byKey(ReviewComparisonLayout.panelKey('b')), findsOneWidget);
     expect(find.byKey(ReviewComparisonLayout.panelKey('c')), findsNothing);
   });
 

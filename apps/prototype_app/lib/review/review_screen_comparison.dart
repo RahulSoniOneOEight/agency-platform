@@ -5,6 +5,7 @@ import '../runtime/prototype_runtime.dart';
 import 'review_comparison_host.dart';
 import 'review_comparison_layout.dart';
 import 'review_controller.dart';
+import 'review_preview.dart';
 import 'review_screen_availability.dart';
 
 /// Comparison surface for the same governed screen across runtime directions.
@@ -41,14 +42,46 @@ class ReviewScreenComparison extends StatefulWidget {
 class _ReviewScreenComparisonState extends State<ReviewScreenComparison> {
   late String _screenId;
   late int _activeIndex;
+  bool _userPreviewed = false;
 
   @override
   void initState() {
     super.initState();
     _screenId = ReviewScreenAvailability.screens(widget.runtime).first;
-    final index =
-        widget.runtime.allowedDirections.indexOf(widget.runtime.defaultDirection);
-    _activeIndex = index < 0 ? 0 : index;
+    _activeIndex = _previewIndex();
+    widget.controller.addListener(_handleControllerChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_handleControllerChanged);
+    super.dispose();
+  }
+
+  int _previewIndex() {
+    final direction = resolvePreviewDirection(
+      widget.runtime,
+      widget.controller.state,
+    );
+    final index = widget.runtime.allowedDirections.indexOf(direction);
+    return index < 0 ? 0 : index;
+  }
+
+  void _handleControllerChanged() {
+    if (_userPreviewed) {
+      return;
+    }
+    final index = _previewIndex();
+    if (index != _activeIndex) {
+      setState(() => _activeIndex = index);
+    }
+  }
+
+  void _previewDirection(int index) {
+    setState(() {
+      _userPreviewed = true;
+      _activeIndex = index;
+    });
   }
 
   @override
@@ -107,8 +140,7 @@ class _ReviewScreenComparisonState extends State<ReviewScreenComparison> {
           child: ReviewComparisonLayout(
             panels: panels,
             activeIndex: _activeIndex,
-            onActiveIndexChanged: (index) =>
-                setState(() => _activeIndex = index),
+            onActiveIndexChanged: _previewDirection,
             allowModeToggle: true,
           ),
         ),
