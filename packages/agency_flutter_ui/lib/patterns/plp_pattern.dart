@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../domain/product_card.dart';
 import '../domain/product_models.dart';
 import '../foundation/agency_tokens.dart';
+import '../themes/agency_theme_tokens.dart';
 import '../primitives/agency_chip.dart';
 import 'pattern_shell.dart';
 
@@ -21,6 +22,7 @@ class PlpPattern extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = AgencyThemeTokens.of(context);
     return AgencyPatternShell(
       title: title,
       density: density,
@@ -34,11 +36,11 @@ class PlpPattern extends StatelessWidget {
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           itemCount: products.length,
-          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+          gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
             maxCrossAxisExtent: 280,
             mainAxisExtent: 290,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
+            crossAxisSpacing: tokens.tileGap,
+            mainAxisSpacing: tokens.tileGap,
           ),
           itemBuilder: (context, index) => ProductCard(
             product: products[index],

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../themes/agency_theme_tokens.dart';
 import '../primitives/agency_surface.dart';
 import 'price_display.dart';
 import 'product_models.dart';
@@ -11,11 +12,12 @@ class CartItemCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = AgencyThemeTokens.of(context);
     return AgencySurface(
       child: Row(
         children: [
           const SizedBox(width: 56, height: 56, child: Icon(Icons.shopping_bag_outlined)),
-          const SizedBox(width: 12),
+          SizedBox(width: tokens.tileGap),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

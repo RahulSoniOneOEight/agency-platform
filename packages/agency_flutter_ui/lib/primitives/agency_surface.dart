@@ -1,20 +1,22 @@
 import 'package:flutter/material.dart';
-import '../foundation/agency_tokens.dart';
+import '../themes/agency_theme_tokens.dart';
 
 class AgencySurface extends StatelessWidget {
   const AgencySurface({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.all(AgencyTokens.spaceMd),
+    this.padding,
   });
 
   final Widget child;
-  final EdgeInsetsGeometry padding;
+  final EdgeInsetsGeometry? padding;
 
   @override
   Widget build(BuildContext context) {
+    final resolvedPadding =
+        padding ?? EdgeInsets.all(AgencyThemeTokens.of(context).cardSpacing);
     return Card(
-      child: Padding(padding: padding, child: child),
+      child: Padding(padding: resolvedPadding, child: child),
     );
   }
 }

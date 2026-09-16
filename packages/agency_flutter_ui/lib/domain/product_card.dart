@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../foundation/agency_tokens.dart';
+import '../themes/agency_theme_tokens.dart';
 import '../primitives/agency_surface.dart';
 import 'price_display.dart';
 import 'product_models.dart';
@@ -22,14 +23,15 @@ class ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final gap = AgencyTokens.gapFor(density);
+    final tokens = AgencyThemeTokens.of(context);
+    final gap = tokens.tileGap;
     final imageHeight = variant == ProductCardVariant.compact ? 92.0 : 132.0;
     return Semantics(
       button: onTap != null,
       label: product.name,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(AgencyTokens.radiusMd),
+        borderRadius: BorderRadius.circular(tokens.cardRadius),
         child: AgencySurface(
           padding: EdgeInsets.all(gap),
           child: Column(
@@ -41,7 +43,7 @@ class ProductCard extends StatelessWidget {
                 width: double.infinity,
                 decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(AgencyTokens.radiusSm),
+                  borderRadius: BorderRadius.circular(tokens.controlRadius),
                 ),
                 child: Icon(Icons.inventory_2_outlined,
                     size: 42, color: Theme.of(context).colorScheme.onSurfaceVariant),

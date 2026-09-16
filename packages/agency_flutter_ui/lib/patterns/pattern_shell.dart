@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../foundation/agency_tokens.dart';
+import '../themes/agency_theme_tokens.dart';
 
 class AgencyPatternShell extends StatelessWidget {
   const AgencyPatternShell({
@@ -17,19 +18,19 @@ class AgencyPatternShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final gap = AgencyTokens.gapFor(density);
+    final tokens = AgencyThemeTokens.of(context);
     return ListView(
-      padding: EdgeInsets.all(gap),
+      padding: EdgeInsets.all(tokens.cardSpacing),
       children: [
         Text(title, style: Theme.of(context).textTheme.headlineSmall),
         if (subtitle != null) ...[
-          const SizedBox(height: 4),
+          SizedBox(height: tokens.tileGap),
           Text(subtitle!, style: Theme.of(context).textTheme.bodyMedium),
         ],
-        SizedBox(height: gap),
+        SizedBox(height: tokens.sectionSpacing),
         for (var i = 0; i < children.length; i++) ...[
           children[i],
-          if (i != children.length - 1) SizedBox(height: gap),
+          if (i != children.length - 1) SizedBox(height: tokens.sectionSpacing),
         ],
       ],
     );

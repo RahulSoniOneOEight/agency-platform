@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../foundation/agency_tokens.dart';
+import '../themes/agency_theme_tokens.dart';
 
 class PromoTile extends StatelessWidget {
   const PromoTile({
@@ -17,19 +17,20 @@ class PromoTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = AgencyThemeTokens.of(context);
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(AgencyTokens.radiusLg),
+      borderRadius: BorderRadius.circular(tokens.cardRadius),
       child: Container(
-        padding: const EdgeInsets.all(AgencyTokens.spaceLg),
+        padding: EdgeInsets.all(tokens.cardSpacing),
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.secondaryContainer,
-          borderRadius: BorderRadius.circular(AgencyTokens.radiusLg),
+          borderRadius: BorderRadius.circular(tokens.cardRadius),
         ),
         child: Row(
           children: [
             Icon(icon, size: 36),
-            const SizedBox(width: 16),
+            SizedBox(width: tokens.tileGap),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

@@ -18,6 +18,7 @@ void main() {
   testWidgets('agency button renders label and callback', (tester) async {
     var tapped = false;
     await tester.pumpWidget(MaterialApp(
+      theme: AgencyTheme.lightDefault(),
       home: Scaffold(
         body: AgencyButton(label: 'Continue', onPressed: () => tapped = true),
       ),
