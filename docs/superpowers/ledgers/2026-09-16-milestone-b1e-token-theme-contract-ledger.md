@@ -124,6 +124,9 @@
   from the allowlist); it may set approved spacing/radius/size/typography-emphasis paths only.
 - **R12 — visual_character.** `visual_character` is validated metadata in v1 (approved enum) with no
   semantic token mapping yet; `brand_to_semantic_overrides` intentionally ignores it.
+- **R14 — Material-derived roles.** Flutter derives un-tokenized Material roles (containers/tones)
+  from the resolved `color.primary` via `ColorScheme.fromSeed`, then overrides the explicit semantic
+  roles. Tokenizing every Material role is out of B.1E scope; explicit semantic roles are governed.
 - **R13 — direction_themes.** The bundle's `theme` is the resolved base (preset + brand, preset
   density). `direction_themes` carries a fully resolved theme for every declared direction (that
   direction's canonical density + allowlisted `theme_overrides`). Flutter selects
@@ -138,7 +141,7 @@
 | 2 | Theme presets + reference resolver | ACCEPTED | `5a19267` + `7f7dc9a` |
 | 3 | Client brand + direction overrides | ACCEPTED | `927bbe5` + `4ac25bf` |
 | 4 | Runtime bundle integration | ACCEPTED | `ddae18a` + `d4e62dc` |
-| 5 | Flutter ThemeData + AgencyThemeTokens | PENDING | — |
+| 5 | Flutter ThemeData + AgencyThemeTokens | ACCEPTED | `9dc5daf` + `4545b6d` |
 | 6 | High-value UI migration | PENDING | — |
 | 7 | Repository validation + CI freshness | PENDING | — |
 | 8 | Docs + full verification + PR | PENDING | — |
@@ -171,3 +174,10 @@
   Deferred to Task 7: wire `validate_direction_theme_overrides` into strategic direction validation;
   dedupe `validate_repo` freshness against `check_resolved_bundles_fresh`; consider orphan-bundle
   detection. Also Task 8: update `docs/client-runtime.md` seed-color reference.
+- 2026-09-16 — Task 5 implemented (`9dc5daf`): `AgencyResolvedTheme` (strict `fromJson`),
+  `AgencyThemeTokens` ThemeExtension, `AgencyTheme.light(resolved)` + explicit agency default,
+  `RuntimeTheme` alias, `PrototypeRuntime` parses `theme`/`direction_themes` + `themeForDirection`,
+  app themes with the active direction theme; seed-color authority removed. Review found no blockers;
+  corrections `4545b6d`: strict integral numbers, expose `overlayElevation`/`iconSize`, governed
+  input error/disabled borders, added parser/theme-switch tests. 33 package + 63 app + 1 widgetbook
+  tests green. ACCEPTED. Known limitation recorded as R14.
