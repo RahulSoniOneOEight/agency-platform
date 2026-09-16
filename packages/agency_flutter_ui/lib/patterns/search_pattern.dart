@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import '../domain/product_card.dart';
+
 import '../domain/product_models.dart';
-import '../primitives/agency_search_field.dart';
-import '../themes/agency_theme_tokens.dart';
-import 'pattern_shell.dart';
+import '../sections/commerce_sections.dart';
+import '../sections/pattern_section.dart';
 
 class SearchPattern extends StatelessWidget {
   const SearchPattern({super.key, required this.products, this.hintText = 'Search products'});
@@ -13,20 +12,8 @@ class SearchPattern extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = AgencyThemeTokens.of(context);
-    return AgencyPatternShell(
-      title: 'Search',
-      children: [
-        AgencySearchField(hintText: hintText),
-        Wrap(
-          spacing: tokens.tileGap,
-          runSpacing: tokens.tileGap,
-          children: products
-              .take(6)
-              .map((p) => SizedBox(width: 220, child: ProductCard(product: p, variant: ProductCardVariant.compact)))
-              .toList(),
-        ),
-      ],
+    return buildPatternComposition(
+      searchComposition(products: products, hintText: hintText),
     );
   }
 }

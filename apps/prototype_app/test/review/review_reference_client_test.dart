@@ -12,6 +12,8 @@ import 'package:prototype_app/review/review_controller.dart';
 import 'package:prototype_app/review/review_direction_comparison.dart';
 import 'package:prototype_app/review/review_screen_availability.dart';
 import 'package:prototype_app/review/review_screen_comparison.dart';
+import 'package:prototype_app/review/review_section_compatibility.dart';
+import 'package:prototype_app/review/review_section_registry.dart';
 import 'package:prototype_app/runtime/prototype_runtime.dart';
 
 /// Loads the committed reference-client bundle exactly as the app does.
@@ -266,6 +268,72 @@ void main() {
           reason: 'missing real direction name for $id',
         );
       }
+    });
+  });
+
+  group('reference client · section availability and compatibility', () {
+    ReviewSectionCompatibilityResult evaluate({
+      required String screenId,
+      required String sectionId,
+      required String source,
+      String base = 'a',
+    }) {
+      return ReviewSectionCompatibility.evaluate(
+        runtime: runtime,
+        screenId: screenId,
+        sectionId: sectionId,
+        sourceDirectionId: source,
+        baseDirectionId: base,
+      );
+    }
+
+    test('governed sections exist for the composed reference screens', () {
+      expect(
+        ReviewSectionRegistry.sectionsForScreen('commerce.plp').map((d) => d.id),
+        contains('plp.product-grid'),
+      );
+      expect(
+        ReviewSectionRegistry.sectionsForScreen('commerce.pdp').map((d) => d.id),
+        contains('pdp.price'),
+      );
+    });
+
+    test('plp.product-grid mixes from c into a base a (both declare plp)', () {
+      final result = evaluate(
+        screenId: 'commerce.plp',
+        sectionId: 'plp.product-grid',
+        source: 'c',
+      );
+      expect(result.allowed, isTrue);
+    });
+
+    test('pdp.price mixes from c into a base a (both declare pdp)', () {
+      final result = evaluate(
+        screenId: 'commerce.pdp',
+        sectionId: 'pdp.price',
+        source: 'c',
+      );
+      expect(result.allowed, isTrue);
+    });
+
+    test('plp.product-grid is unavailable from b (b does not declare plp)', () {
+      final result = evaluate(
+        screenId: 'commerce.plp',
+        sectionId: 'plp.product-grid',
+        source: 'b',
+      );
+      expect(result.allowed, isFalse);
+      expect(result.reason, 'Not present in Direction B');
+    });
+
+    test('search.search-field is unavailable from c (c lacks search-field)', () {
+      final result = evaluate(
+        screenId: 'commerce.search',
+        sectionId: 'search.search-field',
+        source: 'c',
+      );
+      expect(result.allowed, isFalse);
+      expect(result.reason, 'Not present in Direction C');
     });
   });
 }
