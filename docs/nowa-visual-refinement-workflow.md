@@ -46,7 +46,10 @@ Do not start a visual session until every item below is true. This is the pre-No
    intend to touch. Never begin visual edits on top of unknown or half-finished changes.
 2. **The correct client/direction runtime bundle is generated.** The bundle at
    `apps/prototype_app/assets/generated/<client-id>.json` matches the client and directions you
-   are about to preview.
+   are about to preview. Regenerate it with:
+   ```bash
+   python -m tooling.design_contract.generate_resolved_themes --write
+   ```
 3. **B.1D Flutter bindings are fresh.**
    ```bash
    python -m tooling.design_contract.generate_flutter_bindings --check
@@ -130,6 +133,16 @@ are exactly the six below.
 | `reusable_candidate` | Potentially valuable across multiple clients or patterns. | Propose promotion into B.1E semantic tokens, the Design Contract, shared Flutter UI, or a reusable preset. |
 | `implementation_detail` | Legitimate local Flutter implementation detail that does not represent reusable/client semantic intent. | Keep in Flutter code; document only when material. |
 | `reject` | Change bypasses architecture, duplicates an existing contract, introduces unsupported one-off styling, or cannot be justified. | Revert or replace with governed implementation. |
+
+Allowed statuses are exactly the five below:
+
+| Status | Meaning |
+|--------|---------|
+| `observed` | Noted during the session; not yet decided. |
+| `accepted` | Client/operator accepted the visual change. |
+| `reconciled` | Represented in governed repository code/config. |
+| `proposed` | Raised as a governed promotion candidate (for example a reusable token or Design Contract change). |
+| `rejected` | Deliberately not retained. |
 
 ## Reconciliation checklist
 
