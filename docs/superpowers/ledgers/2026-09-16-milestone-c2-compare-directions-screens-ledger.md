@@ -63,7 +63,7 @@
 | 5 | Screen comparison surface + shell wiring | ACCEPTED | `e546b87` |
 | 6 | Restored selection seeds preview | ACCEPTED | `2127b36` |
 | 7 | Reference-client + architecture regressions | ACCEPTED | `52d4741` |
-| 8 | Full verification + final review + PR | IN_PROGRESS | — |
+| 8 | Full verification + final review + PR | ACCEPTED | `7c2e04a` · PR #18 |
 
 ## Progress log
 
@@ -108,6 +108,15 @@
   declared only by `a`, not `a`/`b`; direction themes share one brand primary and differ in
   density/section/radius). Independent review: no blockers/majors; applied test-quality minors.
   22/22 focused; 209 review tests green; analyze clean. ACCEPTED.
+- 2026-09-16 — Task 8 complete. Full verification: `flutter test test/review` 211; `flutter test`
+  (prototype_app) 274; analyze clean (prototype_app + agency_flutter_ui + widgetbook); agency_flutter_ui
+  42 tests; widgetbook 1 test; `flutter build web` built; Python 283 unittest + validate_repo (98 paths)
+  + knowledge/workflow/prototype validators passed; B.1D/B.1E freshness fresh. Final independent
+  whole-branch review: MERGE-READY, 0 blockers / 0 majors. Branch pushed; PR #18 opened against `main`
+  (not merged). ACCEPTED.
+- FINAL: R1-R7 recorded; model-routing deviation R4 (only explore/general subagents available; fresh
+  `general` implementer + reviewer per task + final whole-branch review). Known pre-existing
+  `HomePattern`/`PlpPattern` overflow deferred to a shared-UI/visual-QA fix.
 - 2026-09-16 — Task 2 implemented (`0e9441d`, 13 tests): `ReviewScreenAvailability` thin adapter
   (`orderedDirections` = runtime order; `screens` = sorted union delegated to `ReviewScreenRegistry`;
   `isSupported` from `direction.patterns`, unknown → false; `labelFor` delegates). Independent review
