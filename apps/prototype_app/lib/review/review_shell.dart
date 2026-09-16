@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../fixtures/fixture_repository.dart';
 import '../runtime/prototype_runtime.dart';
+import 'review_actor.dart';
 import 'review_comments.dart';
 import 'review_controller.dart';
+import 'review_coordinator.dart';
 import 'review_direction_comparison.dart';
 import 'review_overview.dart';
 import 'review_screen_comparison.dart';
@@ -24,11 +26,15 @@ class ReviewShell extends StatefulWidget {
     super.key,
     required this.runtime,
     required this.controller,
+    required this.coordinator,
+    required this.actor,
     this.onOpenPrototype,
   });
 
   final PrototypeRuntime runtime;
   final ReviewController controller;
+  final ReviewCoordinator coordinator;
+  final ReviewActor actor;
 
   /// Optional exit path back to normal prototype mode.
   final VoidCallback? onOpenPrototype;
@@ -134,7 +140,12 @@ class _ReviewShellState extends State<ReviewShell> {
           fixtures: _fixtures,
         ),
       _ =>
-        ReviewComments(runtime: widget.runtime, controller: widget.controller),
+        ReviewComments(
+          runtime: widget.runtime,
+          controller: widget.controller,
+          coordinator: widget.coordinator,
+          actor: widget.actor,
+        ),
     };
   }
 }

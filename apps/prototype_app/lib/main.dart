@@ -4,8 +4,11 @@ import 'package:agency_flutter_ui/agency_flutter_ui.dart';
 import 'package:flutter/material.dart';
 
 import 'prototype_app.dart';
+import 'review/memory_feedback_repository.dart';
 import 'review/memory_review_repository.dart';
+import 'review/review_actor.dart';
 import 'review/review_controller.dart';
+import 'review/review_coordinator.dart';
 import 'review/review_route.dart';
 import 'review/review_shell.dart';
 import 'runtime/prototype_runtime.dart';
@@ -16,6 +19,16 @@ import 'screens/runtime_error_screen.dart';
 /// Local/demo convenience default. This is a declared default, not a fallback
 /// for invalid explicit client IDs, and it is never applied to Review Mode.
 const String kDefaultClientId = 'prototype-demo';
+
+/// The local reviewer identity used by the standalone Review Mode shell.
+///
+/// A real deployment supplies reviewer/approver identities from its own
+/// identity layer; the prototype composition root uses one explicit default.
+const ReviewActor kLocalReviewer = ReviewActor(
+  id: 'reviewer-local',
+  name: 'Local Reviewer',
+  role: ReviewRole.reviewer,
+);
 
 void main() {
   runApp(const PrototypeBootstrap());
@@ -40,6 +53,7 @@ class _PrototypeBootstrapState extends State<PrototypeBootstrap> {
   RuntimeException? _routeError;
   String? _requestedDirection;
   ReviewController? _reviewController;
+  ReviewCoordinator? _reviewCoordinator;
   bool _showPrototype = false;
 
   @override
@@ -95,6 +109,20 @@ class _PrototypeBootstrapState extends State<PrototypeBootstrap> {
     return controller;
   }
 
+  /// Composition root for C.4 feedback storage, chosen here and never in the UI.
+  ReviewCoordinator _coordinatorFor(ReviewController controller) {
+    final existing = _reviewCoordinator;
+    if (existing != null) {
+      return existing;
+    }
+    final coordinator = ReviewCoordinator(
+      controller: controller,
+      feedbackRepository: MemoryFeedbackRepository(),
+    );
+    _reviewCoordinator = coordinator;
+    return coordinator;
+  }
+
   @override
   Widget build(BuildContext context) {
     final routeError = _routeError;
@@ -123,10 +151,13 @@ class _PrototypeBootstrapState extends State<PrototypeBootstrap> {
         }
         final runtime = snapshot.requireData;
         if (_route.isReviewMode && !_showPrototype) {
+          final controller = _controllerFor(runtime);
           return _shell(
             ReviewShell(
               runtime: runtime,
-              controller: _controllerFor(runtime),
+              controller: controller,
+              coordinator: _coordinatorFor(controller),
+              actor: kLocalReviewer,
               onOpenPrototype: () => setState(() => _showPrototype = true),
             ),
           );

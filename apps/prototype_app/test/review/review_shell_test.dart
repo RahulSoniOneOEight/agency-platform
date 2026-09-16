@@ -1,15 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:prototype_app/review/memory_feedback_repository.dart';
 import 'package:prototype_app/review/memory_review_repository.dart';
+import 'package:prototype_app/review/review_actor.dart';
 import 'package:prototype_app/review/review_comparison_host.dart';
 import 'package:prototype_app/review/review_comparison_layout.dart';
 import 'package:prototype_app/review/review_controller.dart';
+import 'package:prototype_app/review/review_coordinator.dart';
 import 'package:prototype_app/review/review_direction_summary.dart';
 import 'package:prototype_app/review/review_selection.dart';
 import 'package:prototype_app/review/review_shell.dart';
 import 'package:prototype_app/runtime/prototype_runtime.dart';
 
 import '../support/runtime_fixtures.dart';
+
+const ReviewActor _reviewer = ReviewActor(
+  id: 'reviewer-1',
+  name: 'Reviewer',
+  role: ReviewRole.reviewer,
+);
 
 /// Reference runtime with three directions and multiple governed patterns, so
 /// the shell has real directions and a real governed screen registry to expose.
@@ -44,7 +53,15 @@ ReviewController buildController(PrototypeRuntime runtime) => ReviewController(
     );
 
 Widget wrap(PrototypeRuntime runtime, ReviewController controller) => MaterialApp(
-      home: ReviewShell(runtime: runtime, controller: controller),
+      home: ReviewShell(
+        runtime: runtime,
+        controller: controller,
+        coordinator: ReviewCoordinator(
+          controller: controller,
+          feedbackRepository: MemoryFeedbackRepository(),
+        ),
+        actor: _reviewer,
+      ),
     );
 
 Future<void> tapDestination(WidgetTester tester, String label) async {
