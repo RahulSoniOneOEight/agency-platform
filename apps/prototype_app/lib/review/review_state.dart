@@ -97,15 +97,16 @@ final class ReviewComment {
 }
 
 final class ReviewState {
-  const ReviewState({
+  ReviewState({
     required this.version,
     required this.clientId,
     required this.reviewRound,
     required this.status,
     required this.selectedDirection,
-    required this.screenSelections,
-    required this.comments,
-  });
+    required Map<String, String> screenSelections,
+    required List<ReviewComment> comments,
+  })  : screenSelections = Map<String, String>.unmodifiable(screenSelections),
+        comments = List<ReviewComment>.unmodifiable(comments);
 
   static const int currentVersion = 1;
 
@@ -133,6 +134,9 @@ final class ReviewState {
     final statusValue = json['status'];
     if (statusValue is! String) {
       throw const FormatException('Missing review state status');
+    }
+    if (!json.containsKey('selected_direction')) {
+      throw const FormatException('Missing review state selected_direction');
     }
     final selectedDirection = json['selected_direction'];
     if (selectedDirection != null && selectedDirection is! String) {

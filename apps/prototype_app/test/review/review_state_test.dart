@@ -210,5 +210,49 @@ void main() {
         throwsFormatException,
       );
     });
+
+    test('requires the selected_direction key to be present', () {
+      final missing = canonicalStateJson()..remove('selected_direction');
+
+      expect(() => ReviewState.fromJson(missing), throwsFormatException);
+    });
+
+    test('wraps constructor collections so state stays immutable', () {
+      final selections = <String, String>{'home': 'a'};
+      final comments = <ReviewComment>[
+        const ReviewComment(
+          id: 'c1',
+          scope: ReviewCommentScope.general,
+          text: 'x',
+        ),
+      ];
+      final state = ReviewState(
+        version: 1,
+        clientId: 'prototype-demo',
+        reviewRound: 1,
+        status: ReviewStatus.inReview,
+        selectedDirection: null,
+        screenSelections: selections,
+        comments: comments,
+      );
+
+      expect(
+        () => state.screenSelections['home'] = 'b',
+        throwsUnsupportedError,
+      );
+      expect(
+        () => state.comments.add(
+          const ReviewComment(
+            id: 'c2',
+            scope: ReviewCommentScope.general,
+            text: 'y',
+          ),
+        ),
+        throwsUnsupportedError,
+      );
+
+      selections['home'] = 'b';
+      expect(state.screenSelections['home'], 'a');
+    });
   });
 }
