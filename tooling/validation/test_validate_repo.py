@@ -6,6 +6,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import yaml
+
 
 ROOT = Path(__file__).resolve().parents[2]
 VALIDATOR_PATH = Path(__file__).with_name("validate_repo.py")
@@ -135,9 +137,51 @@ class ValidatorContractTests(unittest.TestCase):
                 json.dumps(bundle, indent=2, sort_keys=True) + "\n", encoding="utf-8"
             )
 
-            errors = validator.generated_runtime_bundle_errors(root)
+            errors = validator.theme_contract_errors(root)
 
         self.assertTrue(any("stale" in error for error in errors), errors)
+
+    def test_current_repository_theme_contract_is_valid(self):
+        validator = self.load_validator()
+        self.assertEqual([], validator.theme_contract_errors(ROOT))
+
+    def test_b1e_theme_paths_are_required(self):
+        validator = self.load_validator()
+        for path in (
+            "design-contract/schema/foundation-tokens.schema.json",
+            "design-contract/schema/semantic-tokens.schema.json",
+            "design-contract/schema/theme-preset.schema.json",
+            "design-contract/tokens/foundation.yaml",
+            "design-contract/tokens/semantic.yaml",
+            "design-contract/themes/premium-modern.yaml",
+            "tooling/design_contract/theme_contract.py",
+            "tooling/design_contract/generate_resolved_themes.py",
+            "tooling/validation/test_theme_contract.py",
+            "apps/prototype_app/lib/runtime/runtime_theme.dart",
+            "packages/agency_flutter_ui/lib/themes/agency_theme_tokens.dart",
+        ):
+            self.assertIn(path, validator.REQUIRED_PATHS)
+
+    def test_invalid_direction_theme_override_is_reported(self):
+        validator = self.load_validator()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            direction_dir = root / "client-projects" / "acme" / "directions"
+            direction_dir.mkdir(parents=True)
+            (direction_dir / "direction-a.yaml").write_text(
+                yaml.safe_dump(
+                    {
+                        "id": "a",
+                        "theme_overrides": {"ProductCard": {"padding": 8}},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            errors = validator.theme_contract_errors(root)
+
+        self.assertTrue(any("theme_overrides" in error for error in errors), errors)
+        self.assertEqual(sorted(errors), errors)
 
 
 if __name__ == "__main__":
