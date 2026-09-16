@@ -136,4 +136,34 @@ void main() {
     expect(find.textContaining('Overall direction: Not selected'), findsOneWidget);
     expect(find.textContaining('Overall direction: A'), findsNothing);
   });
+
+  testWidgets('a direction query parameter does not select a review direction',
+      (tester) async {
+    await tester.pumpWidget(
+      PrototypeBootstrap(
+        uri: Uri.parse(
+          'https://example.test/review?client=prototype-demo&direction=b',
+        ),
+        loadRuntime: _loader(<String>[]),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ReviewShell), findsOneWidget);
+    expect(find.textContaining('Overall direction: Not selected'), findsOneWidget);
+    expect(find.textContaining('Overall direction: B'), findsNothing);
+  });
+
+  testWidgets('an empty review client is rejected governedly', (tester) async {
+    await tester.pumpWidget(
+      PrototypeBootstrap(
+        uri: Uri.parse('https://example.test/review?client='),
+        loadRuntime: _loader(<String>[]),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(RuntimeErrorScreen), findsOneWidget);
+    expect(find.byType(ReviewShell), findsNothing);
+  });
 }

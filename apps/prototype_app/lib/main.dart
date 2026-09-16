@@ -2,6 +2,8 @@ import 'package:agency_flutter_ui/agency_flutter_ui.dart';
 import 'package:flutter/material.dart';
 
 import 'prototype_app.dart';
+import 'review/memory_review_repository.dart';
+import 'review/review_controller.dart';
 import 'review/review_route.dart';
 import 'review/review_shell.dart';
 import 'runtime/prototype_runtime.dart';
@@ -35,6 +37,7 @@ class _PrototypeBootstrapState extends State<PrototypeBootstrap> {
   late final Future<PrototypeRuntime>? _runtime;
   RuntimeException? _routeError;
   String? _requestedDirection;
+  ReviewController? _reviewController;
 
   @override
   void initState() {
@@ -54,11 +57,28 @@ class _PrototypeBootstrapState extends State<PrototypeBootstrap> {
       return;
     }
 
-    _requestedDirection = uri.queryParameters['direction'];
+    // `?direction=` only ever influences normal prototype mode; Review Mode
+    // starts with no selected direction.
+    _requestedDirection =
+        _route.isReviewMode ? null : uri.queryParameters['direction'];
     final clientId =
         _route.isReviewMode ? reviewClientId! : (_route.clientId ?? kDefaultClientId);
     final loader = widget.loadRuntime ?? RuntimeLoader.loadClient;
     _runtime = loader(clientId);
+  }
+
+  @override
+  void dispose() {
+    _reviewController?.dispose();
+    super.dispose();
+  }
+
+  /// Composition root: Review Mode storage is chosen here, never in the UI.
+  ReviewController _controllerFor(PrototypeRuntime runtime) {
+    return _reviewController ??= ReviewController(
+      clientId: runtime.clientId,
+      repository: MemoryReviewRepository(),
+    );
   }
 
   @override
@@ -89,7 +109,9 @@ class _PrototypeBootstrapState extends State<PrototypeBootstrap> {
         }
         final runtime = snapshot.requireData;
         if (_route.isReviewMode) {
-          return _shell(ReviewShell(runtime: runtime));
+          return _shell(
+            ReviewShell(runtime: runtime, controller: _controllerFor(runtime)),
+          );
         }
         final requested = _requestedDirection;
         return PrototypeApp(
