@@ -6,6 +6,7 @@ import 'review_controller.dart';
 import 'review_directions.dart';
 import 'review_overview.dart';
 import 'review_screens.dart';
+import 'review_selection.dart';
 import 'review_state.dart';
 
 /// Width at or above which the review destinations are presented as a rail.
@@ -121,7 +122,7 @@ class _ReviewShellState extends State<ReviewShell> {
       0 => ReviewOverview(runtime: widget.runtime, controller: widget.controller),
       1 => ReviewDirections(runtime: widget.runtime, controller: widget.controller),
       2 => ReviewScreens(runtime: widget.runtime, fixtures: _fixtures),
-      3 => _SelectionSummary(controller: widget.controller),
+      3 => ReviewSelection(runtime: widget.runtime, controller: widget.controller),
       _ => _CommentsSummary(controller: widget.controller),
     };
   }
@@ -133,43 +134,6 @@ class _ReviewDestination {
   final String label;
   final IconData icon;
   final IconData selectedIcon;
-}
-
-/// Real read-only selection summary from the controller state.
-///
-/// The interactive overall selection and per-screen mix editors are added by the
-/// next task; this destination is a genuine summary rather than a placeholder.
-class _SelectionSummary extends StatelessWidget {
-  const _SelectionSummary({required this.controller});
-
-  final ReviewController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: controller,
-      builder: (context, _) {
-        final state = controller.state;
-        final selections = state.screenSelections.entries.toList()
-          ..sort((a, b) => a.key.compareTo(b.key));
-        return ListView(
-          padding: const EdgeInsets.all(24),
-          children: [
-            Text('Overall selection', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 12),
-            Text('Overall direction: ${state.selectedDirection ?? 'Not selected'}'),
-            const SizedBox(height: 8),
-            Text('Mixed screens: ${selections.length}'),
-            const SizedBox(height: 12),
-            if (selections.isEmpty)
-              const Text('No screens mixed yet.')
-            else
-              for (final entry in selections) Text('${entry.key} → ${entry.value}'),
-          ],
-        );
-      },
-    );
-  }
 }
 
 /// Real read-only comments summary from the controller state.
