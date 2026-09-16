@@ -114,6 +114,15 @@ Initial deterministic fixture packs cover:
 - grocery/FMCG
 - services/booking
 
+## Token + theme layer
+
+`design-contract/tokens/` holds foundation and semantic token contracts; `design-contract/themes/`
+holds approved reusable theme presets. The theme compiler
+(`tooling/design_contract/theme_contract.py`) resolves foundation → semantic defaults → theme preset
+→ client brand overrides → direction overrides into a deterministic, fully resolved theme carried by
+the runtime bundle (`theme` + `direction_themes`). Flutter consumes it through `ThemeData` plus an
+`AgencyThemeTokens` extension. See `docs/token-theme-contract.md`.
+
 ## Pattern registry
 
 Canonical runtime pattern IDs come from `design-contract/patterns/` and are preserved

@@ -46,15 +46,21 @@ Each bundle is one self-contained JSON document:
     }
   },
   "fixtures": {"products": [], "services": []},
-  "theme": {"seed_color": "#6750A4"},
+  "theme": {"version": 1, "color": {}, "typography": {}, "spacing": {}, "radius": {},
+            "elevation": {}, "size": {}, "density": {}, "motion": {}, "breakpoints": {}},
+  "direction_themes": {"a": {"version": 1, "color": {}, "...": {}}},
   "resources": {},
   "review": {"query_parameter": "direction", "allowed_directions": ["a", "b"]}
 }
 ```
 
 - Direction fields use the B.1A canonical runtime contract. Density vocabulary
-  is `compact | normal | spacious`; the Flutter app maps these to its internal
-  `AgencyDensity` values.
+  is `compact | normal | spacious`.
+- `theme` is a fully resolved, versioned theme compiled by the B.1E token/theme
+  compiler (see `docs/token-theme-contract.md`). It contains resolved values
+  only: no unresolved `{foundation...}` references and no inheritance logic.
+- `direction_themes` carries a fully resolved theme per direction; the app
+  selects `direction_themes[id] ?? theme`.
 - `patterns` and `components` are canonical Design Contract IDs, copied
   unchanged. Generation never rewrites them to Flutter implementation keys.
 - `resources` carries canonical B.1C bindings keyed by semantic IDs such as

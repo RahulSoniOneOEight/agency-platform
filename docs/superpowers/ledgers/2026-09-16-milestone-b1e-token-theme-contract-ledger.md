@@ -143,7 +143,7 @@
 | 4 | Runtime bundle integration | ACCEPTED | `ddae18a` + `d4e62dc` |
 | 5 | Flutter ThemeData + AgencyThemeTokens | ACCEPTED | `9dc5daf` + `4545b6d` |
 | 6 | High-value UI migration | ACCEPTED | `0931fa3` + `a7892f3` |
-| 7 | Repository validation + CI freshness | PENDING | — |
+| 7 | Repository validation + CI freshness | ACCEPTED | `3a12ca4` + `4ed59b0` |
 | 8 | Docs + full verification + PR | PENDING | — |
 
 ## Progress log
@@ -187,3 +187,8 @@
   corrections `a7892f3`: PDP + search/trade/rfq/booking/quote/credit spacing migrated, button
   min-width fix, `inlineSpacing`/`controlSpacing` exposed, PlpPattern density test. 42 package +
   63 app + 1 widgetbook tests green. ACCEPTED.
+- 2026-09-16 — Task 7 implemented (`3a12ca4`): `theme_contract_errors` wires token catalogs,
+  presets, resolved-bundle freshness, and direction theme-override allowlists into
+  `validate_repo.py`; freshness single-sourced; CI runs `test_theme_contract`; required paths
+  extended. Review found no blockers; corrections `4ed59b0`: docstring, `.yml` direction scan,
+  all approved presets required, test rename. 246 tests green. ACCEPTED.
