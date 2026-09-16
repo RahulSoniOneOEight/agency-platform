@@ -468,9 +468,10 @@ void main() {
       'selected_direction',
       'screen_selections',
       'comments',
+      'feedback_ids',
     };
 
-    test('toJson emits exactly the canonical seven keys and round-trips', () {
+    test('toJson emits exactly the canonical eight keys and round-trips', () {
       final state = ReviewState.fromJson({
         'version': 1,
         'client_id': 'prototype-demo',
@@ -487,7 +488,7 @@ void main() {
       expect(ReviewState.fromJson(state.toJson()), equals(state));
     });
 
-    test('canonical v2 decisions keep the seven-key contract and round-trip', () {
+    test('canonical v2 decisions keep the eight-key contract and round-trip', () {
       final state = ReviewState.fromJson({
         'version': 2,
         'client_id': 'prototype-demo',

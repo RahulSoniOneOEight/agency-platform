@@ -206,6 +206,7 @@ void main() {
         'selected_direction',
         'screen_selections',
         'comments',
+        'feedback_ids',
       }),
     );
 

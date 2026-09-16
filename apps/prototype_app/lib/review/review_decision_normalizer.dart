@@ -85,7 +85,8 @@ ReviewState normalizeReviewDecisions(
     );
   }
 
-  // Rule 4: everything except the normalized screen selections is preserved.
+  // Rule 4: everything except the normalized screen selections is preserved,
+  // including stable feedback references.
   return ReviewState(
     version: ReviewState.currentVersion,
     clientId: state.clientId,
@@ -94,5 +95,6 @@ ReviewState normalizeReviewDecisions(
     selectedDirection: selectedDirection,
     screenSelections: normalizedScreens,
     comments: state.comments,
+    feedbackIds: state.feedbackIds,
   );
 }

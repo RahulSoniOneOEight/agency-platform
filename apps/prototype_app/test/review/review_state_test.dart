@@ -10,6 +10,7 @@ Map<String, dynamic> canonicalStateJson({
   Object? selectedDirection,
   Map<String, dynamic>? screenSelections,
   List<dynamic>? comments,
+  List<dynamic>? feedbackIds,
 }) {
   return {
     'version': version,
@@ -19,6 +20,7 @@ Map<String, dynamic> canonicalStateJson({
     'selected_direction': selectedDirection,
     'screen_selections': screenSelections ?? {'home': 'a'},
     'comments': comments ?? const [],
+    if (feedbackIds != null) 'feedback_ids': feedbackIds,
   };
 }
 
@@ -71,6 +73,7 @@ void main() {
             'text': 'Prefer the quieter visual hierarchy.',
           }
         ],
+        'feedback_ids': <String>[],
       });
       expect(ReviewState.fromJson(state.toJson()), state);
     });
@@ -156,7 +159,56 @@ void main() {
           'selected_direction',
           'screen_selections',
           'comments',
+          'feedback_ids',
         },
+      );
+    });
+
+    test('defaults feedback_ids to empty when absent in legacy v2 state', () {
+      final state = ReviewState.fromJson(
+        canonicalStateJson(version: 2, screenSelections: const <String, dynamic>{}),
+      );
+      expect(state.feedbackIds, isEmpty);
+      expect(state.toJson()['feedback_ids'], <String>[]);
+    });
+
+    test('round-trips feedback references in order', () {
+      final state = ReviewState.fromJson(canonicalStateJson(
+        version: 2,
+        screenSelections: const <String, dynamic>{},
+        feedbackIds: ['feedback-2', 'feedback-1'],
+      ));
+
+      expect(state.feedbackIds, ['feedback-2', 'feedback-1']);
+      expect(state.toJson()['feedback_ids'], ['feedback-2', 'feedback-1']);
+      expect(ReviewState.fromJson(state.toJson()), state);
+    });
+
+    test('rejects malformed feedback_ids structurally', () {
+      expect(
+        () => ReviewState.fromJson(canonicalStateJson(
+          version: 2,
+          screenSelections: const <String, dynamic>{},
+          feedbackIds: ['feedback-1', 2],
+        )),
+        throwsFormatException,
+      );
+      expect(
+        () => ReviewState.fromJson(canonicalStateJson(
+          version: 2,
+          screenSelections: const <String, dynamic>{},
+          feedbackIds: ['feedback-1', '  '],
+        )),
+        throwsFormatException,
+      );
+      final malformedType = canonicalStateJson(
+        version: 2,
+        screenSelections: const <String, dynamic>{},
+      );
+      malformedType['feedback_ids'] = 'feedback-1';
+      expect(
+        () => ReviewState.fromJson(malformedType),
+        throwsFormatException,
       );
     });
 
@@ -238,6 +290,7 @@ void main() {
           text: 'x',
         ),
       ];
+      final feedbackIds = <String>['feedback-1'];
       final state = ReviewState(
         version: ReviewState.currentVersion,
         clientId: 'prototype-demo',
@@ -246,6 +299,7 @@ void main() {
         selectedDirection: null,
         screenSelections: selections,
         comments: comments,
+        feedbackIds: feedbackIds,
       );
 
       expect(
@@ -262,9 +316,16 @@ void main() {
         ),
         throwsUnsupportedError,
       );
+      expect(
+        () => state.feedbackIds.add('feedback-2'),
+        throwsUnsupportedError,
+      );
 
       selections['home'] = ReviewScreenDecision(direction: 'b');
       expect(state.screenSelections['home']!.direction, 'a');
+
+      feedbackIds.add('feedback-2');
+      expect(state.feedbackIds, ['feedback-1']);
     });
   });
 }

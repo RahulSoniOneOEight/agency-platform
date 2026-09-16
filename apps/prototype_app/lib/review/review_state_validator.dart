@@ -130,6 +130,21 @@ List<String> validateReviewState(
     }
   }
 
+  final seenFeedbackIds = <String>{};
+  final duplicateFeedbackIds = <String>{};
+  for (final id in state.feedbackIds) {
+    if (id.trim().isEmpty) {
+      errors.add('invalid feedback id: $id');
+      continue;
+    }
+    if (!seenFeedbackIds.add(id)) {
+      duplicateFeedbackIds.add(id);
+    }
+  }
+  for (final id in duplicateFeedbackIds) {
+    errors.add('duplicate feedback id: $id');
+  }
+
   final unique = errors.toSet().toList()..sort();
   return unique;
 }

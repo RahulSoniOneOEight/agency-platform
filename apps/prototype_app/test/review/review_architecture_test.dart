@@ -7,9 +7,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:prototype_app/fixtures/fixture_repository.dart';
 import 'package:prototype_app/prototype_app.dart';
 import 'package:prototype_app/registry/prototype_registry.dart';
+import 'package:prototype_app/review/memory_feedback_repository.dart';
 import 'package:prototype_app/review/memory_review_repository.dart';
+import 'package:prototype_app/review/review_actor.dart';
 import 'package:prototype_app/review/review_comparison_host.dart';
 import 'package:prototype_app/review/review_controller.dart';
+import 'package:prototype_app/review/review_coordinator.dart';
 import 'package:prototype_app/review/review_screen_registry.dart';
 import 'package:prototype_app/review/review_shell.dart';
 import 'package:prototype_app/review/review_state.dart';
@@ -17,6 +20,12 @@ import 'package:prototype_app/runtime/prototype_runtime.dart';
 import 'package:prototype_app/screens/prototype_shell.dart';
 
 import '../support/runtime_fixtures.dart';
+
+const ReviewActor _reviewer = ReviewActor(
+  id: 'reviewer-1',
+  name: 'Reviewer',
+  role: ReviewRole.reviewer,
+);
 
 /// Keys that belong to the review-state contract. They must never appear inside
 /// the B.1B runtime bundle input (review state is separate from the runtime).
@@ -29,6 +38,7 @@ const Set<String> _reviewStateKeys = {
   'selected_direction',
   'screen_selections',
   'comments',
+  'feedback_ids',
   'direction',
   'sections',
 };
@@ -378,7 +388,17 @@ void main() {
       );
 
       await tester.pumpWidget(
-        MaterialApp(home: ReviewShell(runtime: runtime, controller: controller)),
+        MaterialApp(
+          home: ReviewShell(
+            runtime: runtime,
+            controller: controller,
+            coordinator: ReviewCoordinator(
+              controller: controller,
+              feedbackRepository: MemoryFeedbackRepository(),
+            ),
+            actor: _reviewer,
+          ),
+        ),
       );
       await tester.pumpAndSettle();
 
