@@ -2,13 +2,15 @@ import 'package:agency_flutter_ui/agency_flutter_ui.dart';
 import 'package:flutter/material.dart';
 
 import 'prototype_app.dart';
+import 'review/review_route.dart';
+import 'review/review_shell.dart';
 import 'runtime/prototype_runtime.dart';
 import 'runtime/runtime_exception.dart';
 import 'runtime/runtime_loader.dart';
 import 'screens/runtime_error_screen.dart';
 
 /// Local/demo convenience default. This is a declared default, not a fallback
-/// for invalid explicit client IDs.
+/// for invalid explicit client IDs, and it is never applied to Review Mode.
 const String kDefaultClientId = 'prototype-demo';
 
 void main() {
@@ -16,27 +18,56 @@ void main() {
 }
 
 class PrototypeBootstrap extends StatefulWidget {
-  const PrototypeBootstrap({super.key});
+  const PrototypeBootstrap({super.key, this.uri, this.loadRuntime});
+
+  /// Overrides `Uri.base` in tests. Review Mode is detected from this URI.
+  final Uri? uri;
+
+  /// Overrides `RuntimeLoader.loadClient` in tests. Both modes share one load.
+  final Future<PrototypeRuntime> Function(String clientId)? loadRuntime;
 
   @override
   State<PrototypeBootstrap> createState() => _PrototypeBootstrapState();
 }
 
 class _PrototypeBootstrapState extends State<PrototypeBootstrap> {
-  late final String _requestedDirection;
-  late final Future<PrototypeRuntime> _runtime;
+  late final ReviewRouteRequest _route;
+  late final Future<PrototypeRuntime>? _runtime;
+  RuntimeException? _routeError;
+  String? _requestedDirection;
 
   @override
   void initState() {
     super.initState();
-    final parameters = Uri.base.queryParameters;
-    _requestedDirection = parameters['direction'] ?? '';
-    final clientId = parameters['client'] ?? kDefaultClientId;
-    _runtime = RuntimeLoader.loadClient(clientId);
+    final uri = widget.uri ?? Uri.base;
+    _route = parseReviewRoute(uri);
+
+    final reviewClientId = _route.clientId;
+    if (_route.isReviewMode &&
+        (reviewClientId == null || reviewClientId.trim().isEmpty)) {
+      _routeError = const RuntimeException(
+        code: RuntimeException.clientNotFound,
+        message:
+            'Review Mode requires an explicit client id (use /review?client=<id>).',
+      );
+      _runtime = null;
+      return;
+    }
+
+    _requestedDirection = uri.queryParameters['direction'];
+    final clientId =
+        _route.isReviewMode ? reviewClientId! : (_route.clientId ?? kDefaultClientId);
+    final loader = widget.loadRuntime ?? RuntimeLoader.loadClient;
+    _runtime = loader(clientId);
   }
 
   @override
   Widget build(BuildContext context) {
+    final routeError = _routeError;
+    if (routeError != null) {
+      return _shell(RuntimeErrorScreen(error: routeError));
+    }
+
     return FutureBuilder<PrototypeRuntime>(
       future: _runtime,
       builder: (context, snapshot) {
@@ -56,9 +87,14 @@ class _PrototypeBootstrapState extends State<PrototypeBootstrap> {
             ),
           );
         }
+        final runtime = snapshot.requireData;
+        if (_route.isReviewMode) {
+          return _shell(ReviewShell(runtime: runtime));
+        }
+        final requested = _requestedDirection;
         return PrototypeApp(
-          runtime: snapshot.requireData,
-          requestedDirection: _requestedDirection.isEmpty ? null : _requestedDirection,
+          runtime: runtime,
+          requestedDirection: (requested == null || requested.isEmpty) ? null : requested,
         );
       },
     );
