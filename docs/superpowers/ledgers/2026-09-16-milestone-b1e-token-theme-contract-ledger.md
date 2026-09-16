@@ -142,7 +142,7 @@
 | 3 | Client brand + direction overrides | ACCEPTED | `927bbe5` + `4ac25bf` |
 | 4 | Runtime bundle integration | ACCEPTED | `ddae18a` + `d4e62dc` |
 | 5 | Flutter ThemeData + AgencyThemeTokens | ACCEPTED | `9dc5daf` + `4545b6d` |
-| 6 | High-value UI migration | PENDING | — |
+| 6 | High-value UI migration | ACCEPTED | `0931fa3` + `a7892f3` |
 | 7 | Repository validation + CI freshness | PENDING | — |
 | 8 | Docs + full verification + PR | PENDING | — |
 
@@ -181,3 +181,9 @@
   corrections `4545b6d`: strict integral numbers, expose `overlayElevation`/`iconSize`, governed
   input error/disabled borders, added parser/theme-switch tests. 33 package + 63 app + 1 widgetbook
   tests green. ACCEPTED. Known limitation recorded as R14.
+- 2026-09-16 — Task 6 implemented (`0931fa3`): high-value primitives/domain/patterns read
+  `AgencyThemeTokens.of(context)` / `Theme.of(context)`; semantic migration tests added. Review found
+  one Major (PDP detail still hard-coded radius 16 / spacing) and button width regression;
+  corrections `a7892f3`: PDP + search/trade/rfq/booking/quote/credit spacing migrated, button
+  min-width fix, `inlineSpacing`/`controlSpacing` exposed, PlpPattern density test. 42 package +
+  63 app + 1 widgetbook tests green. ACCEPTED.
