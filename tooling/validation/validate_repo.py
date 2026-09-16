@@ -104,6 +104,7 @@ REQUIRED_PATHS = (
     "tooling/design_contract/theme_contract.py",
     "tooling/design_contract/generate_resolved_themes.py",
     "tooling/validation/test_theme_contract.py",
+    "packages/agency_flutter_ui/lib/themes/generated_agency_default_theme.dart",
     "apps/prototype_app/lib/runtime/runtime_theme.dart",
     "packages/agency_flutter_ui/lib/themes/agency_theme_tokens.dart",
     "design-contract/bindings/flutter",

@@ -16,7 +16,10 @@ from tooling.design_contract.flutter_bindings import (
     runtime_binding_errors,
 )
 from tooling.design_contract.generate_resolved_themes import (
+    check_default_theme_fresh,
     check_resolved_bundles_fresh,
+    render_default_theme_dart,
+    write_default_theme,
     write_resolved_bundles,
 )
 from tooling.design_contract.theme_contract import CANONICAL_GROUPS, resolve_theme
@@ -1072,6 +1075,27 @@ class ResolvedThemeBundleTests(unittest.TestCase):
         errors = validate_runtime_bundle(bundle)
 
         self.assertTrue(any("direction_themes.z" in error for error in errors), errors)
+
+    def test_default_theme_projection_is_deterministic_and_fresh(self):
+        first = render_default_theme_dart(ROOT)
+        second = render_default_theme_dart(ROOT)
+
+        self.assertEqual(first, second)
+        self.assertNotIn("\r", first)
+        self.assertTrue(first.endswith("\n"))
+        self.assertFalse(first.endswith("\n\n"))
+        self.assertEqual([], check_default_theme_fresh(ROOT))
+
+    def test_stale_default_theme_is_reported(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _copy_theme_contract(root)
+            generated = write_default_theme(root)
+            self.assertEqual([], check_default_theme_fresh(root))
+
+            generated.write_bytes(generated.read_bytes() + b"\n")
+
+            self.assertTrue(check_default_theme_fresh(root))
 
     def test_resolved_bundle_freshness_detects_stale(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -7,12 +7,20 @@ from pathlib import Path
 
 import yaml
 
+from tooling.design_contract.theme_contract import resolve_default_theme
 from tooling.prototype.build_runtime_bundle import (
     build_runtime_bundle,
     compose_runtime_bundle,
 )
 
 OUTPUT_RELATIVE = Path("apps") / "prototype_app" / "assets" / "generated"
+DEFAULT_THEME_RELATIVE = (
+    Path("packages")
+    / "agency_flutter_ui"
+    / "lib"
+    / "themes"
+    / "generated_agency_default_theme.dart"
+)
 
 
 def client_manifests(root: Path) -> list[Path]:
@@ -33,9 +41,50 @@ def _client_id(manifest_path: Path) -> str | None:
     return client_id if isinstance(client_id, str) and client_id else None
 
 
+def render_default_theme_dart(root: Path) -> str:
+    """Render the deterministic Dart agency default resolved theme."""
+    payload = json.dumps(
+        resolve_default_theme(root), indent=2, sort_keys=True, allow_nan=False
+    )
+    return (
+        "// GENERATED FILE. DO NOT EDIT.\n"
+        "// Source: design-contract/tokens/{foundation,semantic}.yaml\n"
+        "\n"
+        "const String agencyDefaultResolvedThemeJson = r'''\n"
+        + payload
+        + "\n''';\n"
+    )
+
+
+def write_default_theme(root: Path) -> Path:
+    """Write the generated Dart agency default resolved theme and return its path."""
+    path = root / DEFAULT_THEME_RELATIVE
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(render_default_theme_dart(root), encoding="utf-8", newline="\n")
+    return path
+
+
+def check_default_theme_fresh(root: Path) -> list[str]:
+    """Return a deterministic error list when the default theme projection is not fresh."""
+    relative = DEFAULT_THEME_RELATIVE.as_posix()
+    path = root / DEFAULT_THEME_RELATIVE
+    if not path.exists():
+        return [f"{relative}: generated agency default theme is missing"]
+    try:
+        expected = render_default_theme_dart(root).encode("utf-8")
+    except (OSError, UnicodeError, ValueError) as exc:
+        return [f"{relative}: cannot render agency default theme: {exc}"]
+    if path.read_bytes() != expected:
+        return [
+            f"{relative}: generated agency default theme is stale; regenerate with "
+            "python -m tooling.design_contract.generate_resolved_themes --write"
+        ]
+    return []
+
+
 def write_resolved_bundles(root: Path) -> list[Path]:
-    """Regenerate every checked client runtime bundle from source."""
-    written: list[Path] = []
+    """Regenerate every checked client runtime bundle and the default theme."""
+    written: list[Path] = [write_default_theme(root)]
     for manifest_path in client_manifests(root):
         client_dir = manifest_path.parent.parent
         written.append(build_runtime_bundle(root, client_dir, root / OUTPUT_RELATIVE))
@@ -74,6 +123,7 @@ def check_resolved_bundles_fresh(root: Path) -> list[str]:
                 "python -m tooling.design_contract.generate_resolved_themes --write"
             )
 
+    errors.extend(check_default_theme_fresh(root))
     return sorted(set(errors))
 
 

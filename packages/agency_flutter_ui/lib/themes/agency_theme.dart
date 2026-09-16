@@ -1,68 +1,21 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import 'agency_theme_tokens.dart';
+import 'generated_agency_default_theme.dart';
 
 /// The explicit agency default resolved theme.
 ///
-/// This mirrors the agency foundation + semantic token defaults resolved by the
-/// design-contract compiler. It is **not** a seed fallback: it exists only for
-/// tooling surfaces (Widgetbook) and the prototype app's loading/error shell.
-/// Valid B.1E runtime bundles must always supply their own resolved theme.
+/// This is the design-contract compiler's agency default theme, generated into
+/// `generated_agency_default_theme.dart` and freshness-checked in CI. It is
+/// **not** a seed fallback: it exists only for tooling surfaces (Widgetbook) and
+/// the prototype app's loading/error shell. Valid B.1E runtime bundles must
+/// always supply their own resolved theme.
 abstract final class AgencyThemeDefaults {
-  static const Map<String, Object?> _resolvedJson = <String, Object?>{
-    'version': 1,
-    'color': <String, Object?>{
-      'primary': '#2454FF',
-      'on_primary': '#FFFFFF',
-      'secondary': '#EF8A23',
-      'on_secondary': '#FFFFFF',
-      'surface': '#FFFFFF',
-      'surface_muted': '#F7F8FA',
-      'text_primary': '#16181D',
-      'text_secondary': '#626874',
-      'border': '#E4E6EB',
-      'error': '#D32F2F',
-      'on_error': '#FFFFFF',
-    },
-    'typography': <String, Object?>{
-      'font_family': 'Inter',
-      'font_fallback': 'Roboto',
-      'display': 40,
-      'headline': 32,
-      'title': 22,
-      'body': 15,
-      'label': 13,
-      'line_height_body': 1.5,
-      'weight_regular': 400,
-      'weight_emphasis': 700,
-      'heading_emphasis': 'normal',
-    },
-    'spacing': <String, Object?>{
-      'inline': 8,
-      'control': 12,
-      'card': 16,
-      'tile': 12,
-      'section': 32,
-    },
-    'radius': <String, Object?>{'control': 12, 'card': 20},
-    'elevation': <String, Object?>{'card': 1, 'overlay': 4},
-    'size': <String, Object?>{
-      'control_height': 44,
-      'control_height_compact': 36,
-      'icon': 20,
-    },
-    'density': <String, Object?>{'default': 'normal'},
-    'motion': <String, Object?>{
-      'fast_ms': 150,
-      'normal_ms': 250,
-      'slow_ms': 400,
-      'easing': 'ease-out',
-    },
-    'breakpoints': <String, Object?>{'mobile': 0, 'tablet': 768, 'desktop': 1200},
-  };
-
-  static final AgencyResolvedTheme resolved =
-      AgencyResolvedTheme.fromJson(_resolvedJson);
+  static final AgencyResolvedTheme resolved = AgencyResolvedTheme.fromJson(
+    jsonDecode(agencyDefaultResolvedThemeJson) as Map<String, Object?>,
+  );
 }
 
 /// Builds Material 3 [ThemeData] from a resolved agency theme.

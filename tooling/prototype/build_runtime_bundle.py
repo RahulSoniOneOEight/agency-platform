@@ -69,6 +69,12 @@ def _compile_theme_layers(
         raise _invalid("manifest theme.preset must be an approved preset id")
     preset_id = theme_config["preset"]
     brand = _load_brand_visual(client_dir)
+    brand_preset = brand.get("preset")
+    if isinstance(brand_preset, str) and brand_preset and brand_preset != preset_id:
+        raise _invalid(
+            f"brand input visual.preset {brand_preset!r} does not match manifest "
+            f"theme.preset {preset_id!r}"
+        )
     strategic = _load_strategic_directions(client_dir)
 
     try:

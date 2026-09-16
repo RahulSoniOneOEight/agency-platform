@@ -364,6 +364,11 @@ def _validate_semantic_value(
             return [f"{path}: density must be one of compact, normal, spacious"]
         return []
 
+    if group == "typography" and key == "heading_emphasis":
+        if value not in ("normal", "strong"):
+            return [f"{path}: heading_emphasis must be one of normal, strong"]
+        return []
+
     numeric_leaves = _NUMERIC_LEAVES.get(group, ())
     if numeric_leaves is None or key in numeric_leaves:
         if isinstance(value, bool) or not isinstance(value, (int, float)):
@@ -807,4 +812,24 @@ def resolve_theme(
     if semantic_errors:
         raise ValueError("; ".join(sorted(semantic_errors)))
 
+    return _sorted_deep_copy(resolved)
+
+
+def resolve_default_theme(root: Path) -> dict:
+    """Resolve the agency semantic defaults (no preset) — the agency default theme."""
+    catalog_errors = validate_token_catalogs(root)
+    if catalog_errors:
+        raise ValueError("invalid token catalogs: " + "; ".join(sorted(catalog_errors)))
+
+    foundation = load_foundation_tokens(root)
+    semantic = load_semantic_tokens(root)
+    theme = copy.deepcopy(semantic)
+    theme.pop("version", None)
+    resolved, reference_errors = _resolve_theme_values(theme, foundation)
+    if reference_errors:
+        raise ValueError("; ".join(sorted(set(reference_errors))))
+    resolved["version"] = 1
+    semantic_errors = _validate_semantic(resolved)
+    if semantic_errors:
+        raise ValueError("; ".join(sorted(semantic_errors)))
     return _sorted_deep_copy(resolved)

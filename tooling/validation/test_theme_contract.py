@@ -13,6 +13,7 @@ from tooling.design_contract.theme_contract import (
     load_foundation_tokens,
     load_semantic_tokens,
     load_theme_presets,
+    resolve_default_theme,
     resolve_theme,
     validate_client_brand_visual,
     validate_direction_theme_overrides,
@@ -341,6 +342,32 @@ class SemanticValidationTests(unittest.TestCase):
         errors = validate_token_catalogs(_root_with(semantic=semantic))
 
         self.assertTrue(_has_error(errors, "semantic.color.primary"), errors)
+
+
+def _walk_strings(value):
+    if isinstance(value, dict):
+        for item in value.values():
+            yield from _walk_strings(item)
+    elif isinstance(value, list):
+        for item in value:
+            yield from _walk_strings(item)
+    elif isinstance(value, str):
+        yield value
+
+
+class DefaultThemeTests(unittest.TestCase):
+    def test_resolve_default_theme_is_fully_resolved(self):
+        theme = resolve_default_theme(ROOT)
+
+        self.assertEqual(1, theme["version"])
+        self.assertEqual(
+            sorted(CANONICAL_GROUPS),
+            sorted(key for key in theme if key != "version"),
+        )
+        self.assertFalse(
+            [value for value in _walk_strings(theme) if "{foundation." in value]
+        )
+        self.assertEqual("normal", theme["density"]["default"])
 
 
 class StrictnessTests(unittest.TestCase):
