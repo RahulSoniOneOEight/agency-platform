@@ -30,15 +30,25 @@ List<String> validateReviewState(
 
   for (final entry in state.screenSelections.entries) {
     final screenId = entry.key;
-    final directionId = entry.value;
+    final decision = entry.value;
     if (!screenIds.contains(screenId)) {
       errors.add('unknown screen id: $screenId');
       continue;
     }
-    if (!directionIds.contains(directionId)) {
+    final screenDirection = decision.direction;
+    if (screenDirection != null && !directionIds.contains(screenDirection)) {
       errors.add(
-        'screen $screenId direction $directionId is not present in runtime directions',
+        'screen $screenId direction $screenDirection is not present in runtime directions',
       );
+    }
+    for (final section in decision.sections.entries) {
+      final sectionId = section.key;
+      final sectionDirection = section.value;
+      if (!directionIds.contains(sectionDirection)) {
+        errors.add(
+          'section $sectionId direction $sectionDirection is not present in runtime directions',
+        );
+      }
     }
   }
 

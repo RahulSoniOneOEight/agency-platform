@@ -3,7 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:prototype_app/direction/prototype_direction.dart';
 import 'package:prototype_app/review/memory_review_repository.dart';
 import 'package:prototype_app/review/review_controller.dart';
+import 'package:prototype_app/review/review_screen_decision.dart';
 import 'package:prototype_app/review/review_selection.dart';
+import 'package:prototype_app/review/review_state.dart';
 import 'package:prototype_app/runtime/prototype_runtime.dart';
 
 import '../support/runtime_fixtures.dart';
@@ -111,14 +113,16 @@ void main() {
       (tester) async {
     await controller.selectScreenDirection('commerce.home', 'a');
     await pumpSelection(tester);
-    expect(controller.state.screenSelections, {'commerce.home': 'a'});
+    expect(controller.state.screenSelections, {
+      'commerce.home': ReviewScreenDecision(direction: 'a'),
+    });
 
     final searchGroup = find.byKey(ReviewSelection.screenGroupKey('commerce.search'));
     await tester.tap(find.descendant(of: searchGroup, matching: find.text('C')));
     await tester.pumpAndSettle();
 
-    expect(controller.state.screenSelections['commerce.search'], 'c');
-    expect(controller.state.screenSelections['commerce.home'], 'a');
+    expect(controller.state.screenSelections['commerce.search']!.direction, 'c');
+    expect(controller.state.screenSelections['commerce.home']!.direction, 'a');
     expect(
       controller.state.screenSelections.keys.toSet(),
       {'commerce.home', 'commerce.search'},
@@ -126,8 +130,8 @@ void main() {
 
     final persisted = await repository.load('prototype-demo');
     expect(persisted, isNotNull);
-    expect(persisted!.screenSelections['commerce.search'], 'c');
-    expect(persisted.screenSelections['commerce.home'], 'a');
+    expect(persisted!.screenSelections['commerce.search']!.direction, 'c');
+    expect(persisted.screenSelections['commerce.home']!.direction, 'a');
   });
 
   testWidgets('clear selection resets overall direction but keeps the mix',
@@ -140,12 +144,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(controller.state.selectedDirection, isNull);
-    expect(controller.state.screenSelections['commerce.search'], 'c');
+    expect(controller.state.screenSelections['commerce.search']!.direction, 'c');
 
     final persisted = await repository.load('prototype-demo');
     expect(persisted, isNotNull);
     expect(persisted!.selectedDirection, isNull);
-    expect(persisted.screenSelections['commerce.search'], 'c');
+    expect(persisted.screenSelections['commerce.search']!.direction, 'c');
   });
 
   testWidgets('direction options come only from the runtime directions',
@@ -179,7 +183,7 @@ void main() {
     await tester.tap(find.descendant(of: searchGroup, matching: find.text('C')));
     await tester.pumpAndSettle();
 
-    expect(controller.state.screenSelections['commerce.search'], 'c');
+    expect(controller.state.screenSelections['commerce.search']!.direction, 'c');
     expect(runtime.directions.keys.toSet(), equals(patternsSnapshot.keys.toSet()));
     for (final id in patternsSnapshot.keys) {
       expect(identical(runtime.directions[id], instances[id]), isTrue);
@@ -197,10 +201,38 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(controller.state.screenSelections.containsKey('commerce.search'), isFalse);
-    expect(controller.state.screenSelections['commerce.home'], 'a');
+    expect(controller.state.screenSelections['commerce.home']!.direction, 'a');
     expect(
       (await repository.load('prototype-demo'))!.screenSelections.containsKey('commerce.search'),
       isFalse,
     );
+  });
+
+  testWidgets('renders a section-only decision without crashing', (tester) async {
+    // A canonical v2 screen may carry section overrides with no explicit screen
+    // direction (inherited). The selection UI must not force-unwrap a null
+    // direction.
+    controller = ReviewController(
+      clientId: runtime.clientId,
+      repository: repository,
+      initialState: ReviewState(
+        version: ReviewState.currentVersion,
+        clientId: runtime.clientId,
+        reviewRound: 1,
+        status: ReviewStatus.inReview,
+        selectedDirection: 'a',
+        screenSelections: {
+          'commerce.search': ReviewScreenDecision(
+            sections: const {'search.results-grid': 'b'},
+          ),
+        },
+        comments: const [],
+      ),
+    );
+
+    await pumpSelection(tester);
+
+    expect(tester.takeException(), isNull);
+    expect(controller.state.screenSelections['commerce.search']!.direction, isNull);
   });
 }

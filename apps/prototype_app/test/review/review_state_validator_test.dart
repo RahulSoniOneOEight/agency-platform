@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:prototype_app/review/review_screen_decision.dart';
 import 'package:prototype_app/review/review_state.dart';
 import 'package:prototype_app/review/review_state_validator.dart';
 import 'package:prototype_app/runtime/prototype_runtime.dart';
@@ -10,12 +11,12 @@ const Set<String> screenIds = {'home', 'search'};
 PrototypeRuntime buildRuntime() => PrototypeRuntime.fromMap(canonicalBundle());
 
 ReviewState validState({
-  int version = 1,
+  int version = ReviewState.currentVersion,
   String clientId = 'prototype-demo',
   int reviewRound = 1,
   ReviewStatus status = ReviewStatus.inReview,
   String? selectedDirection = 'a',
-  Map<String, String> screenSelections = const {'home': 'b'},
+  Map<String, ReviewScreenDecision>? screenSelections,
   List<ReviewComment> comments = const [],
 }) {
   return ReviewState(
@@ -24,7 +25,8 @@ ReviewState validState({
     reviewRound: reviewRound,
     status: status,
     selectedDirection: selectedDirection,
-    screenSelections: screenSelections,
+    screenSelections: screenSelections ??
+        {'home': ReviewScreenDecision(direction: 'b')},
     comments: comments,
   );
 }
@@ -46,8 +48,8 @@ void main() {
 
     test('reports an unsupported version', () {
       expect(
-        validateReviewState(validState(version: 2), runtime, screenIds: screenIds),
-        contains('unsupported review state version: 2'),
+        validateReviewState(validState(version: 3), runtime, screenIds: screenIds),
+        contains('unsupported review state version: 3'),
       );
     });
 
@@ -81,7 +83,9 @@ void main() {
     test('reports a screen mix direction missing from runtime directions', () {
       expect(
         validateReviewState(
-          validState(screenSelections: const {'home': 'Z'}),
+          validState(screenSelections: {
+            'home': ReviewScreenDecision(direction: 'Z'),
+          }),
           runtime,
           screenIds: screenIds,
         ),
@@ -89,14 +93,51 @@ void main() {
       );
     });
 
+    test('reports a section direction missing from runtime directions', () {
+      expect(
+        validateReviewState(
+          validState(screenSelections: {
+            'home': ReviewScreenDecision(
+              direction: 'a',
+              sections: const {'home.hero': 'Z'},
+            ),
+          }),
+          runtime,
+          screenIds: screenIds,
+        ),
+        contains('section home.hero direction Z is not present in runtime directions'),
+      );
+    });
+
     test('reports an unknown screen id from screen selections', () {
       expect(
         validateReviewState(
-          validState(screenSelections: const {'unknown': 'a'}),
+          validState(screenSelections: {
+            'unknown': ReviewScreenDecision(direction: 'a'),
+          }),
           runtime,
           screenIds: screenIds,
         ),
         contains('unknown screen id: unknown'),
+      );
+    });
+
+    test('skips further checks for an unknown screen id', () {
+      final errors = validateReviewState(
+        validState(screenSelections: {
+          'unknown': ReviewScreenDecision(
+            direction: 'Z',
+            sections: const {'unknown.hero': 'Y'},
+          ),
+        }),
+        runtime,
+        screenIds: screenIds,
+      );
+
+      expect(errors, contains('unknown screen id: unknown'));
+      expect(
+        errors.where((error) => error.contains('unknown.hero')),
+        isEmpty,
       );
     });
 
@@ -195,7 +236,13 @@ void main() {
         validateReviewState(
           validState(
             selectedDirection: 'b',
-            screenSelections: const {'home': 'a', 'search': 'b'},
+            screenSelections: {
+              'home': ReviewScreenDecision(
+                direction: 'a',
+                sections: const {'home.hero': 'b'},
+              ),
+              'search': ReviewScreenDecision(direction: 'b'),
+            },
             comments: const [
               ReviewComment(id: 'c1', scope: ReviewCommentScope.general, text: 'general'),
               ReviewComment(
@@ -216,12 +263,15 @@ void main() {
 
     test('returns a deterministic unique and sorted list for the plan example', () {
       final invalid = ReviewState(
-        version: 1,
+        version: ReviewState.currentVersion,
         clientId: 'prototype-demo',
         reviewRound: 0,
         status: ReviewStatus.inReview,
         selectedDirection: 'Z',
-        screenSelections: const {'home': 'a', 'unknown': 'b'},
+        screenSelections: {
+          'home': ReviewScreenDecision(direction: 'a'),
+          'unknown': ReviewScreenDecision(direction: 'b'),
+        },
         comments: const [
           ReviewComment(id: 'c1', scope: ReviewCommentScope.general, text: 'one'),
           ReviewComment(id: 'c1', scope: ReviewCommentScope.general, text: 'two'),
@@ -243,7 +293,9 @@ void main() {
 
     test('deduplicates repeated findings', () {
       final state = validState(
-        screenSelections: const {'unknown': 'a'},
+        screenSelections: {
+          'unknown': ReviewScreenDecision(direction: 'a'),
+        },
         comments: const [
           ReviewComment(
             id: 'c1',
@@ -264,13 +316,17 @@ void main() {
       final state = validState(
         reviewRound: 0,
         selectedDirection: 'Z',
-        screenSelections: const {'home': 'Z', 'unknown': 'b'},
+        screenSelections: {
+          'home': ReviewScreenDecision(direction: 'Z'),
+          'unknown': ReviewScreenDecision(direction: 'b'),
+        },
         comments: const [
           ReviewComment(id: 'c1', scope: ReviewCommentScope.general, text: '   '),
         ],
       );
       final directionsBefore = runtime.directions.keys.toList();
-      final selectionsBefore = Map<String, String>.from(state.screenSelections);
+      final selectionsBefore =
+          Map<String, ReviewScreenDecision>.from(state.screenSelections);
       final commentsBefore = List<ReviewComment>.from(state.comments);
 
       validateReviewState(state, runtime, screenIds: screenIds);

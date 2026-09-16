@@ -5,6 +5,7 @@ import 'package:prototype_app/review/review_comparison_layout.dart';
 import 'package:prototype_app/review/review_controller.dart';
 import 'package:prototype_app/review/review_direction_comparison.dart';
 import 'package:prototype_app/review/review_direction_summary.dart';
+import 'package:prototype_app/review/review_screen_decision.dart';
 import 'package:prototype_app/review/review_state.dart';
 import 'package:prototype_app/runtime/prototype_runtime.dart';
 
@@ -36,7 +37,7 @@ void main() {
         reviewRound: 1,
         status: ReviewStatus.inReview,
         selectedDirection: selectedDirection,
-        screenSelections: const <String, String>{},
+        screenSelections: const <String, ReviewScreenDecision>{},
         comments: const <ReviewComment>[],
       ),
     );

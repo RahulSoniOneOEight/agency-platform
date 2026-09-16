@@ -1,3 +1,5 @@
+import 'review_screen_decision.dart';
+
 enum ReviewStatus { inReview, needsRevision, readyForFinalReview }
 
 enum ReviewCommentScope { general, screen }
@@ -103,25 +105,29 @@ final class ReviewState {
     required this.reviewRound,
     required this.status,
     required this.selectedDirection,
-    required Map<String, String> screenSelections,
+    required Map<String, ReviewScreenDecision> screenSelections,
     required List<ReviewComment> comments,
-  })  : screenSelections = Map<String, String>.unmodifiable(screenSelections),
+  })  : screenSelections =
+            Map<String, ReviewScreenDecision>.unmodifiable(screenSelections),
         comments = List<ReviewComment>.unmodifiable(comments);
 
-  static const int currentVersion = 1;
+  static const int currentVersion = 2;
 
   final int version;
   final String clientId;
   final int reviewRound;
   final ReviewStatus status;
   final String? selectedDirection;
-  final Map<String, String> screenSelections;
+  final Map<String, ReviewScreenDecision> screenSelections;
   final List<ReviewComment> comments;
 
   factory ReviewState.fromJson(Map<String, dynamic> json) {
     final version = json['version'];
     if (version is! int) {
       throw const FormatException('Missing review state version');
+    }
+    if (version != 1 && version != currentVersion) {
+      throw FormatException('Unsupported review state version: $version');
     }
     final clientId = json['client_id'];
     if (clientId is! String || clientId.trim().isEmpty) {
@@ -146,14 +152,26 @@ final class ReviewState {
     if (rawSelections is! Map) {
       throw const FormatException('Missing review state screen_selections');
     }
-    final screenSelections = <String, String>{};
+    final screenSelections = <String, ReviewScreenDecision>{};
     for (final entry in rawSelections.entries) {
       final key = entry.key;
       final value = entry.value;
-      if (key is! String || value is! String) {
+      if (key is! String) {
         throw const FormatException('Invalid review state screen selection');
       }
-      screenSelections[key] = value;
+      if (version == 1) {
+        // Legacy C.1/C.2 shape: `screen -> direction` string.
+        if (value is! String || value.trim().isEmpty) {
+          throw const FormatException('Invalid review state screen selection');
+        }
+        screenSelections[key] = ReviewScreenDecision(direction: value);
+      } else {
+        if (value is! Map || value.keys.any((key) => key is! String)) {
+          throw const FormatException('Invalid review state screen selection');
+        }
+        screenSelections[key] =
+            ReviewScreenDecision.fromJson(value.cast<String, dynamic>());
+      }
     }
     final rawComments = json['comments'];
     if (rawComments is! List) {
@@ -167,26 +185,26 @@ final class ReviewState {
       comments.add(ReviewComment.fromJson(item.cast<String, dynamic>()));
     }
     return ReviewState(
-      version: version,
+      version: currentVersion,
       clientId: clientId,
       reviewRound: reviewRound,
       status: reviewStatusFromWire(statusValue),
       selectedDirection: selectedDirection as String?,
-      screenSelections: Map<String, String>.unmodifiable(screenSelections),
-      comments: List<ReviewComment>.unmodifiable(comments),
+      screenSelections: screenSelections,
+      comments: comments,
     );
   }
 
   Map<String, dynamic> toJson() {
     final sortedKeys = screenSelections.keys.toList()..sort();
     return {
-      'version': version,
+      'version': currentVersion,
       'client_id': clientId,
       'review_round': reviewRound,
       'status': reviewStatusToWire(status),
       'selected_direction': selectedDirection,
       'screen_selections': {
-        for (final key in sortedKeys) key: screenSelections[key],
+        for (final key in sortedKeys) key: screenSelections[key]!.toJson(),
       },
       'comments': [for (final comment in comments) comment.toJson()],
     };
@@ -221,7 +239,10 @@ final class ReviewState {
       );
 }
 
-bool _mapEquals(Map<String, String> a, Map<String, String> b) {
+bool _mapEquals(
+  Map<String, ReviewScreenDecision> a,
+  Map<String, ReviewScreenDecision> b,
+) {
   if (a.length != b.length) return false;
   for (final entry in a.entries) {
     if (b[entry.key] != entry.value) return false;

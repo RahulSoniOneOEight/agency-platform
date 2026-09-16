@@ -88,7 +88,7 @@ class ReviewSelection extends StatelessWidget {
                 const Text('No screens mixed yet.')
               else
                 for (final entry in sortedSelections)
-                  Text('${entry.key} → ${entry.value}'),
+                  Text('${entry.key} → ${entry.value.direction}'),
               const SizedBox(height: 12),
               for (final screenId in screenIds) ...[
                 Text(
@@ -106,7 +106,10 @@ class ReviewSelection extends StatelessWidget {
                       ),
                   ],
                   selected: state.screenSelections.containsKey(screenId)
-                      ? <String>{state.screenSelections[screenId]!}
+                      ? <String>{
+                          if (state.screenSelections[screenId]!.direction != null)
+                            state.screenSelections[screenId]!.direction!,
+                        }
                       : const <String>{},
                   emptySelectionAllowed: true,
                   showSelectedIcon: false,

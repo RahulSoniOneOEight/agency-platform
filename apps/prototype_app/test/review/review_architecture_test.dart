@@ -203,7 +203,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(controller.state.selectedDirection, 'b');
-      expect(controller.state.screenSelections['commerce.search'], 'c');
+      expect(controller.state.screenSelections['commerce.search']!.direction, 'c');
       expect(controller.state.reviewRound, 2);
 
       expect(runtime.directions.keys.toSet(), equals(directionsBefore.keys.toSet()));

@@ -4,6 +4,7 @@ import 'package:prototype_app/direction/prototype_direction.dart';
 import 'package:prototype_app/review/memory_review_repository.dart';
 import 'package:prototype_app/review/review_controller.dart';
 import 'package:prototype_app/review/review_overview.dart';
+import 'package:prototype_app/review/review_screen_decision.dart';
 import 'package:prototype_app/review/review_state.dart';
 import 'package:prototype_app/runtime/prototype_runtime.dart';
 
@@ -73,7 +74,9 @@ void main() {
 
       expect(controller.state.reviewRound, 2);
       expect(controller.state.selectedDirection, 'b');
-      expect(controller.state.screenSelections, {'commerce.search': 'c'});
+      expect(controller.state.screenSelections, {
+        'commerce.search': ReviewScreenDecision(direction: 'c'),
+      });
       expect(controller.state.comments.single.text, 'keep me');
       expect(controller.state.status, ReviewStatus.inReview);
       expect((await repository.load('prototype-demo'))!.reviewRound, 2);

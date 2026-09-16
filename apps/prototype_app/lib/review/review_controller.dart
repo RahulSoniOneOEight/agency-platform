@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import 'review_repository.dart';
+import 'review_screen_decision.dart';
 import 'review_state.dart';
 
 const Object _unset = Object();
@@ -22,7 +23,7 @@ final class ReviewController extends ChangeNotifier {
       reviewRound: 1,
       status: ReviewStatus.inReview,
       selectedDirection: null,
-      screenSelections: const <String, String>{},
+      screenSelections: const <String, ReviewScreenDecision>{},
       comments: const <ReviewComment>[],
     );
   }
@@ -66,8 +67,13 @@ final class ReviewController extends ChangeNotifier {
   }
 
   Future<void> selectScreenDirection(String screenId, String directionId) async {
-    final selections = Map<String, String>.of(_state.screenSelections);
-    selections[screenId] = directionId;
+    final selections =
+        Map<String, ReviewScreenDecision>.of(_state.screenSelections);
+    final existing = selections[screenId];
+    selections[screenId] = ReviewScreenDecision(
+      direction: directionId,
+      sections: existing?.sections ?? const {},
+    );
     _state = _copyWith(screenSelections: selections);
     await _persistAndNotify();
   }
@@ -77,7 +83,7 @@ final class ReviewController extends ChangeNotifier {
     if (!_state.screenSelections.containsKey(screenId)) {
       return;
     }
-    final selections = Map<String, String>.of(_state.screenSelections)
+    final selections = Map<String, ReviewScreenDecision>.of(_state.screenSelections)
       ..remove(screenId);
     _state = _copyWith(screenSelections: selections);
     await _persistAndNotify();
@@ -122,7 +128,7 @@ final class ReviewController extends ChangeNotifier {
     int? reviewRound,
     ReviewStatus? status,
     Object? selectedDirection = _unset,
-    Map<String, String>? screenSelections,
+    Map<String, ReviewScreenDecision>? screenSelections,
     List<ReviewComment>? comments,
   }) {
     return ReviewState(

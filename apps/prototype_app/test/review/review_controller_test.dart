@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prototype_app/review/memory_review_repository.dart';
 import 'package:prototype_app/review/review_controller.dart';
+import 'package:prototype_app/review/review_screen_decision.dart';
 import 'package:prototype_app/review/review_state.dart';
 
 ReviewComment comment(String id, {String text = 'note', String? screen}) {
@@ -72,10 +73,16 @@ void main() {
       await controller.selectScreenDirection('home', 'a');
       await controller.selectScreenDirection('search', 'b');
 
-      expect(controller.state.screenSelections, {'home': 'a', 'search': 'b'});
+      expect(controller.state.screenSelections, {
+        'home': ReviewScreenDecision(direction: 'a'),
+        'search': ReviewScreenDecision(direction: 'b'),
+      });
       expect(
         (await repository.load('prototype-demo'))!.screenSelections,
-        {'home': 'a', 'search': 'b'},
+        {
+          'home': ReviewScreenDecision(direction: 'a'),
+          'search': ReviewScreenDecision(direction: 'b'),
+        },
       );
     });
 
@@ -83,7 +90,9 @@ void main() {
       await controller.selectScreenDirection('search', 'b');
       await controller.selectScreenDirection('search', 'c');
 
-      expect(controller.state.screenSelections, {'search': 'c'});
+      expect(controller.state.screenSelections, {
+        'search': ReviewScreenDecision(direction: 'c'),
+      });
     });
   });
 
@@ -136,7 +145,9 @@ void main() {
 
       expect(controller.state.reviewRound, 2);
       expect(controller.state.selectedDirection, 'b');
-      expect(controller.state.screenSelections, {'search': 'b'});
+      expect(controller.state.screenSelections, {
+        'search': ReviewScreenDecision(direction: 'b'),
+      });
       expect(controller.state.comments.map((c) => c.id), ['c1']);
       expect((await repository.load('prototype-demo'))!.reviewRound, 2);
     });
@@ -227,10 +238,10 @@ void main() {
       await controller.clearScreenDirection('search');
 
       expect(controller.state.screenSelections.containsKey('search'), isFalse);
-      expect(controller.state.screenSelections['home'], 'a');
+      expect(controller.state.screenSelections['home']!.direction, 'a');
       final persisted = await repository.load('prototype-demo');
       expect(persisted!.screenSelections.containsKey('search'), isFalse);
-      expect(persisted.screenSelections['home'], 'a');
+      expect(persisted.screenSelections['home']!.direction, 'a');
 
       var notifications = 0;
       controller.addListener(() => notifications++);
