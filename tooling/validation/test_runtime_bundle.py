@@ -46,24 +46,6 @@ _EXAMPLE_REFINEMENT_NOTES = (
     / "prototype"
     / "refinement-notes.yaml"
 )
-_REFINEMENT_NOTE = """version: 1
-changes:
-  - id: home-hero-height
-    screen: home
-    subject: hero
-    change: reduce hero height for the client workshop direction
-    classification: client_override
-    status: reconciled
-    target: theme.spacing.section
-  - id: compact-product-card-spacing
-    component: commerce.product-card
-    change: evaluate tighter compact card spacing across commerce prototypes
-    classification: reusable_candidate
-    status: proposed
-    target: design-contract
-"""
-
-
 def _compose_bundle_bytes(root: Path, client_dir: Path) -> tuple[dict, bytes]:
     """Compose a bundle and serialize it exactly as ``build_runtime_bundle`` does."""
     bundle = compose_runtime_bundle(root, client_dir)
@@ -1003,21 +985,30 @@ class RuntimeBundleTests(unittest.TestCase):
                 build_runtime_bundle(root, client, root / "output")
 
     def test_refinement_notes_are_never_runtime_input(self):
+        note_text = _EXAMPLE_REFINEMENT_NOTES.read_text(encoding="utf-8")
+        note_path = None
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             client = root / "client-projects" / "acme-client"
             _write_client(client)
+            note_path = client / "prototype" / "refinement-notes.yaml"
 
             _, before = _compose_bundle_bytes(root, client)
-            (client / "prototype" / "refinement-notes.yaml").write_text(
-                _REFINEMENT_NOTE, encoding="utf-8"
-            )
+
+            note_path.write_text(note_text, encoding="utf-8")
             bundle, after = _compose_bundle_bytes(root, client)
 
+            # A malformed note must also never block or alter runtime composition.
+            note_path.write_text("version: 1\nchanges: {not: valid}\n", encoding="utf-8")
+            _, invalid_after = _compose_bundle_bytes(root, client)
+
         self.assertEqual(before, after)
+        self.assertEqual(before, invalid_after)
         self.assertNotIn("refinement_notes", bundle)
         self.assertNotIn("refinement-notes", bundle)
-        self.assertNotIn("refinement-notes.yaml", json.dumps(bundle, sort_keys=True))
+        self.assertFalse(
+            [value for value in _walk_strings(bundle) if "refinement" in value]
+        )
 
     def test_example_refinement_notes_validate_clean(self):
         self.assertTrue(_EXAMPLE_REFINEMENT_NOTES.is_file())
