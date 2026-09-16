@@ -5,7 +5,7 @@ import 'review_state.dart';
 
 const Object _unset = Object();
 
-class ReviewController extends ChangeNotifier {
+final class ReviewController extends ChangeNotifier {
   ReviewController({
     required this.clientId,
     required ReviewRepository repository,

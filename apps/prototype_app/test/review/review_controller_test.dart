@@ -199,5 +199,25 @@ void main() {
 
       expect(notifications, 0);
     });
+
+    test('rejected mutations neither persist nor notify', () async {
+      await controller.addComment(comment('c1'));
+      final persistedBefore = await repository.load('prototype-demo');
+      var notifications = 0;
+      controller.addListener(() => notifications++);
+
+      await expectLater(
+        () => controller.addComment(comment('c1', text: 'duplicate')),
+        throwsStateError,
+      );
+      await expectLater(
+        () => controller.updateComment(comment('missing', text: 'nope')),
+        throwsStateError,
+      );
+
+      expect(notifications, 0);
+      expect(await repository.load('prototype-demo'), persistedBefore);
+      expect(controller.state.comments.single.text, 'note');
+    });
   });
 }
