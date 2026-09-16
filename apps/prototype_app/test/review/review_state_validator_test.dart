@@ -1,14 +1,37 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prototype_app/review/review_screen_decision.dart';
+import 'package:prototype_app/review/review_screen_registry.dart';
 import 'package:prototype_app/review/review_state.dart';
 import 'package:prototype_app/review/review_state_validator.dart';
 import 'package:prototype_app/runtime/prototype_runtime.dart';
 
 import '../support/runtime_fixtures.dart';
 
-const Set<String> screenIds = {'home', 'search'};
-
-PrototypeRuntime buildRuntime() => PrototypeRuntime.fromMap(canonicalBundle());
+/// Three directions with asymmetric exposure:
+///   a = plp/pdp/search, product-card/price-display/search-field
+///   b = search/trade-dashboard, search-field/credit-summary (no plp, no product-card)
+///   c = plp/pdp, product-card/price-display (no search, no search-field)
+PrototypeRuntime buildRuntime() {
+  return PrototypeRuntime.fromMap(
+    canonicalBundle(
+      directionIds: const ['a', 'b', 'c'],
+      patterns: const {
+        'a': ['commerce.plp', 'commerce.pdp', 'commerce.search'],
+        'b': ['commerce.search', 'commerce.trade-dashboard'],
+        'c': ['commerce.plp', 'commerce.pdp'],
+      },
+      components: const {
+        'a': [
+          'commerce.product-card',
+          'commerce.price-display',
+          'commerce.search-field',
+        ],
+        'b': ['commerce.search-field', 'commerce.credit-summary'],
+        'c': ['commerce.product-card', 'commerce.price-display'],
+      },
+    ),
+  );
+}
 
 ReviewState validState({
   int version = ReviewState.currentVersion,
@@ -26,16 +49,18 @@ ReviewState validState({
     status: status,
     selectedDirection: selectedDirection,
     screenSelections: screenSelections ??
-        {'home': ReviewScreenDecision(direction: 'b')},
+        {'commerce.plp': ReviewScreenDecision(direction: 'c')},
     comments: comments,
   );
 }
 
 void main() {
   late PrototypeRuntime runtime;
+  late Set<String> screenIds;
 
   setUp(() {
     runtime = buildRuntime();
+    screenIds = ReviewScreenRegistry.screenIdsFor(runtime);
   });
 
   group('validateReviewState', () {
@@ -80,32 +105,216 @@ void main() {
       );
     });
 
-    test('reports a screen mix direction missing from runtime directions', () {
+    test('reports a screen direction missing from runtime directions', () {
       expect(
         validateReviewState(
           validState(screenSelections: {
-            'home': ReviewScreenDecision(direction: 'Z'),
+            'commerce.plp': ReviewScreenDecision(direction: 'Z'),
           }),
           runtime,
           screenIds: screenIds,
         ),
-        contains('screen home direction Z is not present in runtime directions'),
+        contains(
+          'screen commerce.plp direction Z is not present in runtime directions',
+        ),
       );
     });
 
-    test('reports a section direction missing from runtime directions', () {
+    test('reports a section source direction that is not mixable', () {
       expect(
         validateReviewState(
           validState(screenSelections: {
-            'home': ReviewScreenDecision(
-              direction: 'a',
-              sections: const {'home.hero': 'Z'},
+            'commerce.plp': ReviewScreenDecision(
+              direction: 'c',
+              sections: const {'plp.product-grid': 'Z'},
             ),
           }),
           runtime,
           screenIds: screenIds,
         ),
-        contains('section home.hero direction Z is not present in runtime directions'),
+        contains(
+          'section plp.product-grid source Z is not mixable: Unknown direction',
+        ),
+      );
+    });
+
+    test('reports a redundant screen override', () {
+      expect(
+        validateReviewState(
+          validState(
+            selectedDirection: 'a',
+            screenSelections: {
+              'commerce.plp': ReviewScreenDecision(direction: 'a'),
+            },
+          ),
+          runtime,
+          screenIds: screenIds,
+        ),
+        contains('redundant screen override: commerce.plp'),
+      );
+    });
+
+    test('reports a redundant section override', () {
+      expect(
+        validateReviewState(
+          validState(
+            selectedDirection: 'a',
+            screenSelections: {
+              'commerce.plp': ReviewScreenDecision(
+                direction: 'c',
+                sections: const {'plp.product-grid': 'c'},
+              ),
+            },
+          ),
+          runtime,
+          screenIds: screenIds,
+        ),
+        contains('redundant section override: plp.product-grid'),
+      );
+    });
+
+    test('reports an empty screen decision', () {
+      expect(
+        validateReviewState(
+          validState(screenSelections: {
+            'commerce.plp': ReviewScreenDecision(),
+          }),
+          runtime,
+          screenIds: screenIds,
+        ),
+        contains('empty screen decision: commerce.plp'),
+      );
+    });
+
+    test('reports an unknown section id', () {
+      expect(
+        validateReviewState(
+          validState(screenSelections: {
+            'commerce.plp': ReviewScreenDecision(
+              direction: 'c',
+              sections: const {'commerce.nope': 'a'},
+            ),
+          }),
+          runtime,
+          screenIds: screenIds,
+        ),
+        contains('unknown section id: commerce.nope'),
+      );
+    });
+
+    test('reports a section that does not belong to the named screen', () {
+      expect(
+        validateReviewState(
+          validState(screenSelections: {
+            'commerce.plp': ReviewScreenDecision(
+              direction: 'c',
+              sections: const {'search.search-field': 'a'},
+            ),
+          }),
+          runtime,
+          screenIds: screenIds,
+        ),
+        contains(
+          'section search.search-field does not belong to screen commerce.plp',
+        ),
+      );
+    });
+
+    test('reports a section with no effective screen direction', () {
+      expect(
+        validateReviewState(
+          validState(
+            selectedDirection: null,
+            screenSelections: {
+              'commerce.plp': ReviewScreenDecision(
+                sections: const {'plp.product-grid': 'a'},
+              ),
+            },
+          ),
+          runtime,
+          screenIds: screenIds,
+        ),
+        contains('section plp.product-grid has no effective screen direction'),
+      );
+    });
+
+    test('reports a source direction that does not expose the section', () {
+      expect(
+        validateReviewState(
+          validState(
+            selectedDirection: 'a',
+            screenSelections: {
+              'commerce.plp': ReviewScreenDecision(
+                direction: 'c',
+                sections: const {'plp.product-grid': 'b'},
+              ),
+            },
+          ),
+          runtime,
+          screenIds: screenIds,
+        ),
+        contains(
+          'section plp.product-grid source b is not mixable: Not present in Direction B',
+        ),
+      );
+    });
+
+    test('reports a section source unavailable from the source direction', () {
+      expect(
+        validateReviewState(
+          validState(
+            selectedDirection: 'a',
+            screenSelections: {
+              'commerce.search': ReviewScreenDecision(
+                direction: 'a',
+                sections: const {'search.search-field': 'c'},
+              ),
+            },
+          ),
+          runtime,
+          screenIds: screenIds,
+        ),
+        contains(
+          'section search.search-field source c is not mixable: Not present in Direction C',
+        ),
+      );
+    });
+
+    test('reports a section source incompatible with the base screen layout', () {
+      // Overall 'b' does not declare commerce.plp, so the inherited base cannot
+      // host the plp section.
+      expect(
+        validateReviewState(
+          validState(
+            selectedDirection: 'b',
+            screenSelections: {
+              'commerce.plp': ReviewScreenDecision(
+                sections: const {'plp.product-grid': 'a'},
+              ),
+            },
+          ),
+          runtime,
+          screenIds: screenIds,
+        ),
+        contains(
+          'section plp.product-grid source a is not mixable: Not compatible with this screen layout',
+        ),
+      );
+    });
+
+    test('reports a screen direction that does not include the screen', () {
+      expect(
+        validateReviewState(
+          validState(
+            selectedDirection: 'a',
+            screenSelections: {
+              'commerce.plp': ReviewScreenDecision(direction: 'b'),
+            },
+          ),
+          runtime,
+          screenIds: screenIds,
+        ),
+        contains('screen commerce.plp direction b does not include this screen'),
       );
     });
 
@@ -235,21 +444,24 @@ void main() {
       expect(
         validateReviewState(
           validState(
-            selectedDirection: 'b',
+            selectedDirection: 'a',
             screenSelections: {
-              'home': ReviewScreenDecision(
-                direction: 'a',
-                sections: const {'home.hero': 'b'},
+              'commerce.plp': ReviewScreenDecision(
+                direction: 'c',
+                sections: const {'plp.product-grid': 'a'},
               ),
-              'search': ReviewScreenDecision(direction: 'b'),
+              'commerce.search': ReviewScreenDecision(
+                direction: 'b',
+                sections: const {'search.search-field': 'a'},
+              ),
             },
             comments: const [
               ReviewComment(id: 'c1', scope: ReviewCommentScope.general, text: 'general'),
               ReviewComment(
                 id: 'c2',
                 scope: ReviewCommentScope.screen,
-                screen: 'home',
-                direction: 'a',
+                screen: 'commerce.plp',
+                direction: 'c',
                 text: 'screen',
               ),
             ],
@@ -269,7 +481,7 @@ void main() {
         status: ReviewStatus.inReview,
         selectedDirection: 'Z',
         screenSelections: {
-          'home': ReviewScreenDecision(direction: 'a'),
+          'commerce.plp': ReviewScreenDecision(direction: 'a'),
           'unknown': ReviewScreenDecision(direction: 'b'),
         },
         comments: const [
@@ -280,7 +492,7 @@ void main() {
       );
 
       expect(
-        validateReviewState(invalid, runtime, screenIds: {'home', 'search'}),
+        validateReviewState(invalid, runtime, screenIds: screenIds),
         equals([
           'duplicate comment id: c1',
           'invalid review round: 0',
@@ -317,7 +529,7 @@ void main() {
         reviewRound: 0,
         selectedDirection: 'Z',
         screenSelections: {
-          'home': ReviewScreenDecision(direction: 'Z'),
+          'commerce.plp': ReviewScreenDecision(direction: 'Z'),
           'unknown': ReviewScreenDecision(direction: 'b'),
         },
         comments: const [
