@@ -150,6 +150,18 @@ abstract final class AgencyTheme {
           borderRadius: controlRadius,
           borderSide: BorderSide(color: colors['primary']!, width: 2),
         ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: controlRadius,
+          borderSide: BorderSide(color: colors['error']!),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: controlRadius,
+          borderSide: BorderSide(color: colors['error']!, width: 2),
+        ),
+        disabledBorder: OutlineInputBorder(
+          borderRadius: controlRadius,
+          borderSide: BorderSide(color: colors['border']!),
+        ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(

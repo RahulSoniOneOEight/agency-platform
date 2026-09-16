@@ -122,6 +122,31 @@ void main() {
     expect(app.theme!.colorScheme.primary, const Color(0xFFAA0000));
   });
 
+  testWidgets('switching directions swaps the active direction theme',
+      (tester) async {
+    final runtime = PrototypeRuntime.fromMap(
+      canonicalBundle(directionThemes: {
+        'a': resolvedThemeMap(primary: '#AA0000'),
+        'b': resolvedThemeMap(primary: '#00AA00'),
+      }),
+    );
+
+    await tester.pumpWidget(PrototypeApp(runtime: runtime, requestedDirection: 'a'));
+
+    Color primaryOf() => tester
+        .widget<MaterialApp>(find.byType(MaterialApp))
+        .theme!
+        .colorScheme
+        .primary;
+
+    expect(primaryOf(), const Color(0xFFAA0000));
+
+    await tester.tap(find.text('B'));
+    await tester.pumpAndSettle();
+
+    expect(primaryOf(), const Color(0xFF00AA00));
+  });
+
   testWidgets('runtime error screen shows the client without a stack trace',
       (tester) async {
     const error = RuntimeException(

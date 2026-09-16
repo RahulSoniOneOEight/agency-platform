@@ -147,6 +147,36 @@ void main() {
       expect(AgencyResolvedTheme.fromJson(withDensity('normal')).density, 'normal');
       expect(AgencyResolvedTheme.fromJson(withDensity('spacious')).density, 'spacious');
     });
+
+    test('rejects a missing key in color', () {
+      final json = resolvedThemeJson();
+      (json['color']! as Map).remove('error');
+      expect(() => AgencyResolvedTheme.fromJson(json), throwsFormatException);
+    });
+
+    test('rejects an unknown key in typography', () {
+      final json = resolvedThemeJson();
+      (json['typography']! as Map)['tracking'] = 0.5;
+      expect(() => AgencyResolvedTheme.fromJson(json), throwsFormatException);
+    });
+
+    test('rejects a non-integral motion.fast_ms', () {
+      final json = resolvedThemeJson();
+      (json['motion']! as Map)['fast_ms'] = 150.9;
+      expect(() => AgencyResolvedTheme.fromJson(json), throwsFormatException);
+    });
+
+    test('accepts an integral double for motion.fast_ms', () {
+      final json = resolvedThemeJson();
+      (json['motion']! as Map)['fast_ms'] = 150.0;
+      expect(AgencyResolvedTheme.fromJson(json).motion.fastMs, 150);
+    });
+
+    test('rejects a missing key in breakpoints', () {
+      final json = resolvedThemeJson();
+      (json['breakpoints']! as Map).remove('desktop');
+      expect(() => AgencyResolvedTheme.fromJson(json), throwsFormatException);
+    });
   });
 
   group('AgencyTheme.light', () {
@@ -184,6 +214,31 @@ void main() {
       expect(tokens.motionFast, const Duration(milliseconds: 150));
       expect(tokens.density, 'spacious');
       expect(tokens.breakpointTablet, 768);
+    });
+
+    test('fromResolved exposes overlay elevation and icon size', () {
+      final resolved = AgencyResolvedTheme.fromJson(resolvedThemeJson());
+      final tokens = AgencyThemeTokens.fromResolved(resolved);
+
+      expect(tokens.overlayElevation, 4);
+      expect(tokens.iconSize, 20);
+    });
+
+    test('inputDecorationTheme.errorBorder uses the resolved error color', () {
+      final resolved = AgencyResolvedTheme.fromJson(resolvedThemeJson());
+      final theme = AgencyTheme.light(resolved);
+
+      final errorBorder =
+          theme.inputDecorationTheme.errorBorder! as OutlineInputBorder;
+      expect(errorBorder.borderSide.color, const Color(0xFFD32F2F));
+
+      final focusedErrorBorder =
+          theme.inputDecorationTheme.focusedErrorBorder! as OutlineInputBorder;
+      expect(focusedErrorBorder.borderSide.color, const Color(0xFFD32F2F));
+
+      final disabledBorder =
+          theme.inputDecorationTheme.disabledBorder! as OutlineInputBorder;
+      expect(disabledBorder.borderSide.color, const Color(0xFFE4E6EB));
     });
 
     test('lightDefault uses the agency default resolved theme', () {

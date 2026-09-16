@@ -335,10 +335,13 @@ double _requireNumber(Map<String, Object?> group, String name, String key) {
 
 int _requireInt(Map<String, Object?> group, String name, String key) {
   final value = group[key];
-  if (value is! num || !value.isFinite || value < 0) {
-    throw FormatException('theme.$name.$key must be a finite non-negative number');
+  if (value is! num ||
+      !value.isFinite ||
+      value < 0 ||
+      value != value.truncateToDouble()) {
+    throw FormatException('theme.$name.$key must be a non-negative integer');
   }
-  return value.round();
+  return value.toInt();
 }
 
 String _requireString(Map<String, Object?> group, String name, String key) {
@@ -358,8 +361,10 @@ class AgencyThemeTokens extends ThemeExtension<AgencyThemeTokens> {
     required this.tileGap,
     required this.controlRadius,
     required this.cardRadius,
+    required this.overlayElevation,
     required this.controlHeight,
     required this.compactControlHeight,
+    required this.iconSize,
     required this.motionFast,
     required this.motionNormal,
     required this.breakpointMobile,
@@ -373,8 +378,10 @@ class AgencyThemeTokens extends ThemeExtension<AgencyThemeTokens> {
   final double tileGap;
   final double controlRadius;
   final double cardRadius;
+  final double overlayElevation;
   final double controlHeight;
   final double compactControlHeight;
+  final double iconSize;
   final Duration motionFast;
   final Duration motionNormal;
   final double breakpointMobile;
@@ -389,8 +396,10 @@ class AgencyThemeTokens extends ThemeExtension<AgencyThemeTokens> {
       tileGap: theme.spacing['tile']!,
       controlRadius: theme.radius['control']!,
       cardRadius: theme.radius['card']!,
+      overlayElevation: theme.elevation['overlay']!,
       controlHeight: theme.size['control_height']!,
       compactControlHeight: theme.size['control_height_compact']!,
+      iconSize: theme.size['icon']!,
       motionFast: theme.motion.fast,
       motionNormal: theme.motion.normal,
       breakpointMobile: theme.breakpoints['mobile']!,
@@ -429,8 +438,10 @@ class AgencyThemeTokens extends ThemeExtension<AgencyThemeTokens> {
     double? tileGap,
     double? controlRadius,
     double? cardRadius,
+    double? overlayElevation,
     double? controlHeight,
     double? compactControlHeight,
+    double? iconSize,
     Duration? motionFast,
     Duration? motionNormal,
     double? breakpointMobile,
@@ -444,8 +455,10 @@ class AgencyThemeTokens extends ThemeExtension<AgencyThemeTokens> {
       tileGap: tileGap ?? this.tileGap,
       controlRadius: controlRadius ?? this.controlRadius,
       cardRadius: cardRadius ?? this.cardRadius,
+      overlayElevation: overlayElevation ?? this.overlayElevation,
       controlHeight: controlHeight ?? this.controlHeight,
       compactControlHeight: compactControlHeight ?? this.compactControlHeight,
+      iconSize: iconSize ?? this.iconSize,
       motionFast: motionFast ?? this.motionFast,
       motionNormal: motionNormal ?? this.motionNormal,
       breakpointMobile: breakpointMobile ?? this.breakpointMobile,
@@ -466,12 +479,14 @@ class AgencyThemeTokens extends ThemeExtension<AgencyThemeTokens> {
       tileGap: _lerpDouble(tileGap, other.tileGap, t),
       controlRadius: _lerpDouble(controlRadius, other.controlRadius, t),
       cardRadius: _lerpDouble(cardRadius, other.cardRadius, t),
+      overlayElevation: _lerpDouble(overlayElevation, other.overlayElevation, t),
       controlHeight: _lerpDouble(controlHeight, other.controlHeight, t),
       compactControlHeight: _lerpDouble(
         compactControlHeight,
         other.compactControlHeight,
         t,
       ),
+      iconSize: _lerpDouble(iconSize, other.iconSize, t),
       motionFast: _lerpDuration(motionFast, other.motionFast, t),
       motionNormal: _lerpDuration(motionNormal, other.motionNormal, t),
       breakpointMobile: _lerpDouble(breakpointMobile, other.breakpointMobile, t),
@@ -490,8 +505,10 @@ class AgencyThemeTokens extends ThemeExtension<AgencyThemeTokens> {
           tileGap == other.tileGap &&
           controlRadius == other.controlRadius &&
           cardRadius == other.cardRadius &&
+          overlayElevation == other.overlayElevation &&
           controlHeight == other.controlHeight &&
           compactControlHeight == other.compactControlHeight &&
+          iconSize == other.iconSize &&
           motionFast == other.motionFast &&
           motionNormal == other.motionNormal &&
           breakpointMobile == other.breakpointMobile &&
@@ -506,8 +523,10 @@ class AgencyThemeTokens extends ThemeExtension<AgencyThemeTokens> {
         tileGap,
         controlRadius,
         cardRadius,
+        overlayElevation,
         controlHeight,
         compactControlHeight,
+        iconSize,
         motionFast,
         motionNormal,
         breakpointMobile,
