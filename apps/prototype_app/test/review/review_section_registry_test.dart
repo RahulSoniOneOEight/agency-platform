@@ -1,3 +1,4 @@
+import 'package:agency_flutter_ui/agency_flutter_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prototype_app/fixtures/fixture_repository.dart';
 import 'package:prototype_app/registry/design_contract_resolver.dart';
@@ -80,6 +81,35 @@ void main() {
           composition!.sections.map((section) => section.id),
           contains(definition.id),
           reason: '${definition.id} is not exposed by the ${definition.screenId} composition',
+        );
+      }
+    });
+
+    test('each registered section maps to its expected shared section widget', () {
+      final runtime = PrototypeRuntime.fromMap(
+        canonicalBundle(directionIds: const ['a', 'c'], resources: const {}),
+      );
+      final direction = runtime.directions['a']!;
+      final fixtures = FixtureRepository.fromRuntime(runtime);
+
+      const expected = <String, Type>{
+        'home.product-grid': ProductGridSection,
+        'plp.product-grid': ProductGridSection,
+        'search.search-field': SearchFieldSection,
+        'search.results-grid': CompactProductRowSection,
+        'pdp.price': PriceSection,
+      };
+
+      for (final definition in ReviewSectionRegistry.all) {
+        final composition =
+            PrototypeRegistry.compositionFor(definition.screenId, direction, fixtures)!;
+        final section = composition.sections
+            .firstWhere((candidate) => candidate.id == definition.id);
+        expect(
+          section.child.runtimeType,
+          expected[definition.id],
+          reason: '${definition.id} composes the wrong section widget for '
+              'component ${definition.componentId}',
         );
       }
     });

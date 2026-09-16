@@ -326,7 +326,7 @@ void main() {
       expect(result.reason, 'Not present in Direction B');
     });
 
-    test('search.search-field is unavailable from c (c lacks search-field)', () {
+    test('search.search-field is unavailable from c (c does not declare search)', () {
       final result = evaluate(
         screenId: 'commerce.search',
         sectionId: 'search.search-field',

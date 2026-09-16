@@ -8,8 +8,8 @@ import '../patterns/pattern_shell.dart';
 /// A [PatternSection] is a stable composition boundary identified by [id]. It is
 /// not a component library and does not own identity authority: the widget in
 /// [child] is the existing shared implementation. Patterns and the review mixed
-/// preview compose the same [PatternSection] instances so there is exactly one
-/// screen implementation.
+/// preview compose equal sections built by the same builders, so there is
+/// exactly one screen implementation.
 class PatternSection {
   const PatternSection({required this.id, required this.child});
 
