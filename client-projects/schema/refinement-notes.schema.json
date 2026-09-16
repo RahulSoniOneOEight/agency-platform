@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Refinement Notes",
+  "description": "Optional, non-runtime metadata recording material Nowa visual refinements for OpenCode reconciliation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "changes"],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "changes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "change", "classification", "status"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "screen": {
+            "type": "string",
+            "minLength": 1
+          },
+          "component": {
+            "type": "string",
+            "minLength": 1
+          },
+          "pattern": {
+            "type": "string",
+            "minLength": 1
+          },
+          "subject": {
+            "type": "string",
+            "minLength": 1
+          },
+          "change": {
+            "type": "string",
+            "minLength": 1
+          },
+          "classification": {
+            "enum": [
+              "semantic_token",
+              "client_override",
+              "direction_override",
+              "reusable_candidate",
+              "implementation_detail",
+              "reject"
+            ]
+          },
+          "status": {
+            "enum": [
+              "observed",
+              "accepted",
+              "reconciled",
+              "proposed",
+              "rejected"
+            ]
+          },
+          "target": {
+            "type": "string",
+            "minLength": 1
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

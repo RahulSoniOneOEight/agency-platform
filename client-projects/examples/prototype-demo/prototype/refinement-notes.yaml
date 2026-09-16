@@ -1,0 +1,16 @@
+version: 1
+changes:
+  - id: home-hero-height
+    screen: home
+    subject: hero
+    change: reduce hero height for the client workshop direction
+    classification: client_override
+    status: reconciled
+    target: theme.spacing.section
+
+  - id: compact-product-card-spacing
+    component: commerce.product-card
+    change: evaluate tighter compact card spacing across commerce prototypes
+    classification: reusable_candidate
+    status: proposed
+    target: design-contract

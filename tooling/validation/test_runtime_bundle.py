@@ -24,9 +24,14 @@ from tooling.design_contract.generate_resolved_themes import (
 )
 from tooling.design_contract.theme_contract import CANONICAL_GROUPS, resolve_theme
 from tooling.knowledge.index_design_contract import build_indexes
-from tooling.prototype.build_runtime_bundle import build_runtime_bundle
+from tooling.prototype.build_runtime_bundle import (
+    build_runtime_bundle,
+    compose_runtime_bundle,
+)
 from tooling.prototype import validate_runtime_bundle as runtime_bundle_validator
 from tooling.prototype.project_direction import project_direction
+from tooling.prototype.refinement_notes import validate_refinement_notes
+from tooling.validation.validate_repo import refinement_note_errors
 
 
 validate_runtime_bundle = runtime_bundle_validator.validate_runtime_bundle
@@ -34,6 +39,19 @@ validate_runtime_bundle = runtime_bundle_validator.validate_runtime_bundle
 
 ROOT = Path(__file__).resolve().parents[2]
 _RESOLVED_THEME = resolve_theme(ROOT, "premium-modern")
+_EXAMPLE_REFINEMENT_NOTES = (
+    ROOT
+    / "client-projects"
+    / "examples"
+    / "prototype-demo"
+    / "prototype"
+    / "refinement-notes.yaml"
+)
+def _compose_bundle_bytes(root: Path, client_dir: Path) -> tuple[dict, bytes]:
+    """Compose a bundle and serialize it exactly as ``build_runtime_bundle`` does."""
+    bundle = compose_runtime_bundle(root, client_dir)
+    serialized = json.dumps(bundle, indent=2, sort_keys=True, allow_nan=False) + "\n"
+    return bundle, serialized.encode("utf-8")
 
 
 def _copy_theme_contract(root: Path) -> None:
@@ -967,6 +985,56 @@ class RuntimeBundleTests(unittest.TestCase):
             ):
                 build_runtime_bundle(root, client, root / "output")
 
+    def test_refinement_notes_are_never_runtime_input(self):
+        note_text = _EXAMPLE_REFINEMENT_NOTES.read_text(encoding="utf-8")
+        note_path = None
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            client = root / "client-projects" / "acme-client"
+            _write_client(client)
+            note_path = client / "prototype" / "refinement-notes.yaml"
+
+            _, before = _compose_bundle_bytes(root, client)
+
+            note_path.write_text(note_text, encoding="utf-8")
+            bundle, after = _compose_bundle_bytes(root, client)
+
+            # A malformed note must also never block or alter runtime composition.
+            note_path.write_text("version: 1\nchanges: {not: valid}\n", encoding="utf-8")
+            _, invalid_after = _compose_bundle_bytes(root, client)
+
+        self.assertEqual(before, after)
+        self.assertEqual(before, invalid_after)
+        self.assertNotIn("refinement_notes", bundle)
+        self.assertNotIn("refinement-notes", bundle)
+        self.assertFalse(
+            [value for value in _walk_strings(bundle) if "refinement" in value]
+        )
+
+    def test_example_refinement_notes_validate_clean(self):
+        self.assertTrue(_EXAMPLE_REFINEMENT_NOTES.is_file())
+        self.assertEqual(
+            [], validate_refinement_notes(ROOT, _EXAMPLE_REFINEMENT_NOTES)
+        )
+
+    def test_complete_client_without_refinement_notes_passes_runtime_and_note_validation(
+        self,
+    ):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            client = root / "client-projects" / "acme-client"
+            _write_client(client)
+
+            note_path = client / "prototype" / "refinement-notes.yaml"
+            self.assertFalse(note_path.exists())
+            self.assertEqual([], refinement_note_errors(root))
+
+            output = build_runtime_bundle(root, client, root / "output")
+            bundle = json.loads(output.read_text(encoding="utf-8"))
+
+        self.assertEqual("acme-client", bundle["client_id"])
+        self.assertEqual([], validate_runtime_bundle(bundle))
+
 
 def _walk_strings(value):
     if isinstance(value, dict):
@@ -1035,6 +1103,52 @@ class ResolvedThemeBundleTests(unittest.TestCase):
         self.assertEqual(
             "spacious", bundle["direction_themes"]["c"]["density"]["default"]
         )
+
+    def test_refinement_note_target_cannot_redefine_runtime_theme_authority(self):
+        classifications = (
+            "semantic_token",
+            "client_override",
+            "direction_override",
+            "reusable_candidate",
+            "implementation_detail",
+            "reject",
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            client = root / "client-projects" / "acme-client"
+            _write_client(client)
+
+            baseline_bundle, baseline_bytes = _compose_bundle_bytes(root, client)
+            baseline_theme = copy.deepcopy(baseline_bundle["theme"])
+            baseline_direction_themes = copy.deepcopy(
+                baseline_bundle["direction_themes"]
+            )
+            fresh_theme = resolve_theme(
+                root, "premium-modern", {"preset": "premium-modern"}, None
+            )
+
+            note_path = client / "prototype" / "refinement-notes.yaml"
+            for classification in classifications:
+                with self.subTest(classification=classification):
+                    note_path.write_text(
+                        "version: 1\n"
+                        "changes:\n"
+                        "  - id: repaint-primary\n"
+                        "    change: make the primary brand colour hotter in Nowa\n"
+                        f"    classification: {classification}\n"
+                        "    status: observed\n"
+                        "    target: theme.color.primary\n",
+                        encoding="utf-8",
+                    )
+
+                    after_bundle, after_bytes = _compose_bundle_bytes(root, client)
+
+                    self.assertEqual(baseline_bytes, after_bytes)
+                    self.assertEqual(baseline_theme, after_bundle["theme"])
+                    self.assertEqual(fresh_theme, after_bundle["theme"])
+                    self.assertEqual(
+                        baseline_direction_themes, after_bundle["direction_themes"]
+                    )
 
     def test_bundle_theme_matches_fresh_resolve(self):
         with tempfile.TemporaryDirectory() as tmp:
