@@ -91,3 +91,47 @@ final class InvalidReviewState extends ReviewDomainError {
   @override
   String get code => 'invalid_review_state';
 }
+
+/// Approval was requested while one or more eligibility gates failed.
+///
+/// Every gate (readiness, blocking feedback, valid C.3 decision tree, recorded
+/// reviewer/approver identities, source commit SHA, review-state hash) reports
+/// through this single stable code; no partial approval is ever persisted.
+final class ApprovalNotEligible extends ReviewDomainError {
+  const ApprovalNotEligible(super.message);
+
+  @override
+  String get code => 'approval_not_eligible';
+}
+
+/// An approval version already exists; approvals are append-only.
+final class ApprovalVersionConflict extends ReviewDomainError {
+  const ApprovalVersionConflict(super.message);
+
+  @override
+  String get code => 'approval_version_conflict';
+}
+
+/// A contract-impacting change requires a new review round before re-approval.
+final class ContractImpactRequiresNewRound extends ReviewDomainError {
+  const ContractImpactRequiresNewRound(super.message);
+
+  @override
+  String get code => 'contract_impact_requires_new_round';
+}
+
+/// A visual annotation payload is structurally or numerically invalid.
+final class InvalidVisualAnnotation extends ReviewDomainError {
+  const InvalidVisualAnnotation(super.message);
+
+  @override
+  String get code => 'invalid_visual_annotation';
+}
+
+/// A visual feedback provider payload could not be normalized.
+final class UnsupportedVisualProviderPayload extends ReviewDomainError {
+  const UnsupportedVisualProviderPayload(super.message);
+
+  @override
+  String get code => 'unsupported_visual_provider_payload';
+}

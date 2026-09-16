@@ -1,15 +1,56 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:prototype_app/review/approval_repository.dart';
+import 'package:prototype_app/review/approval_snapshot.dart';
 import 'package:prototype_app/review/feedback_record.dart';
+import 'package:prototype_app/review/memory_approval_repository.dart';
 import 'package:prototype_app/review/memory_feedback_repository.dart';
 import 'package:prototype_app/review/memory_review_repository.dart';
 import 'package:prototype_app/review/review_actor.dart';
 import 'package:prototype_app/review/review_controller.dart';
 import 'package:prototype_app/review/review_coordinator.dart';
 import 'package:prototype_app/review/review_domain_error.dart';
+import 'package:prototype_app/review/review_screen_registry.dart';
 import 'package:prototype_app/review/review_state.dart';
+import 'package:prototype_app/review/review_state_validator.dart';
+import 'package:prototype_app/review/visual_attachment.dart';
 import 'package:prototype_app/runtime/prototype_runtime.dart';
 
 import '../support/runtime_fixtures.dart';
+
+/// Approval repository that always fails on create, to prove `createApproval`
+/// is transactional and performs no other writes when persistence fails.
+final class _FailingApprovalRepository implements ApprovalRepository {
+  @override
+  Future<List<ApprovalSnapshot>> list(String clientId) async =>
+      const <ApprovalSnapshot>[];
+
+  @override
+  Future<void> create(String clientId, ApprovalSnapshot snapshot) async {
+    throw const ApprovalVersionConflict('injected persistence failure');
+  }
+}
+
+VisualAttachment visualAttachment({
+  String clientId = 'prototype-demo',
+  String screenId = 'commerce.home',
+  String? sectionId,
+  String screenshotRef = 'review-home-round-1',
+}) {
+  return VisualAttachment(
+    screenshotRef: screenshotRef,
+    viewportWidth: 1440,
+    viewportHeight: 1200,
+    clientId: clientId,
+    reviewRound: 1,
+    screenId: screenId,
+    effectiveDirection: 'a',
+    sourceCommitSha: 'abc123',
+    annotation: NormalizedRect(x: 0.4, y: 0.3, width: 0.2, height: 0.1),
+    providerName: 'bugdrop',
+    externalRef: 'provider-item-1',
+    sectionId: sectionId,
+  );
+}
 
 const reviewer = ReviewActor(
   id: 'reviewer-123',
@@ -44,6 +85,7 @@ void main() {
   late PrototypeRuntime runtime;
   late ReviewController controller;
   late MemoryFeedbackRepository feedback;
+  late MemoryApprovalRepository approvals;
   late ReviewCoordinator coordinator;
 
   setUp(() {
@@ -54,9 +96,11 @@ void main() {
       runtime: runtime,
     );
     feedback = MemoryFeedbackRepository();
+    approvals = MemoryApprovalRepository();
     coordinator = ReviewCoordinator(
       controller: controller,
       feedbackRepository: feedback,
+      approvalRepository: approvals,
     );
   });
 
@@ -593,6 +637,331 @@ void main() {
     });
   });
 
+  group('createApproval', () {
+    Future<void> readyForApproval() async {
+      await create(id: 'feedback-nb', blocking: false);
+      await coordinator.closeCurrentRound(actor: reviewer);
+    }
+
+    test('creates an immutable version 1 snapshot with carried non-blockers',
+        () async {
+      await readyForApproval();
+
+      final snapshot = await coordinator.createApproval(
+        reviewer: reviewer,
+        approver: approver,
+        sourceCommitSha: 'abc123',
+      );
+
+      expect(snapshot.version, 1);
+      expect(snapshot.supersedes, isNull);
+      expect(snapshot.clientId, 'prototype-demo');
+      expect(snapshot.reviewRound, 1);
+      expect(snapshot.reviewedBy, reviewer);
+      expect(snapshot.approvedBy, approver);
+      expect(snapshot.sourceCommitSha, 'abc123');
+      expect(snapshot.reviewStateHash, startsWith('sha256:'));
+      expect(snapshot.unresolvedNonBlockingFeedbackIds, ['feedback-nb']);
+      expect(await coordinator.listApprovals(), [snapshot]);
+    });
+
+    test('records reviewer and approver separately while allowing one person',
+        () async {
+      await readyForApproval();
+      const dualRoleApprover = ReviewActor(
+        id: 'reviewer-123',
+        name: 'Rahul',
+        role: ReviewRole.approver,
+      );
+
+      final snapshot = await coordinator.createApproval(
+        reviewer: reviewer,
+        approver: dualRoleApprover,
+        sourceCommitSha: 'abc123',
+      );
+
+      expect(snapshot.reviewedBy.id, snapshot.approvedBy.id);
+      expect(snapshot.reviewedBy.role, ReviewRole.reviewer);
+      expect(snapshot.approvedBy.role, ReviewRole.approver);
+    });
+
+    test('appends a higher version that supersedes the previous one', () async {
+      await readyForApproval();
+      final first = await coordinator.createApproval(
+        reviewer: reviewer,
+        approver: approver,
+        sourceCommitSha: 'abc123',
+      );
+
+      await coordinator.startNextRound(actor: reviewer);
+      await create(id: 'feedback-2', blocking: false);
+      await coordinator.closeCurrentRound(actor: reviewer);
+      final second = await coordinator.createApproval(
+        reviewer: reviewer,
+        approver: approver,
+        sourceCommitSha: 'def456',
+      );
+
+      expect(second.version, 2);
+      expect(second.supersedes, first.version);
+      expect(
+        (await coordinator.listApprovals()).map((s) => s.version),
+        [1, 2],
+      );
+      // The first snapshot is never rewritten.
+      expect((await coordinator.listApprovals()).first, first);
+    });
+
+    test('is rejected when the review is not ready for final review', () async {
+      await create(id: 'feedback-nb', blocking: false);
+      final stateBefore = controller.state;
+
+      await expectLater(
+        () => coordinator.createApproval(
+          reviewer: reviewer,
+          approver: approver,
+          sourceCommitSha: 'abc123',
+        ),
+        throwsA(
+          isA<ApprovalNotEligible>()
+              .having((error) => error.code, 'code', 'approval_not_eligible'),
+        ),
+      );
+
+      expect(await coordinator.listApprovals(), isEmpty);
+      expect(identical(controller.state, stateBefore), isTrue);
+    });
+
+    test('is rejected while blocking feedback is unresolved', () async {
+      await create(id: 'feedback-block', blocking: true);
+      // Force readiness only to isolate the blocking gate.
+      await controller.applyState(status: ReviewStatus.readyForFinalReview);
+
+      await expectLater(
+        () => coordinator.createApproval(
+          reviewer: reviewer,
+          approver: approver,
+          sourceCommitSha: 'abc123',
+        ),
+        throwsA(isA<ApprovalNotEligible>()),
+      );
+      expect(await coordinator.listApprovals(), isEmpty);
+    });
+
+    test('is rejected when the approver identity is not an approver', () async {
+      await readyForApproval();
+
+      await expectLater(
+        () => coordinator.createApproval(
+          reviewer: reviewer,
+          approver: reviewer,
+          sourceCommitSha: 'abc123',
+        ),
+        throwsA(isA<ApprovalNotEligible>()),
+      );
+      expect(await coordinator.listApprovals(), isEmpty);
+    });
+
+    test('is reviewer-only', () async {
+      await readyForApproval();
+
+      await expectLater(
+        () => coordinator.createApproval(
+          reviewer: agent,
+          approver: approver,
+          sourceCommitSha: 'abc123',
+        ),
+        throwsA(isA<UnauthorizedReviewAction>()),
+      );
+      expect(await coordinator.listApprovals(), isEmpty);
+    });
+
+    test('requires a non-empty source commit SHA', () async {
+      await readyForApproval();
+
+      await expectLater(
+        () => coordinator.createApproval(
+          reviewer: reviewer,
+          approver: approver,
+          sourceCommitSha: '   ',
+        ),
+        throwsA(isA<ApprovalNotEligible>()),
+      );
+      expect(await coordinator.listApprovals(), isEmpty);
+    });
+
+    test('rejects an invalid C.3 decision tree with a typed error', () async {
+      var reject = false;
+      final customRuntime = buildRuntime();
+      final customController = ReviewController(
+        clientId: customRuntime.clientId,
+        repository: MemoryReviewRepository(),
+        runtime: customRuntime,
+        validate: (state) {
+          if (reject) return const <String>['injected decision-tree failure'];
+          return validateReviewState(
+            state,
+            customRuntime,
+            screenIds: ReviewScreenRegistry.screenIdsFor(customRuntime),
+          );
+        },
+      );
+      final customCoordinator = ReviewCoordinator(
+        controller: customController,
+        feedbackRepository: MemoryFeedbackRepository(),
+        approvalRepository: MemoryApprovalRepository(),
+      );
+      await customController
+          .applyState(status: ReviewStatus.readyForFinalReview);
+      reject = true;
+
+      await expectLater(
+        () => customCoordinator.createApproval(
+          reviewer: reviewer,
+          approver: approver,
+          sourceCommitSha: 'abc123',
+        ),
+        throwsA(isA<ApprovalNotEligible>()),
+      );
+      expect(await customCoordinator.listApprovals(), isEmpty);
+    });
+
+    test('is transactional when approval persistence fails', () async {
+      final failingCoordinator = ReviewCoordinator(
+        controller: controller,
+        feedbackRepository: feedback,
+        approvalRepository: _FailingApprovalRepository(),
+      );
+      await create(id: 'feedback-nb', blocking: false);
+      await coordinator.closeCurrentRound(actor: reviewer);
+      final stateBefore = controller.state;
+
+      await expectLater(
+        () => failingCoordinator.createApproval(
+          reviewer: reviewer,
+          approver: approver,
+          sourceCommitSha: 'abc123',
+        ),
+        throwsA(isA<ApprovalVersionConflict>()),
+      );
+
+      expect(identical(controller.state, stateBefore), isTrue);
+      expect(await coordinator.listApprovals(), isEmpty);
+    });
+
+    test('reports eligibility reasons for the UI', () async {
+      await create(id: 'feedback-block', blocking: true);
+      final reasons = await coordinator.approvalBlockingReasons();
+      expect(await coordinator.isEligibleForApproval(), isFalse);
+      expect(reasons, isNotEmpty);
+      expect(reasons.any((reason) => reason.contains('ready_for_final_review')),
+          isTrue);
+      expect(reasons.any((reason) => reason.contains('feedback-block')), isTrue);
+
+      await coordinator.markAddressed(
+        actor: agent,
+        feedbackId: 'feedback-block',
+      );
+      await coordinator.resolveFeedback(
+        actor: reviewer,
+        feedbackId: 'feedback-block',
+      );
+      await coordinator.closeCurrentRound(actor: reviewer);
+
+      expect(await coordinator.isEligibleForApproval(), isTrue);
+      expect(await coordinator.approvalBlockingReasons(), isEmpty);
+    });
+  });
+
+  group('visual feedback', () {
+    test('attaches normalized evidence only for visual_annotation scope',
+        () async {
+      final record = await coordinator.createFeedback(
+        actor: reviewer,
+        id: 'feedback-visual',
+        scope: FeedbackScope.visualAnnotation,
+        text: 'Align the price block',
+        target: const FeedbackTarget(
+          screen: 'commerce.home',
+          section: 'home.product-grid',
+        ),
+        visualAttachment: visualAttachment(sectionId: 'home.product-grid'),
+      );
+
+      expect(record.scope, FeedbackScope.visualAnnotation);
+      expect(record.visualAttachment, isNotNull);
+      expect(record.visualAttachment!.providerName, 'bugdrop');
+      expect(
+        (await feedback.load('prototype-demo', 'feedback-visual'))!
+            .visualAttachment,
+        record.visualAttachment,
+      );
+    });
+
+    test('rejects visual evidence on a non-visual scope', () async {
+      await expectLater(
+        () => coordinator.createFeedback(
+          actor: reviewer,
+          id: 'feedback-general',
+          scope: FeedbackScope.general,
+          text: 'General note',
+          target: const FeedbackTarget(),
+          visualAttachment: visualAttachment(),
+        ),
+        throwsA(isA<InvalidVisualAnnotation>()),
+      );
+      expect(await feedback.list('prototype-demo'), isEmpty);
+    });
+
+    test('validates the attachment screen through the governed registry',
+        () async {
+      await expectLater(
+        () => coordinator.createFeedback(
+          actor: reviewer,
+          id: 'feedback-visual',
+          scope: FeedbackScope.visualAnnotation,
+          text: 'Unknown screen',
+          target: const FeedbackTarget(),
+          visualAttachment: visualAttachment(screenId: 'commerce.unknown'),
+        ),
+        throwsA(isA<InvalidVisualAnnotation>()),
+      );
+      expect(await feedback.list('prototype-demo'), isEmpty);
+    });
+
+    test('validates that a section belongs to the attachment screen', () async {
+      await expectLater(
+        () => coordinator.createFeedback(
+          actor: reviewer,
+          id: 'feedback-visual',
+          scope: FeedbackScope.visualAnnotation,
+          text: 'Wrong section',
+          target: const FeedbackTarget(),
+          visualAttachment: visualAttachment(
+            screenId: 'commerce.home',
+            sectionId: 'pdp.price',
+          ),
+        ),
+        throwsA(isA<InvalidVisualAnnotation>()),
+      );
+      expect(await feedback.list('prototype-demo'), isEmpty);
+    });
+
+    test('rejects evidence for a different client', () async {
+      await expectLater(
+        () => coordinator.createFeedback(
+          actor: reviewer,
+          id: 'feedback-visual',
+          scope: FeedbackScope.visualAnnotation,
+          text: 'Wrong client',
+          target: const FeedbackTarget(),
+          visualAttachment: visualAttachment(clientId: 'other-client'),
+        ),
+        throwsA(isA<InvalidVisualAnnotation>()),
+      );
+    });
+  });
+
   group('typed domain errors', () {
     test('expose stable machine-readable codes', () {
       expect(
@@ -615,6 +984,23 @@ void main() {
       );
       expect(const DuplicateFeedbackId('x').code, 'duplicate_feedback_id');
       expect(const FeedbackNotFound('x').code, 'feedback_not_found');
+      expect(const ApprovalNotEligible('x').code, 'approval_not_eligible');
+      expect(
+        const ApprovalVersionConflict('x').code,
+        'approval_version_conflict',
+      );
+      expect(
+        const ContractImpactRequiresNewRound('x').code,
+        'contract_impact_requires_new_round',
+      );
+      expect(
+        const InvalidVisualAnnotation('x').code,
+        'invalid_visual_annotation',
+      );
+      expect(
+        const UnsupportedVisualProviderPayload('x').code,
+        'unsupported_visual_provider_payload',
+      );
     });
 
     test('are exceptions with a message', () {

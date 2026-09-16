@@ -55,6 +55,16 @@ List<File> _reviewSourceFiles() {
   return files;
 }
 
+/// Whether [file] lives under the file-backed `persistence/` adapter layer.
+///
+/// Per R1 only `persistence/` may perform file I/O; the review domain must stay
+/// I/O-free.
+bool _isPersistenceFile(File file) =>
+    file.path.replaceAll('\\', '/').contains('/persistence/');
+
+List<File> _domainReviewSourceFiles() =>
+    _reviewSourceFiles().where((file) => !_isPersistenceFile(file)).toList();
+
 List<File> _comparisonSourceFiles() {
   final files = _reviewSourceFiles()
       .where((file) => _comparisonSourceNames.contains(file.uri.pathSegments.last))
@@ -198,15 +208,20 @@ Future<void> _pumpDirectionComparison(
 
 void main() {
   group('source boundaries (B.1B/D/F + approval)', () {
-    test('lib/review never references approval artifacts or performs file I/O', () {
+    test('lib/review never references approval artifacts', () {
       for (final file in _reviewSourceFiles()) {
-        final source = file.readAsStringSync();
-        final lower = source.toLowerCase();
+        final lower = file.readAsStringSync().toLowerCase();
 
         expect(lower.contains('approved-experience'), isFalse,
             reason: '${file.path} references approved-experience');
         expect(lower.contains('approved_experience'), isFalse,
             reason: '${file.path} references approved_experience');
+      }
+    });
+
+    test('the review domain performs no file I/O', () {
+      for (final file in _domainReviewSourceFiles()) {
+        final source = file.readAsStringSync();
         expect(source.contains('dart:io'), isFalse,
             reason: '${file.path} performs file I/O');
         expect(source.contains('File('), isFalse,
@@ -218,9 +233,9 @@ void main() {
       }
     });
 
-    test('lib/review never references B.1F refinement notes', () {
+    test('the review domain never references B.1F refinement notes', () {
       final offenders = <String>[
-        for (final file in _reviewSourceFiles())
+        for (final file in _domainReviewSourceFiles())
           if (file.readAsStringSync().toLowerCase().contains('refinement'))
             file.path,
       ];
@@ -230,7 +245,7 @@ void main() {
 
     test('review subsystem sources render no ranking vocabulary', () {
       final offenders = <String>[];
-      for (final file in _reviewSourceFiles()) {
+      for (final file in _domainReviewSourceFiles()) {
         final code = _stripComments(file.readAsStringSync());
         if (_rankingVocabulary.hasMatch(code)) {
           offenders.add(file.path);

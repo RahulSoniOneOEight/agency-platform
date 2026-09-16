@@ -59,6 +59,12 @@ final class ReviewController extends ChangeNotifier {
 
   ReviewState get state => _state;
 
+  /// The governed runtime this controller validates decisions against.
+  ///
+  /// Exposed read-only so cross-domain orchestration can validate governed
+  /// screen/section identity through the existing registries.
+  PrototypeRuntime get runtime => _runtime;
+
   /// Validation findings from the most recent [load] of persisted state.
   List<String> get loadErrors => _loadErrors;
 

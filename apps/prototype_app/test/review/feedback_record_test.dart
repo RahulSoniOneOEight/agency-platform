@@ -1,5 +1,26 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prototype_app/review/feedback_record.dart';
+import 'package:prototype_app/review/visual_attachment.dart';
+
+VisualAttachment visualAttachment({
+  String screenId = 'commerce.home',
+  String? sectionId,
+}) {
+  return VisualAttachment(
+    screenshotRef: 'review-home-round-1',
+    viewportWidth: 1440,
+    viewportHeight: 1200,
+    clientId: 'prototype-demo',
+    reviewRound: 1,
+    screenId: screenId,
+    effectiveDirection: 'a',
+    sourceCommitSha: 'abc123',
+    annotation: NormalizedRect(x: 0.1, y: 0.1, width: 0.2, height: 0.2),
+    providerName: 'bugdrop',
+    externalRef: 'provider-item-1',
+    sectionId: sectionId,
+  );
+}
 
 FeedbackEvent createdEvent({
   String actorId = 'reviewer-1',
@@ -23,6 +44,7 @@ FeedbackRecord record({
   FeedbackTarget target = const FeedbackTarget(),
   List<FeedbackEvent>? history,
   int? resolvedRound,
+  VisualAttachment? visualAttachment,
 }) {
   return FeedbackRecord(
     id: id,
@@ -34,6 +56,7 @@ FeedbackRecord record({
     target: target,
     history: history ?? [createdEvent(round: createdRound)],
     resolvedRound: resolvedRound,
+    visualAttachment: visualAttachment,
   );
 }
 
@@ -290,6 +313,40 @@ void main() {
       );
     });
 
+    test('only allows a visual attachment on visual_annotation scope', () {
+      expect(
+        record(
+          scope: FeedbackScope.visualAnnotation,
+          visualAttachment: visualAttachment(),
+        ).visualAttachment,
+        isNotNull,
+      );
+      for (final scope in const [
+        FeedbackScope.general,
+        FeedbackScope.screen,
+        FeedbackScope.section,
+        FeedbackScope.decision,
+      ]) {
+        expect(
+          () => record(
+            scope: scope,
+            target: switch (scope) {
+              FeedbackScope.screen =>
+                const FeedbackTarget(screen: 'commerce.home'),
+              FeedbackScope.section => const FeedbackTarget(
+                  screen: 'commerce.home',
+                  section: 'home.product-grid',
+                ),
+              FeedbackScope.decision => const FeedbackTarget(direction: 'a'),
+              _ => const FeedbackTarget(),
+            },
+            visualAttachment: visualAttachment(),
+          ),
+          throwsFormatException,
+        );
+      }
+    });
+
     test('rejects a resolved round that precedes creation', () {
       expect(
         () => record(
@@ -388,9 +445,28 @@ void main() {
           'resolved_round',
           'target',
           'history',
+          'visual_attachment',
         },
       );
       expect(json['resolved_round'], isNull);
+      expect(json['visual_attachment'], isNull);
+    });
+
+    test('round-trips a visual annotation with evidence', () {
+      final original = record(
+        id: 'feedback-visual',
+        scope: FeedbackScope.visualAnnotation,
+        target: const FeedbackTarget(
+          screen: 'commerce.home',
+          section: 'home.product-grid',
+        ),
+        visualAttachment: visualAttachment(sectionId: 'home.product-grid'),
+      );
+
+      final json = original.toJson();
+      expect(json['scope'], 'visual_annotation');
+      expect(json['visual_attachment'], isA<Map>());
+      expect(FeedbackRecord.fromJson(json), original);
     });
 
     test('emits history event round and batch id only when present', () {

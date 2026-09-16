@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:prototype_app/fixtures/fixture_repository.dart';
 import 'package:prototype_app/prototype_app.dart';
 import 'package:prototype_app/registry/prototype_registry.dart';
+import 'package:prototype_app/review/memory_approval_repository.dart';
 import 'package:prototype_app/review/memory_feedback_repository.dart';
 import 'package:prototype_app/review/memory_review_repository.dart';
 import 'package:prototype_app/review/review_actor.dart';
@@ -80,6 +81,17 @@ List<File> _reviewSourceFiles() {
   );
   return files;
 }
+
+/// Whether [file] lives under the file-backed `persistence/` adapter layer.
+///
+/// Per R1, only `persistence/` may perform file I/O; every other review source
+/// file must stay I/O-free.
+bool _isPersistenceFile(File file) =>
+    file.path.replaceAll('\\', '/').contains('/persistence/');
+
+/// Review source files that must remain free of any file I/O.
+List<File> _domainReviewSourceFiles() =>
+    _reviewSourceFiles().where((file) => !_isPersistenceFile(file)).toList();
 
 PrototypeRuntime _threeDirectionRuntime() {
   return PrototypeRuntime.fromMap(
@@ -246,11 +258,11 @@ void main() {
     });
   });
 
-  // 4. B.1F refinement notes remain non-runtime for the review subsystem.
+  // 4. B.1F refinement notes remain non-runtime for the review domain.
   group('B.1F refinement notes', () {
-    test('lib/review never references refinement or refinement-notes', () {
+    test('the review domain never references refinement metadata', () {
       final offenders = <String>[];
-      for (final file in _reviewSourceFiles()) {
+      for (final file in _domainReviewSourceFiles()) {
         final source = file.readAsStringSync().toLowerCase();
         if (source.contains('refinement')) {
           offenders.add(file.path);
@@ -264,17 +276,23 @@ void main() {
     });
   });
 
-  // 5. No approved-experience generation exists in the review subsystem.
+  // 5. No approved-experience generation exists in the review subsystem, and
+  //    only `persistence/` performs file I/O (R1).
   group('approval artifact exclusion', () {
-    test('lib/review never references or writes approved-experience artifacts', () {
+    test('no review file references or writes approved-experience artifacts', () {
       for (final file in _reviewSourceFiles()) {
-        final source = file.readAsStringSync();
-        final lower = source.toLowerCase();
+        final lower = file.readAsStringSync().toLowerCase();
 
         expect(lower.contains('approved-experience'), isFalse,
             reason: '${file.path} references approved-experience');
         expect(lower.contains('approved_experience'), isFalse,
             reason: '${file.path} references approved_experience');
+      }
+    });
+
+    test('the review domain performs no file I/O', () {
+      for (final file in _domainReviewSourceFiles()) {
+        final source = file.readAsStringSync();
 
         expect(source.contains('dart:io'), isFalse,
             reason: '${file.path} performs file I/O');
@@ -284,6 +302,23 @@ void main() {
             reason: '${file.path} writes files');
         expect(source.contains('File('), isFalse,
             reason: '${file.path} opens files');
+      }
+    });
+
+    test('persistence adapters never write runtime bundles', () {
+      final persistenceFiles =
+          _reviewSourceFiles().where(_isPersistenceFile).toList();
+      expect(
+        persistenceFiles,
+        isNotEmpty,
+        reason: 'Expected the file-backed persistence layer to exist.',
+      );
+      for (final file in persistenceFiles) {
+        final lower = file.readAsStringSync().toLowerCase();
+        expect(lower.contains('assets/generated'), isFalse,
+            reason: '${file.path} writes a runtime bundle');
+        expect(lower.contains('runtime_bundle'), isFalse,
+            reason: '${file.path} writes a runtime bundle');
       }
     });
   });
@@ -395,6 +430,7 @@ void main() {
             coordinator: ReviewCoordinator(
               controller: controller,
               feedbackRepository: MemoryFeedbackRepository(),
+              approvalRepository: MemoryApprovalRepository(),
             ),
             actor: _reviewer,
           ),

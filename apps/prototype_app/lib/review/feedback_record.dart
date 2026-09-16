@@ -7,6 +7,8 @@
 /// [FeedbackScope] and malformed wire payloads fail with a [FormatException].
 library;
 
+import 'visual_attachment.dart';
+
 enum FeedbackStatus { open, addressed, resolved }
 
 enum FeedbackScope { general, screen, section, decision, visualAnnotation }
@@ -260,6 +262,7 @@ final class FeedbackRecord {
     required this.target,
     required List<FeedbackEvent> history,
     this.resolvedRound,
+    this.visualAttachment,
   }) : history = List<FeedbackEvent>.unmodifiable(history) {
     if (id.trim().isEmpty) {
       throw const FormatException('Feedback id is required');
@@ -300,6 +303,11 @@ final class FeedbackRecord {
     if (status != FeedbackStatus.resolved && resolved != null) {
       throw const FormatException('Unresolved feedback must not carry a resolved round');
     }
+    if (visualAttachment != null && scope != FeedbackScope.visualAnnotation) {
+      throw const FormatException(
+        'Visual evidence is only valid for visual_annotation feedback',
+      );
+    }
   }
 
   final String id;
@@ -311,6 +319,10 @@ final class FeedbackRecord {
   final FeedbackTarget target;
   final List<FeedbackEvent> history;
   final int? resolvedRound;
+
+  /// Provider-neutral visual evidence; only present for
+  /// [FeedbackScope.visualAnnotation] records.
+  final VisualAttachment? visualAttachment;
 
   factory FeedbackRecord.fromJson(Map<String, dynamic> json) {
     final id = json['id'];
@@ -356,6 +368,16 @@ final class FeedbackRecord {
       }
       history.add(FeedbackEvent.fromJson(item.cast<String, dynamic>()));
     }
+    final rawAttachment = json['visual_attachment'];
+    VisualAttachment? visualAttachment;
+    if (rawAttachment != null) {
+      if (rawAttachment is! Map ||
+          rawAttachment.keys.any((key) => key is! String)) {
+        throw const FormatException('Invalid feedback visual attachment');
+      }
+      visualAttachment =
+          VisualAttachment.fromJson(rawAttachment.cast<String, dynamic>());
+    }
     return FeedbackRecord(
       id: id,
       scope: feedbackScopeFromWire(scopeValue),
@@ -366,10 +388,11 @@ final class FeedbackRecord {
       target: FeedbackTarget.fromJson(rawTarget.cast<String, dynamic>()),
       history: history,
       resolvedRound: resolvedRound as int?,
+      visualAttachment: visualAttachment,
     );
   }
 
-  /// Deterministic canonical serialization (all nine keys always present).
+  /// Deterministic canonical serialization (all ten keys always present).
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -381,6 +404,7 @@ final class FeedbackRecord {
       'resolved_round': resolvedRound,
       'target': target.toJson(),
       'history': [for (final event in history) event.toJson()],
+      'visual_attachment': visualAttachment?.toJson(),
     };
   }
 
@@ -395,6 +419,7 @@ final class FeedbackRecord {
     FeedbackTarget? target,
     List<FeedbackEvent>? history,
     Object? resolvedRound = _unset,
+    Object? visualAttachment = _unset,
   }) {
     return FeedbackRecord(
       id: id ?? this.id,
@@ -408,6 +433,9 @@ final class FeedbackRecord {
       resolvedRound: identical(resolvedRound, _unset)
           ? this.resolvedRound
           : resolvedRound as int?,
+      visualAttachment: identical(visualAttachment, _unset)
+          ? this.visualAttachment
+          : visualAttachment as VisualAttachment?,
     );
   }
 
@@ -422,7 +450,8 @@ final class FeedbackRecord {
         other.blocking != blocking ||
         other.createdRound != createdRound ||
         other.resolvedRound != resolvedRound ||
-        other.target != target) {
+        other.target != target ||
+        other.visualAttachment != visualAttachment) {
       return false;
     }
     return _historyEquals(other.history, history);
@@ -439,6 +468,7 @@ final class FeedbackRecord {
         resolvedRound,
         target,
         Object.hashAll(history),
+        visualAttachment,
       );
 }
 

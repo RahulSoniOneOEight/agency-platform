@@ -41,6 +41,16 @@ List<File> _reviewSourceFiles() {
   return files;
 }
 
+/// Whether [file] lives under the file-backed `persistence/` adapter layer.
+///
+/// Per R1 only `persistence/` may perform file I/O; the review domain must stay
+/// I/O-free.
+bool _isPersistenceFile(File file) =>
+    file.path.replaceAll('\\', '/').contains('/persistence/');
+
+List<File> _domainReviewSourceFiles() =>
+    _reviewSourceFiles().where((file) => !_isPersistenceFile(file)).toList();
+
 Set<String> _generatedFileNames() {
   final directory = Directory('assets/generated');
   return directory
@@ -134,8 +144,8 @@ void main() {
   });
 
   group('no synthetic runtime artifact', () {
-    test('lib/review performs no file I/O', () {
-      for (final file in _reviewSourceFiles()) {
+    test('the review domain performs no file I/O', () {
+      for (final file in _domainReviewSourceFiles()) {
         final source = file.readAsStringSync();
         expect(source.contains('dart:io'), isFalse,
             reason: '${file.path} performs file I/O');
@@ -156,7 +166,7 @@ void main() {
         'RfqPattern|TradeDashboardPattern|BookingPattern',
       );
       final offenders = <String>[];
-      for (final file in _reviewSourceFiles()) {
+      for (final file in _domainReviewSourceFiles()) {
         if (concretePatterns.hasMatch(file.readAsStringSync())) {
           offenders.add(file.path);
         }
@@ -185,7 +195,7 @@ void main() {
       expect(sectionIds, isNotEmpty);
 
       final offenders = <String>[];
-      for (final file in _reviewSourceFiles()) {
+      for (final file in _domainReviewSourceFiles()) {
         if (file.uri.pathSegments.last == authority) {
           continue;
         }
@@ -209,7 +219,7 @@ void main() {
         'ReviewComponentRegistry|componentMix',
       );
       final offenders = <String>[
-        for (final file in _reviewSourceFiles())
+        for (final file in _domainReviewSourceFiles())
           if (componentApi.hasMatch(file.readAsStringSync())) file.path,
       ];
       expect(offenders, isEmpty,
@@ -220,7 +230,7 @@ void main() {
   group('B.1F refinement notes remain non-runtime', () {
     test('lib/review never references refinement notes', () {
       final offenders = <String>[
-        for (final file in _reviewSourceFiles())
+        for (final file in _domainReviewSourceFiles())
           if (file.readAsStringSync().toLowerCase().contains('refinement'))
             file.path,
       ];
