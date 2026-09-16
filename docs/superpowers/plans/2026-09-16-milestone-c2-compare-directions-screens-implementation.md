@@ -260,10 +260,12 @@ class ReviewComparisonLayout extends StatefulWidget {
 
 - [ ] **Step 1: Write reference-client tests** reading the committed generated bundle
   `apps/prototype_app/assets/generated/prototype-demo.json`, asserting: direction order
-  `['a','b','c']`; availability (`commerce.search` supported by `a`/`b`, unavailable under `c`;
-  `commerce.home` supported by `c`); distinct `themeForDirection` values; a widget render proving a
-  supported panel uses the direction-resolved theme and an unsupported pair shows the unavailable
-  state.
+  `['a','b','c']`; availability (`commerce.search` declared only by `a`; `commerce.home` only by
+  `c`; `b`/`c` unavailable for `search`); direction themes differ in density / section spacing /
+  card radius (one shared brand primary); a widget render proving a supported panel uses the
+  direction-resolved theme and an unsupported pair shows the unavailable state. Avoid rendering
+  `commerce.home`/`commerce.plp` with the reference theme (pre-existing shared `ProductCard`
+  overflow, out of scope).
 - [ ] **Step 2: Write architecture tests** proving: comparison uses
   `ReviewComparisonHost`/`PrototypeRegistry` (no duplicate screen implementation); runtime objects
   are not mutated; C.1 `ReviewState` JSON contract keys unchanged; no approval artifact

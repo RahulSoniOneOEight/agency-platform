@@ -279,8 +279,10 @@ comment architecture, BugDrop, GitHub issues, screenshots, or Visual AI.
 - no approval artifact generation;
 - **reference client:** the actual generated bundle
   (`apps/prototype_app/assets/generated/prototype-demo.json`) yields the expected direction order,
-  per-direction screen availability (e.g. `commerce.search` supported by `a`/`b`, unavailable under
-  `c`), and distinct direction themes.
+  per-direction screen availability (`commerce.search` is declared only by `a`; `commerce.home`
+  only by `c`; `b`/`c` show the neutral unavailable state for `search`), and direction-resolved
+  themes that differ in density / section spacing / card radius (the reference bundle shares one
+  brand primary across directions).
 
 ## Reference Client
 
