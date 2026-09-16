@@ -121,3 +121,9 @@
   path; end-to-end C.4–C.7 test. Task 11 verification: app 637 + analyze clean + web built;
   agency_flutter_ui 42 + clean; widgetbook 1 + clean; Python 283 OK + validate_repo (98 paths) +
   knowledge/workflow/prototype validators; B.1D/B.1E freshness fresh.
+- 2026-09-17 — Final whole-branch review (`git diff main...HEAD`): 12/12 checks pass, mergeable,
+  but 3 majors found — F1 governed target existence unenforced; F2 public `markAddressed` bypassed
+  the batch gate; F3 validation gate used `any(passed)` instead of all-passed. Fixed in `059188f`
+  (governed target validation, `markAddressed` removed / batch-only addressed transition, all-checks
+  gate + `BatchValidationRequired`/`BatchValidationFailed`, plus F4/F7/F8). Focused re-review:
+  ACCEPT, 0 blockers / 0 majors. 644 app tests / 581 review tests green; analyze clean.
