@@ -5,6 +5,7 @@ import 'package:prototype_app/review/review_comparison_host.dart';
 import 'package:prototype_app/review/review_comparison_layout.dart';
 import 'package:prototype_app/review/review_controller.dart';
 import 'package:prototype_app/review/review_direction_summary.dart';
+import 'package:prototype_app/review/review_selection.dart';
 import 'package:prototype_app/review/review_shell.dart';
 import 'package:prototype_app/runtime/prototype_runtime.dart';
 
@@ -165,12 +166,16 @@ void main() {
     expect(find.text('Home'), findsWidgets);
   });
 
-  testWidgets('selection and comments render real read-only summaries', (tester) async {
+  testWidgets('selection workspace and comments render real summaries', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
     await tester.pumpWidget(wrap(runtime, controller));
     await tapDestination(tester, 'Selection');
 
-    expect(find.text('Overall direction: Not selected'), findsOneWidget);
-    expect(find.text('No screens mixed yet.'), findsOneWidget);
+    expect(find.text('Overall: Not selected'), findsOneWidget);
+    expect(find.text('Screen mix'), findsOneWidget);
+    expect(find.byKey(ReviewSelection.previewHostKey), findsOneWidget);
 
     await tapDestination(tester, 'Comments');
 
@@ -178,11 +183,48 @@ void main() {
     expect(find.text('No comments yet.'), findsOneWidget);
   });
 
+  testWidgets('navigating destinations never mutates saved mix decisions',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    // Compact spacing keeps the reviewed product cards within their cells while
+    // the Screens comparison surface is visited.
+    final navRuntime = buildReviewRuntime(
+      theme: resolvedThemeMap(cardSpacing: 12, tileGap: 8),
+    );
+    final navController = buildController(navRuntime);
+    await navController.selectDirection('a');
+    await navController.setScreenDirection('commerce.plp', 'c');
+
+    await tester.pumpWidget(wrap(navRuntime, navController));
+    await tester.pumpAndSettle();
+
+    for (final label in const [
+      'Screens',
+      'Directions',
+      'Overview',
+      'Comments',
+      'Selection',
+    ]) {
+      await tapDestination(tester, label);
+    }
+
+    expect(navController.state.selectedDirection, 'a');
+    expect(navController.state.screenSelections.length, 1);
+    expect(navController.state.screenSelections['commerce.plp']!.direction, 'c');
+  });
+
   testWidgets('switching destinations preserves the controller selection', (tester) async {
     await tester.binding.setSurfaceSize(const Size(1200, 800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
+    // The Selection destination renders the live mixed preview; compact spacing
+    // keeps the shared ProductCard within its grid cell at panel width.
+    final compactRuntime = buildReviewRuntime(
+      theme: resolvedThemeMap(cardSpacing: 12, tileGap: 8),
+    );
+    final compactController = buildController(compactRuntime);
 
-    await tester.pumpWidget(wrap(runtime, controller));
+    await tester.pumpWidget(wrap(compactRuntime, compactController));
     await tapDestination(tester, 'Directions');
 
     final button = find.byKey(ReviewDirectionSummary.selectButtonKey('b'));
@@ -195,9 +237,9 @@ void main() {
     expect(find.text('Overall direction: b'), findsOneWidget);
 
     await tapDestination(tester, 'Selection');
-    expect(find.text('Overall direction: b'), findsOneWidget);
+    expect(find.text('Overall: B'), findsOneWidget);
 
-    expect(controller.state.selectedDirection, 'b');
+    expect(compactController.state.selectedDirection, 'b');
   });
 
   testWidgets('uses a NavigationBar at compact widths and a NavigationRail when wide',

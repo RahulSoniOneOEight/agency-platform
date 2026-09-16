@@ -128,8 +128,11 @@ class _ReviewShellState extends State<ReviewShell> {
           runtime: widget.runtime,
           fixtures: _fixtures,
           controller: widget.controller),
-      3 =>
-        ReviewSelection(runtime: widget.runtime, controller: widget.controller),
+      3 => ReviewSelection(
+          runtime: widget.runtime,
+          controller: widget.controller,
+          fixtures: _fixtures,
+        ),
       _ =>
         ReviewComments(runtime: widget.runtime, controller: widget.controller),
     };
