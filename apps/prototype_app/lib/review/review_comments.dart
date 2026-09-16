@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../runtime/prototype_runtime.dart';
+import 'review_actor.dart';
 import 'review_controller.dart';
+import 'review_coordinator.dart';
+import 'review_feedback_panel.dart';
 import 'review_screen_registry.dart';
 import 'review_state.dart';
 
@@ -9,20 +12,26 @@ import 'review_state.dart';
 /// while still modelling "no direction" as `null` in review state.
 const String _noDirection = '__none__';
 
-/// General and screen comment capture plus the existing comment list.
+/// The Comments destination: the C.4 feedback panel plus the legacy comment
+/// capture retained for C.1–C.3 persisted-state compatibility.
 ///
-/// Comments are stored as review state through [ReviewController] and never
-/// mutate runtime/design contracts. Blank text is rejected at this UI boundary
-/// (the controller is not called), a screen comment cannot be saved without a
-/// governed screen selection, and IDs are generated as the smallest unused
-/// `review-<n>` so repeated adds never collide. Duplicate IDs remain governed by
-/// the controller (`StateError`) and are never swallowed here.
+/// New review feedback flows through [ReviewCoordinator] and [FeedbackRecord];
+/// the legacy [ReviewComment] form is preserved where it is not superseded and
+/// still stores through [ReviewController]. Blank text is rejected at this UI
+/// boundary (the controller is not called), a screen comment cannot be saved
+/// without a governed screen selection, and IDs are generated as the smallest
+/// unused `review-<n>` so repeated adds never collide.
 class ReviewComments extends StatefulWidget {
   const ReviewComments({
     super.key,
     required this.runtime,
     required this.controller,
+    required this.coordinator,
+    required this.actor,
   });
+
+  /// Marks the retained C.1–C.3 comment capture as legacy/back-compat.
+  static const Key legacyCommentsLabelKey = Key('review-comments-legacy-label');
 
   static const Key generalTextFieldKey = Key('review-comments-general-text');
   static const Key generalDirectionFieldKey =
@@ -46,6 +55,8 @@ class ReviewComments extends StatefulWidget {
 
   final PrototypeRuntime runtime;
   final ReviewController controller;
+  final ReviewCoordinator coordinator;
+  final ReviewActor actor;
 
   @override
   State<ReviewComments> createState() => _ReviewCommentsState();
@@ -127,6 +138,26 @@ class _ReviewCommentsState extends State<ReviewComments> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          ReviewFeedbackPanel(
+            runtime: widget.runtime,
+            controller: widget.controller,
+            coordinator: widget.coordinator,
+            actor: widget.actor,
+          ),
+          const SizedBox(height: 24),
+          const Divider(),
+          const SizedBox(height: 16),
+          Text(
+            'Legacy comments (retained for C.1-C.3 back-compat)',
+            key: ReviewComments.legacyCommentsLabelKey,
+            style: Theme.of(context).textTheme.labelLarge,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Superseded by the review feedback panel above.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 16),
           Text('Review comments',
               style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 16),

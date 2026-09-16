@@ -9,8 +9,10 @@ import 'review_state.dart';
 /// Every value is derived from the loaded [PrototypeRuntime] and the injected
 /// [ReviewController] state. The explicit advance action is deterministic
 /// (`round + 1`) with no workflow/approval transition logic, and the status
-/// control offers exactly the three C.1 lifecycle statuses; neither is an
-/// approval action. This screen never mutates the runtime bundle.
+/// control offers only the interactive C.1 statuses (`in_review`,
+/// `needs_revision`); `ready_for_final_review` is coordinator-owned and is set
+/// only by closing the review round. Neither control is an approval action.
+/// This screen never mutates the runtime bundle.
 class ReviewOverview extends StatelessWidget {
   const ReviewOverview({
     super.key,
@@ -23,6 +25,15 @@ class ReviewOverview extends StatelessWidget {
 
   /// C.1 status control.
   static const Key statusControlKey = Key('review-overview-status');
+
+  /// Statuses the overview control may set directly.
+  ///
+  /// `readyForFinalReview` is deliberately absent: readiness is only reachable
+  /// through `ReviewCoordinator.closeCurrentRound`.
+  static const List<ReviewStatus> selectableStatuses = <ReviewStatus>[
+    ReviewStatus.inReview,
+    ReviewStatus.needsRevision,
+  ];
 
   final PrototypeRuntime runtime;
   final ReviewController controller;
@@ -97,13 +108,16 @@ class ReviewOverview extends StatelessWidget {
             SegmentedButton<ReviewStatus>(
               key: statusControlKey,
               segments: [
-                for (final status in ReviewStatus.values)
+                for (final status in selectableStatuses)
                   ButtonSegment<ReviewStatus>(
                     value: status,
                     label: Text(reviewStatusToWire(status)),
                   ),
               ],
-              selected: {state.status},
+              selected: selectableStatuses.contains(state.status)
+                  ? <ReviewStatus>{state.status}
+                  : const <ReviewStatus>{},
+              emptySelectionAllowed: true,
               showSelectedIcon: false,
               onSelectionChanged: (selection) =>
                   controller.setStatus(selection.first),

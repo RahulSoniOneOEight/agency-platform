@@ -1,13 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:prototype_app/review/memory_approval_repository.dart';
+import 'package:prototype_app/review/memory_refinement_batch_repository.dart';
+import 'package:prototype_app/review/memory_feedback_repository.dart';
 import 'package:prototype_app/review/memory_review_repository.dart';
+import 'package:prototype_app/review/review_actor.dart';
 import 'package:prototype_app/review/review_comments.dart';
 import 'package:prototype_app/review/review_controller.dart';
+import 'package:prototype_app/review/review_coordinator.dart';
 import 'package:prototype_app/review/review_screen_registry.dart';
 import 'package:prototype_app/review/review_state.dart';
 import 'package:prototype_app/runtime/prototype_runtime.dart';
 
 import '../support/runtime_fixtures.dart';
+
+const ReviewActor _reviewer = ReviewActor(
+  id: 'reviewer-1',
+  name: 'Reviewer',
+  role: ReviewRole.reviewer,
+);
 
 /// Reference runtime with three directions and four governed screens so the
 /// comment forms have real screen and direction options to choose from.
@@ -33,6 +44,7 @@ void main() {
   late PrototypeRuntime runtime;
   late MemoryReviewRepository repository;
   late ReviewController controller;
+  late ReviewCoordinator coordinator;
 
   setUp(() {
     runtime = buildCommentsRuntime();
@@ -42,15 +54,26 @@ void main() {
       repository: repository,
       runtime: runtime,
     );
+    coordinator = ReviewCoordinator(
+      controller: controller,
+      feedbackRepository: MemoryFeedbackRepository(),
+      approvalRepository: MemoryApprovalRepository(),
+      refinementBatchRepository: MemoryRefinementBatchRepository(),
+    );
   });
 
   Future<void> pumpComments(WidgetTester tester) async {
-    await tester.binding.setSurfaceSize(const Size(1200, 2000));
+    await tester.binding.setSurfaceSize(const Size(1200, 2400));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: ReviewComments(runtime: runtime, controller: controller),
+          body: ReviewComments(
+            runtime: runtime,
+            controller: controller,
+            coordinator: coordinator,
+            actor: _reviewer,
+          ),
         ),
       ),
     );
@@ -89,6 +112,17 @@ void main() {
     await tester.tap(find.byKey(ReviewComments.addScreenButtonKey));
     await tester.pumpAndSettle();
   }
+
+  testWidgets('labels the retained comment capture as legacy back-compat',
+      (tester) async {
+    await pumpComments(tester);
+
+    expect(find.byKey(ReviewComments.legacyCommentsLabelKey), findsOneWidget);
+    expect(
+      find.text('Legacy comments (retained for C.1-C.3 back-compat)'),
+      findsOneWidget,
+    );
+  });
 
   testWidgets('adds a general comment, persists it and displays it',
       (tester) async {

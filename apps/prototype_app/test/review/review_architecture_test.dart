@@ -7,9 +7,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:prototype_app/fixtures/fixture_repository.dart';
 import 'package:prototype_app/prototype_app.dart';
 import 'package:prototype_app/registry/prototype_registry.dart';
+import 'package:prototype_app/review/memory_approval_repository.dart';
+import 'package:prototype_app/review/memory_feedback_repository.dart';
+import 'package:prototype_app/review/memory_refinement_batch_repository.dart';
 import 'package:prototype_app/review/memory_review_repository.dart';
+import 'package:prototype_app/review/review_actor.dart';
 import 'package:prototype_app/review/review_comparison_host.dart';
 import 'package:prototype_app/review/review_controller.dart';
+import 'package:prototype_app/review/review_coordinator.dart';
 import 'package:prototype_app/review/review_screen_registry.dart';
 import 'package:prototype_app/review/review_shell.dart';
 import 'package:prototype_app/review/review_state.dart';
@@ -17,6 +22,12 @@ import 'package:prototype_app/runtime/prototype_runtime.dart';
 import 'package:prototype_app/screens/prototype_shell.dart';
 
 import '../support/runtime_fixtures.dart';
+
+const ReviewActor _reviewer = ReviewActor(
+  id: 'reviewer-1',
+  name: 'Reviewer',
+  role: ReviewRole.reviewer,
+);
 
 /// Keys that belong to the review-state contract. They must never appear inside
 /// the B.1B runtime bundle input (review state is separate from the runtime).
@@ -29,6 +40,7 @@ const Set<String> _reviewStateKeys = {
   'selected_direction',
   'screen_selections',
   'comments',
+  'feedback_ids',
   'direction',
   'sections',
 };
@@ -70,6 +82,17 @@ List<File> _reviewSourceFiles() {
   );
   return files;
 }
+
+/// Whether [file] lives under the file-backed `persistence/` adapter layer.
+///
+/// Per R1, only `persistence/` may perform file I/O; every other review source
+/// file must stay I/O-free.
+bool _isPersistenceFile(File file) =>
+    file.path.replaceAll('\\', '/').contains('/persistence/');
+
+/// Review source files that must remain free of any file I/O.
+List<File> _domainReviewSourceFiles() =>
+    _reviewSourceFiles().where((file) => !_isPersistenceFile(file)).toList();
 
 PrototypeRuntime _threeDirectionRuntime() {
   return PrototypeRuntime.fromMap(
@@ -236,13 +259,20 @@ void main() {
     });
   });
 
-  // 4. B.1F refinement notes remain non-runtime for the review subsystem.
+  // 4. B.1F refinement notes remain non-runtime for the review domain.
   group('B.1F refinement notes', () {
-    test('lib/review never references refinement or refinement-notes', () {
+    test('the review domain never references B.1F refinement-note metadata', () {
+      // C.7 legitimately introduces RefinementBatch, so this guard pins the
+      // B.1F *refinement-notes* artifact rather than the bare word.
+      const needles = <String>[
+        'refinement-notes',
+        'refinement_notes',
+        'refinement note',
+      ];
       final offenders = <String>[];
-      for (final file in _reviewSourceFiles()) {
+      for (final file in _domainReviewSourceFiles()) {
         final source = file.readAsStringSync().toLowerCase();
-        if (source.contains('refinement')) {
+        if (needles.any(source.contains)) {
           offenders.add(file.path);
         }
       }
@@ -254,17 +284,23 @@ void main() {
     });
   });
 
-  // 5. No approved-experience generation exists in the review subsystem.
+  // 5. No approved-experience generation exists in the review subsystem, and
+  //    only `persistence/` performs file I/O (R1).
   group('approval artifact exclusion', () {
-    test('lib/review never references or writes approved-experience artifacts', () {
+    test('no review file references or writes approved-experience artifacts', () {
       for (final file in _reviewSourceFiles()) {
-        final source = file.readAsStringSync();
-        final lower = source.toLowerCase();
+        final lower = file.readAsStringSync().toLowerCase();
 
         expect(lower.contains('approved-experience'), isFalse,
             reason: '${file.path} references approved-experience');
         expect(lower.contains('approved_experience'), isFalse,
             reason: '${file.path} references approved_experience');
+      }
+    });
+
+    test('the review domain performs no file I/O', () {
+      for (final file in _domainReviewSourceFiles()) {
+        final source = file.readAsStringSync();
 
         expect(source.contains('dart:io'), isFalse,
             reason: '${file.path} performs file I/O');
@@ -274,6 +310,23 @@ void main() {
             reason: '${file.path} writes files');
         expect(source.contains('File('), isFalse,
             reason: '${file.path} opens files');
+      }
+    });
+
+    test('persistence adapters never write runtime bundles', () {
+      final persistenceFiles =
+          _reviewSourceFiles().where(_isPersistenceFile).toList();
+      expect(
+        persistenceFiles,
+        isNotEmpty,
+        reason: 'Expected the file-backed persistence layer to exist.',
+      );
+      for (final file in persistenceFiles) {
+        final lower = file.readAsStringSync().toLowerCase();
+        expect(lower.contains('assets/generated'), isFalse,
+            reason: '${file.path} writes a runtime bundle');
+        expect(lower.contains('runtime_bundle'), isFalse,
+            reason: '${file.path} writes a runtime bundle');
       }
     });
   });
@@ -378,7 +431,19 @@ void main() {
       );
 
       await tester.pumpWidget(
-        MaterialApp(home: ReviewShell(runtime: runtime, controller: controller)),
+        MaterialApp(
+          home: ReviewShell(
+            runtime: runtime,
+            controller: controller,
+            coordinator: ReviewCoordinator(
+              controller: controller,
+              feedbackRepository: MemoryFeedbackRepository(),
+              approvalRepository: MemoryApprovalRepository(),
+              refinementBatchRepository: MemoryRefinementBatchRepository(),
+            ),
+            actor: _reviewer,
+          ),
+        ),
       );
       await tester.pumpAndSettle();
 

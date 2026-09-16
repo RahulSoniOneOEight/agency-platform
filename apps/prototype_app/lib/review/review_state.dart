@@ -107,9 +107,11 @@ final class ReviewState {
     required this.selectedDirection,
     required Map<String, ReviewScreenDecision> screenSelections,
     required List<ReviewComment> comments,
+    List<String> feedbackIds = const <String>[],
   })  : screenSelections =
             Map<String, ReviewScreenDecision>.unmodifiable(screenSelections),
-        comments = List<ReviewComment>.unmodifiable(comments);
+        comments = List<ReviewComment>.unmodifiable(comments),
+        feedbackIds = List<String>.unmodifiable(feedbackIds);
 
   static const int currentVersion = 2;
 
@@ -120,6 +122,12 @@ final class ReviewState {
   final String? selectedDirection;
   final Map<String, ReviewScreenDecision> screenSelections;
   final List<ReviewComment> comments;
+
+  /// References to the feedback relevant to the current review.
+  ///
+  /// ReviewState stores stable feedback ids only; [FeedbackRecord] remains the
+  /// sole authority over feedback content and history.
+  final List<String> feedbackIds;
 
   factory ReviewState.fromJson(Map<String, dynamic> json) {
     final version = json['version'];
@@ -184,6 +192,21 @@ final class ReviewState {
       }
       comments.add(ReviewComment.fromJson(item.cast<String, dynamic>()));
     }
+    // Backward-compatible: legacy v1/v2 state without feedback references
+    // migrates to an empty list (R2).
+    final rawFeedbackIds = json['feedback_ids'];
+    if (rawFeedbackIds != null && rawFeedbackIds is! List) {
+      throw const FormatException('Invalid review state feedback_ids');
+    }
+    final feedbackIds = <String>[];
+    if (rawFeedbackIds is List) {
+      for (final item in rawFeedbackIds) {
+        if (item is! String || item.trim().isEmpty) {
+          throw const FormatException('Invalid review state feedback id');
+        }
+        feedbackIds.add(item);
+      }
+    }
     return ReviewState(
       version: currentVersion,
       clientId: clientId,
@@ -192,6 +215,7 @@ final class ReviewState {
       selectedDirection: selectedDirection as String?,
       screenSelections: screenSelections,
       comments: comments,
+      feedbackIds: feedbackIds,
     );
   }
 
@@ -207,6 +231,7 @@ final class ReviewState {
         for (final key in sortedKeys) key: screenSelections[key]!.toJson(),
       },
       'comments': [for (final comment in comments) comment.toJson()],
+      'feedback_ids': [for (final id in feedbackIds) id],
     };
   }
 
@@ -222,7 +247,8 @@ final class ReviewState {
       return false;
     }
     return _mapEquals(other.screenSelections, screenSelections) &&
-        _listEquals(other.comments, comments);
+        _listEquals(other.comments, comments) &&
+        _stringListEquals(other.feedbackIds, feedbackIds);
   }
 
   @override
@@ -236,6 +262,7 @@ final class ReviewState {
           screenSelections.entries.map((entry) => Object.hash(entry.key, entry.value)),
         ),
         Object.hashAll(comments),
+        Object.hashAll(feedbackIds),
       );
 }
 
@@ -251,6 +278,14 @@ bool _mapEquals(
 }
 
 bool _listEquals(List<ReviewComment> a, List<ReviewComment> b) {
+  if (a.length != b.length) return false;
+  for (var index = 0; index < a.length; index++) {
+    if (a[index] != b[index]) return false;
+  }
+  return true;
+}
+
+bool _stringListEquals(List<String> a, List<String> b) {
   if (a.length != b.length) return false;
   for (var index = 0; index < a.length; index++) {
     if (a[index] != b[index]) return false;

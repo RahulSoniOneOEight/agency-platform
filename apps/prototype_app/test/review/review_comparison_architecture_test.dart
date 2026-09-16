@@ -55,6 +55,16 @@ List<File> _reviewSourceFiles() {
   return files;
 }
 
+/// Whether [file] lives under the file-backed `persistence/` adapter layer.
+///
+/// Per R1 only `persistence/` may perform file I/O; the review domain must stay
+/// I/O-free.
+bool _isPersistenceFile(File file) =>
+    file.path.replaceAll('\\', '/').contains('/persistence/');
+
+List<File> _domainReviewSourceFiles() =>
+    _reviewSourceFiles().where((file) => !_isPersistenceFile(file)).toList();
+
 List<File> _comparisonSourceFiles() {
   final files = _reviewSourceFiles()
       .where((file) => _comparisonSourceNames.contains(file.uri.pathSegments.last))
@@ -198,15 +208,20 @@ Future<void> _pumpDirectionComparison(
 
 void main() {
   group('source boundaries (B.1B/D/F + approval)', () {
-    test('lib/review never references approval artifacts or performs file I/O', () {
+    test('lib/review never references approval artifacts', () {
       for (final file in _reviewSourceFiles()) {
-        final source = file.readAsStringSync();
-        final lower = source.toLowerCase();
+        final lower = file.readAsStringSync().toLowerCase();
 
         expect(lower.contains('approved-experience'), isFalse,
             reason: '${file.path} references approved-experience');
         expect(lower.contains('approved_experience'), isFalse,
             reason: '${file.path} references approved_experience');
+      }
+    });
+
+    test('the review domain performs no file I/O', () {
+      for (final file in _domainReviewSourceFiles()) {
+        final source = file.readAsStringSync();
         expect(source.contains('dart:io'), isFalse,
             reason: '${file.path} performs file I/O');
         expect(source.contains('File('), isFalse,
@@ -218,10 +233,17 @@ void main() {
       }
     });
 
-    test('lib/review never references B.1F refinement notes', () {
+    test('the review domain never references B.1F refinement-note metadata', () {
+      // C.7 legitimately introduces RefinementBatch, so this guard pins the
+      // B.1F *refinement-notes* artifact rather than the bare word.
+      const needles = <String>[
+        'refinement-notes',
+        'refinement_notes',
+        'refinement note',
+      ];
       final offenders = <String>[
-        for (final file in _reviewSourceFiles())
-          if (file.readAsStringSync().toLowerCase().contains('refinement'))
+        for (final file in _domainReviewSourceFiles())
+          if (needles.any(file.readAsStringSync().toLowerCase().contains))
             file.path,
       ];
       expect(offenders, isEmpty,
@@ -230,7 +252,7 @@ void main() {
 
     test('review subsystem sources render no ranking vocabulary', () {
       final offenders = <String>[];
-      for (final file in _reviewSourceFiles()) {
+      for (final file in _domainReviewSourceFiles()) {
         final code = _stripComments(file.readAsStringSync());
         if (_rankingVocabulary.hasMatch(code)) {
           offenders.add(file.path);
@@ -468,9 +490,10 @@ void main() {
       'selected_direction',
       'screen_selections',
       'comments',
+      'feedback_ids',
     };
 
-    test('toJson emits exactly the canonical seven keys and round-trips', () {
+    test('toJson emits exactly the canonical eight keys and round-trips', () {
       final state = ReviewState.fromJson({
         'version': 1,
         'client_id': 'prototype-demo',
@@ -487,7 +510,7 @@ void main() {
       expect(ReviewState.fromJson(state.toJson()), equals(state));
     });
 
-    test('canonical v2 decisions keep the seven-key contract and round-trip', () {
+    test('canonical v2 decisions keep the eight-key contract and round-trip', () {
       final state = ReviewState.fromJson({
         'version': 2,
         'client_id': 'prototype-demo',

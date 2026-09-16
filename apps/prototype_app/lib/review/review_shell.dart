@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../fixtures/fixture_repository.dart';
 import '../runtime/prototype_runtime.dart';
+import 'review_actor.dart';
+import 'review_approval_panel.dart';
 import 'review_comments.dart';
 import 'review_controller.dart';
+import 'review_coordinator.dart';
 import 'review_direction_comparison.dart';
 import 'review_overview.dart';
 import 'review_screen_comparison.dart';
@@ -14,8 +17,8 @@ const double _wideBreakpoint = 900;
 
 /// Responsive Review Mode shell.
 ///
-/// It exposes the five review destinations (Overview, Directions, Screens,
-/// Selection, Comments) with a [NavigationRail] at wide widths and a
+/// It exposes the six review destinations (Overview, Directions, Screens,
+/// Selection, Comments, Approval) with a [NavigationRail] at wide widths and a
 /// [NavigationBar] at compact widths. The destination index is local UI state;
 /// all review decisions live in the injected [ReviewController], which is owned
 /// by the composition root, so switching destinations never loses review state.
@@ -24,11 +27,15 @@ class ReviewShell extends StatefulWidget {
     super.key,
     required this.runtime,
     required this.controller,
+    required this.coordinator,
+    required this.actor,
     this.onOpenPrototype,
   });
 
   final PrototypeRuntime runtime;
   final ReviewController controller;
+  final ReviewCoordinator coordinator;
+  final ReviewActor actor;
 
   /// Optional exit path back to normal prototype mode.
   final VoidCallback? onOpenPrototype;
@@ -45,6 +52,7 @@ class _ReviewShellState extends State<ReviewShell> {
     _ReviewDestination(
         'Selection', Icons.check_circle_outline, Icons.check_circle),
     _ReviewDestination('Comments', Icons.comment_outlined, Icons.comment),
+    _ReviewDestination('Approval', Icons.verified_outlined, Icons.verified),
   ];
 
   late final FixtureRepository _fixtures;
@@ -133,8 +141,18 @@ class _ReviewShellState extends State<ReviewShell> {
           controller: widget.controller,
           fixtures: _fixtures,
         ),
-      _ =>
-        ReviewComments(runtime: widget.runtime, controller: widget.controller),
+      4 => ReviewComments(
+          runtime: widget.runtime,
+          controller: widget.controller,
+          coordinator: widget.coordinator,
+          actor: widget.actor,
+        ),
+      _ => ReviewApprovalPanel(
+          runtime: widget.runtime,
+          controller: widget.controller,
+          coordinator: widget.coordinator,
+          actor: widget.actor,
+        ),
     };
   }
 }

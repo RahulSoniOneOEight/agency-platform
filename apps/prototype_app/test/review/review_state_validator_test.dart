@@ -41,6 +41,7 @@ ReviewState validState({
   String? selectedDirection = 'a',
   Map<String, ReviewScreenDecision>? screenSelections,
   List<ReviewComment> comments = const [],
+  List<String> feedbackIds = const [],
 }) {
   return ReviewState(
     version: version,
@@ -51,6 +52,7 @@ ReviewState validState({
     screenSelections: screenSelections ??
         {'commerce.plp': ReviewScreenDecision(direction: 'c')},
     comments: comments,
+    feedbackIds: feedbackIds,
   );
 }
 
@@ -437,6 +439,39 @@ void main() {
           screenIds: screenIds,
         ),
         contains('comment c1 has empty text'),
+      );
+    });
+
+    test('accepts unique non-empty feedback references', () {
+      expect(
+        validateReviewState(
+          validState(feedbackIds: const ['feedback-1', 'feedback-2']),
+          runtime,
+          screenIds: screenIds,
+        ),
+        isEmpty,
+      );
+    });
+
+    test('reports a blank feedback reference', () {
+      expect(
+        validateReviewState(
+          validState(feedbackIds: const ['feedback-1', '   ']),
+          runtime,
+          screenIds: screenIds,
+        ),
+        contains('invalid feedback id:    '),
+      );
+    });
+
+    test('reports duplicate feedback references', () {
+      expect(
+        validateReviewState(
+          validState(feedbackIds: const ['feedback-1', 'feedback-1']),
+          runtime,
+          screenIds: screenIds,
+        ),
+        contains('duplicate feedback id: feedback-1'),
       );
     });
 
