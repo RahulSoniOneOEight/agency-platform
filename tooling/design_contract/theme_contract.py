@@ -414,14 +414,21 @@ def _validate_semantic(catalog: dict, *, prefix: str = "semantic") -> list[str]:
     return errors
 
 
-def _walk_leaves(value, path: str = ""):
+def _walk_leaves(value, path: str = "", seen: set[int] | None = None):
+    if seen is None:
+        seen = set()
+    if isinstance(value, (dict, list)):
+        identity = id(value)
+        if identity in seen:
+            return
+        seen = seen | {identity}
     if isinstance(value, dict):
         for key in sorted(value, key=str):
             child = f"{path}.{key}" if path else str(key)
-            yield from _walk_leaves(value[key], child)
+            yield from _walk_leaves(value[key], child, seen)
     elif isinstance(value, list):
         for index, item in enumerate(value):
-            yield from _walk_leaves(item, f"{path}.{index}")
+            yield from _walk_leaves(item, f"{path}.{index}", seen)
     else:
         yield path, value
 

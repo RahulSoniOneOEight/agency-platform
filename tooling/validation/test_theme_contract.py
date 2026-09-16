@@ -68,14 +68,6 @@ def _root_with(foundation=None, semantic=None) -> Path:
     return root
 
 
-def _write_preset(root: Path, name: str, document) -> None:
-    directory = root / "design-contract" / "themes"
-    directory.mkdir(parents=True, exist_ok=True)
-    (directory / name).write_text(
-        yaml.safe_dump(document, sort_keys=False), encoding="utf-8"
-    )
-
-
 def _has_error(errors: list[str], needle: str) -> bool:
     return any(needle in error for error in errors)
 

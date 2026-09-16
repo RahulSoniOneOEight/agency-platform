@@ -132,7 +132,11 @@ def _write_design_contract(
             )
 
 
-def _write_client(client_dir: Path, direction_ids: tuple[str, ...] = ("a", "b")) -> None:
+def _write_client(
+    client_dir: Path,
+    direction_ids: tuple[str, ...] = ("a", "b"),
+    densities: dict[str, str] | None = None,
+) -> None:
     root = client_dir.parents[1]
     _write_design_contract(root)
     _copy_theme_contract(root)
@@ -158,8 +162,12 @@ def _write_client(client_dir: Path, direction_ids: tuple[str, ...] = ("a", "b"))
     direction_paths = {}
     for direction_id in direction_ids:
         relative_path = f"prototype/runtime/direction-{direction_id}.json"
+        density = (densities or {}).get(direction_id, "compact")
         (client_dir / relative_path).write_text(
-            json.dumps(_direction(direction_id), indent=2, sort_keys=True) + "\n",
+            json.dumps(
+                _direction(direction_id, density=density), indent=2, sort_keys=True
+            )
+            + "\n",
             encoding="utf-8",
         )
         direction_paths[direction_id] = relative_path
@@ -1007,7 +1015,11 @@ class ResolvedThemeBundleTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             client = root / "client-projects" / "acme-client"
-            _write_client(client, ("a", "b"))
+            _write_client(
+                client,
+                ("a", "b", "c"),
+                densities={"a": "compact", "b": "normal", "c": "spacious"},
+            )
 
             bundle = json.loads(
                 build_runtime_bundle(root, client, root / "output").read_text(
@@ -1016,7 +1028,10 @@ class ResolvedThemeBundleTests(unittest.TestCase):
             )
 
         self.assertEqual("compact", bundle["direction_themes"]["a"]["density"]["default"])
-        self.assertEqual("compact", bundle["direction_themes"]["b"]["density"]["default"])
+        self.assertEqual("normal", bundle["direction_themes"]["b"]["density"]["default"])
+        self.assertEqual(
+            "spacious", bundle["direction_themes"]["c"]["density"]["default"]
+        )
 
     def test_bundle_theme_matches_fresh_resolve(self):
         with tempfile.TemporaryDirectory() as tmp:
