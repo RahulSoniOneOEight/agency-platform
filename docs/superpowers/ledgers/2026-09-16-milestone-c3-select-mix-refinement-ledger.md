@@ -89,7 +89,7 @@
 | 5 | Mixed preview + source-direction theming | ACCEPTED | `d97c5e9` |
 | 6 | Select + Mix client workspace | ACCEPTED | `cabc085` + `7ddc23b` |
 | 7 | Reference-client + architecture regressions | ACCEPTED | `ca57011` |
-| 8 | Full verification + final review + PR | IN_PROGRESS | — |
+| 8 | Full verification + final review + PR | ACCEPTED | `83000af` · PR #19 |
 
 ## Progress log
 
@@ -158,3 +158,10 @@
 - 2026-09-16 — Task 8 verification: app `flutter test` 387, analyze clean; agency_flutter_ui 42 +
   clean; widgetbook 1 + clean; `flutter build web` built; Python 283 unittest OK + validate_repo (98
   paths) + knowledge/workflow/prototype validators; B.1D/B.1E freshness fresh.
+- 2026-09-16 — Task 8 complete. Final independent whole-branch review over `git diff main...HEAD`:
+  MERGE-READY, 0 blockers / 0 majors (11/11 checks). Deferred minors: inherited base direction not
+  gated against screen membership; redundant save/notify when selecting the effective base. Branch
+  pushed; PR #19 opened against `main` (not merged).
+- FINAL: R1–R9 recorded; model-routing deviation R4 (only explore/general subagents; fresh general
+  implementer + reviewer per task + final whole-branch review; Tasks 2/5 implemented directly with
+  fresh review due to cross-package rendering fidelity).
