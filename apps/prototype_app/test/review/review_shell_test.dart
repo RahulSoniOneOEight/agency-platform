@@ -10,9 +10,10 @@ import '../support/runtime_fixtures.dart';
 
 /// Reference runtime with three directions and multiple governed patterns, so
 /// the shell has real directions and a real governed screen registry to expose.
-PrototypeRuntime buildReviewRuntime() {
+PrototypeRuntime buildReviewRuntime({Map<String, Object?>? theme}) {
   return PrototypeRuntime.fromMap(
     canonicalBundle(
+      theme: theme,
       directionIds: const ['a', 'b', 'c'],
       names: const {
         'a': 'Alpha Direction',
@@ -179,5 +180,26 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(NavigationRail), findsOneWidget);
     expect(find.byType(NavigationBar), findsNothing);
+  });
+
+  testWidgets('renders the Screens destination at a compact phone width',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    // Compact spacing keeps the reviewed product card within its grid cell at
+    // phone width (the shared ProductCard's fixed grid extent is not a C.1
+    // concern and is unchanged here).
+    final compactRuntime = buildReviewRuntime(
+      theme: resolvedThemeMap(cardSpacing: 12, tileGap: 8),
+    );
+    final compactController = buildController(compactRuntime);
+
+    await tester.pumpWidget(wrap(compactRuntime, compactController));
+    await tester.pumpAndSettle();
+    await tapDestination(tester, 'Screens');
+
+    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.byType(ReviewComparisonHost), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

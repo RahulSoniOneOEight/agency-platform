@@ -166,4 +166,21 @@ void main() {
     expect(find.byType(RuntimeErrorScreen), findsOneWidget);
     expect(find.byType(ReviewShell), findsNothing);
   });
+
+  testWidgets('review mode can return to prototype mode', (tester) async {
+    await tester.pumpWidget(
+      PrototypeBootstrap(
+        uri: Uri.parse('https://example.test/review?client=prototype-demo'),
+        loadRuntime: _loader(<String>[]),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(ReviewShell), findsOneWidget);
+
+    await tester.tap(find.text('Prototype'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(PrototypeApp), findsOneWidget);
+    expect(find.byType(ReviewShell), findsNothing);
+  });
 }

@@ -23,10 +23,14 @@ class ReviewShell extends StatefulWidget {
     super.key,
     required this.runtime,
     required this.controller,
+    this.onOpenPrototype,
   });
 
   final PrototypeRuntime runtime;
   final ReviewController controller;
+
+  /// Optional exit path back to normal prototype mode.
+  final VoidCallback? onOpenPrototype;
 
   @override
   State<ReviewShell> createState() => _ReviewShellState();
@@ -54,7 +58,16 @@ class _ReviewShellState extends State<ReviewShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Review Mode · ${widget.runtime.clientId}')),
+      appBar: AppBar(
+        title: Text('Review Mode · ${widget.runtime.clientId}'),
+        actions: [
+          if (widget.onOpenPrototype != null)
+            TextButton(
+              onPressed: widget.onOpenPrototype,
+              child: const Text('Prototype'),
+            ),
+        ],
+      ),
       body: LayoutBuilder(
         builder: (context, constraints) {
           final content = _buildDestination(_destinationIndex);

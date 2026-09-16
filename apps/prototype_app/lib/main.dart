@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:agency_flutter_ui/agency_flutter_ui.dart';
 import 'package:flutter/material.dart';
 
@@ -38,6 +40,7 @@ class _PrototypeBootstrapState extends State<PrototypeBootstrap> {
   RuntimeException? _routeError;
   String? _requestedDirection;
   ReviewController? _reviewController;
+  bool _showPrototype = false;
 
   @override
   void initState() {
@@ -74,11 +77,21 @@ class _PrototypeBootstrapState extends State<PrototypeBootstrap> {
   }
 
   /// Composition root: Review Mode storage is chosen here, never in the UI.
+  ///
+  /// A persisted state (when one exists) is restored; otherwise the controller
+  /// keeps its initial state (round 1, no selected direction).
   ReviewController _controllerFor(PrototypeRuntime runtime) {
-    return _reviewController ??= ReviewController(
+    final existing = _reviewController;
+    if (existing != null) {
+      return existing;
+    }
+    final controller = ReviewController(
       clientId: runtime.clientId,
       repository: MemoryReviewRepository(),
     );
+    unawaited(controller.load());
+    _reviewController = controller;
+    return controller;
   }
 
   @override
@@ -108,12 +121,16 @@ class _PrototypeBootstrapState extends State<PrototypeBootstrap> {
           );
         }
         final runtime = snapshot.requireData;
-        if (_route.isReviewMode) {
+        if (_route.isReviewMode && !_showPrototype) {
           return _shell(
-            ReviewShell(runtime: runtime, controller: _controllerFor(runtime)),
+            ReviewShell(
+              runtime: runtime,
+              controller: _controllerFor(runtime),
+              onOpenPrototype: () => setState(() => _showPrototype = true),
+            ),
           );
         }
-        final requested = _requestedDirection;
+        final requested = _route.isReviewMode ? null : _requestedDirection;
         return PrototypeApp(
           runtime: runtime,
           requestedDirection: (requested == null || requested.isEmpty) ? null : requested,

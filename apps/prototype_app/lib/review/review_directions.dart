@@ -6,11 +6,10 @@ import 'review_controller.dart';
 
 /// Direction browsing plus the explicit overall-direction selection action.
 ///
-/// The selector only updates a local preview direction; `selected_direction` in
-/// review state changes only when the reviewer presses `Select this direction`.
-/// The invariant `previewed direction != selected_direction` therefore always
-/// holds, and the runtime's declared `default_direction` is used only as the
-/// initial local preview, never as a silent client selection.
+/// The selector only updates a local preview direction; previewing alone never
+/// changes `selected_direction`. Review state changes only when the reviewer
+/// presses `Select this direction`, and the runtime's declared `default_direction`
+/// is used only as the initial local preview, never as a silent client selection.
 class ReviewDirections extends StatefulWidget {
   const ReviewDirections({
     super.key,

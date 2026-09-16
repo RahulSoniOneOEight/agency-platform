@@ -102,15 +102,20 @@
   Review state is never written to the runtime bundle or `refinement-notes.yaml`.
 - **R10 — No unnecessary churn.** `prototype_registry.dart` / `prototype_shell.dart` are modified only
   if a test proves it necessary.
+- **R11 — Minimal shell in Task 4.** Task 4 creates a minimal-but-real `review_shell.dart` (client
+  identity, round, status, "Overall direction: Not selected") so Review Mode is genuinely usable
+  before Task 5 expands it into the full five-destination shell. This is a deliberate deviation from
+  the plan's file list (which assigns `review_shell.dart` to Task 5); Task 5 modifies rather than
+  creates it.
 
 ## Task table
 
 | Task | Scope | Status | Commit |
 |------|-------|--------|--------|
-| 1 | Review-state model + deterministic validation | PENDING | — |
-| 2 | Persistence abstraction + controller | PENDING | — |
-| 3 | Governed screen registry + comparison host | PENDING | — |
-| 4 | Deterministic review entry point | PENDING | — |
+| 1 | Review-state model + deterministic validation | ACCEPTED | `39db2f7` + `808632b` |
+| 2 | Persistence abstraction + controller | ACCEPTED | `e7021b5` + `89d2600` |
+| 3 | Governed screen registry + comparison host | ACCEPTED | `c16f18b` + `e423a3b` |
+| 4 | Deterministic review entry point | ACCEPTED | `940d7d1` + `bf483a1` |
 | 5 | Review shell + Overview/Directions/Screens | PENDING | — |
 | 6 | Overall selection + per-screen mix | PENDING | — |
 | 7 | Comments + review-round controls | PENDING | — |
@@ -119,3 +124,25 @@
 ## Progress log
 
 - 2026-09-16 — Pre-flight complete. Ledger initialized. No tasks started.
+- 2026-09-16 — Task 1 implemented (`39db2f7`, 28 tests): `ReviewState`/`ReviewComment`/
+  `ReviewStatus`/`ReviewCommentScope` + `validateReviewState` (runtime-aware, exact error templates,
+  `sorted(set(errors))`). Review found no blockers; corrections `808632b`: constructor now wraps
+  collections immutably, `selected_direction` key required at parse. 30 tests green. ACCEPTED.
+- 2026-09-16 — Task 2 implemented (`e7021b5`, 20 tests): `ReviewRepository` + `MemoryReviewRepository`
+  + `ReviewController` (initial state, load, selection, mix, comments, status, round; persist then
+  notify; duplicate/missing comment `StateError`). Review found no blockers; corrections `89d2600`:
+  `final class` controller + tests proving rejected mutations are inert. 21 tests green. ACCEPTED.
+- 2026-09-16 — Task 3 implemented (`c16f18b`, 9 tests): `ReviewScreenRegistry` (sorted union of
+  canonical runtime pattern IDs; `labelFor` delegates to `PrototypeRegistry`) and
+  `ReviewComparisonHost` (reuses `PrototypeRegistry.buildPattern`; wraps only the client surface in
+  the direction resolved theme). `runtime_fixtures.dart` extended (multiple patterns) with defaults
+  unchanged; `prototype_registry.dart`/`prototype_shell.dart` untouched (R10). Review found no
+  blockers; corrections `e423a3b`: unknown-screen test + direction-forwarding assertion. 6 host tests
+  green. ACCEPTED.
+- 2026-09-16 — Task 4 implemented (`940d7d1`, 17 tests): `ReviewRouteRequest` + `parseReviewRoute`
+  (path `/review` and hash `#/review`, client from query/fragment, no default substitution);
+  `PrototypeBootstrap({uri, loadRuntime})` shares one runtime load; review mode requires explicit
+  client; minimal real `ReviewShell` per R11. Review found no blockers; corrections `bf483a1`: shell
+  takes an injected controller (storage chosen in the composition root), `?direction=` only affects
+  prototype mode, empty-client and `&direction=b` tests. 144 full tests green. ACCEPTED.
+  Deviation recorded: Task 4 created `review_shell.dart` (plan assigns creation to Task 5) — R11.

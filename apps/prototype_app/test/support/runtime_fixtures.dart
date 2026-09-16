@@ -51,6 +51,8 @@ Map<String, Object?> resolvedThemeMap({
   String density = 'normal',
   double section = 40,
   double cardRadius = 20,
+  double cardSpacing = 16,
+  double tileGap = 12,
   String headingEmphasis = 'normal',
 }) {
   return {
@@ -84,8 +86,8 @@ Map<String, Object?> resolvedThemeMap({
     'spacing': {
       'inline': 8,
       'control': 12,
-      'card': 16,
-      'tile': 12,
+      'card': cardSpacing,
+      'tile': tileGap,
       'section': section,
     },
     'radius': {'control': 12, 'card': cardRadius},
