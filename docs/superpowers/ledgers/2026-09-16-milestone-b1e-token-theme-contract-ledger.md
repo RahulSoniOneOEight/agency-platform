@@ -115,16 +115,29 @@
   the resolved theme), never silently to a platform-dependent substitute.
 - **R9 — Nowa.** No Nowa-specific state or tooling is added. Documentation records the operating
   rule only.
+- **R10 — Implementer delegation.** Core contract/compiler tasks are implemented by the orchestrator
+  with strict TDD; every task is reviewed by a fresh independent `general` reviewer subagent before
+  continuing, and a final whole-branch review is dispatched. This preserves the review gates while
+  keeping cross-task interfaces coherent.
+- **R11 — Direction density.** The canonical direction `density` field is authoritative for a
+  direction theme's `density.default`. Direction `theme_overrides` may not set `density` (excluded
+  from the allowlist); it may set approved spacing/radius/size/typography-emphasis paths only.
+- **R12 — visual_character.** `visual_character` is validated metadata in v1 (approved enum) with no
+  semantic token mapping yet; `brand_to_semantic_overrides` intentionally ignores it.
+- **R13 — direction_themes.** The bundle's `theme` is the resolved base (preset + brand, preset
+  density). `direction_themes` carries a fully resolved theme for every declared direction (that
+  direction's canonical density + allowlisted `theme_overrides`). Flutter selects
+  `direction_themes[id] ?? theme`. `compose_runtime_bundle(root, client_dir)` compiles both; the
+  manifest carries only `theme: {preset}`.
 
 ## Task table
 
 | Task | Scope | Status | Commit |
 |------|-------|--------|--------|
-| 1 | Foundation + semantic token contracts | PENDING | — |
-| 2 | Theme presets + reference resolver | PENDING | — |
-| 3 | Client brand + direction overrides | PENDING | — |
-| 3r | Task 3 review | PENDING | — |
-| 4 | Runtime bundle integration | PENDING | — |
+| 1 | Foundation + semantic token contracts | ACCEPTED | `8220de3` + `ff90e0d` |
+| 2 | Theme presets + reference resolver | ACCEPTED | `5a19267` + `7f7dc9a` |
+| 3 | Client brand + direction overrides | ACCEPTED | `927bbe5` + `4ac25bf` |
+| 4 | Runtime bundle integration | ACCEPTED | `ddae18a` + `d4e62dc` |
 | 5 | Flutter ThemeData + AgencyThemeTokens | PENDING | — |
 | 6 | High-value UI migration | PENDING | — |
 | 7 | Repository validation + CI freshness | PENDING | — |
@@ -132,4 +145,29 @@
 
 ## Progress log
 
-- 2026-09-16 — Pre-flight complete. Ledger initialized. No tasks started.
+- 2026-09-16 — Pre-flight complete. Ledger initialized.
+- 2026-09-16 — Task 1 implemented (`8220de3`, 28 tests) and independently reviewed (no blockers).
+  Review corrections `ff90e0d`: reject empty groups, non-numeric literals in numeric semantic
+  groups, and boolean `version`; removed dead constant. 32 tests green. ACCEPTED.
+- 2026-09-16 — Task 2 implemented (`5a19267`, 51 tests): preset loader/validator, brand mapping,
+  `resolve_theme` with DFS reference resolution + cycle detection, 3 approved presets, preset schema.
+  Independent review found one Major (type-changing overrides for typography/motion accepted).
+  Corrections `7f7dc9a`: per-leaf numeric/string enforcement, preset unknown-key rejection, duplicate
+  preset id rejection, strict resolution regex. 56 tests; full suite 226 green. ACCEPTED.
+  Note: `load_theme_presets` raises on duplicate id; `resolve_theme` revalidates the resolved theme.
+- 2026-09-16 — Task 3 implemented (`927bbe5`): brand-input `visual` schema + reference client visual
+  (preset `premium-modern`), `theme_overrides` on the three reference directions, direction schema
+  property, `validate_client_brand_visual` + `validate_direction_theme_overrides` + allowlists.
+  Review found no blockers; corrections `4ac25bf`: never-raise on mixed keys, reject empty disallowed
+  override groups, tolerate `visual.preset`. 77 focused / 236 full tests green. ACCEPTED.
+  Deferred to Task 4/7: invoke `validate_direction_theme_overrides` at the strategic direction
+  validation entry point (repo validation) — currently only `resolve_theme` enforces it.
+- 2026-09-16 — Task 4 implemented (`ddae18a`): `compose_runtime_bundle(root, client_dir)` compiles
+  `theme` + `direction_themes` via `resolve_theme`; manifest carries `theme: {preset}`; runtime
+  validator uses `validate_resolved_theme`; `generate_resolved_themes` CLI (`--write`/`--check`);
+  bundle regenerated (brand primary `#1155CC`, direction densities a=compact b/c=normal). Review
+  found no blockers; corrections `d4e62dc`: template `theme.preset`, cycle-safe `_walk_leaves`,
+  dedup `_write_preset`, compact/normal/spacious density coverage. 243 tests green. ACCEPTED.
+  Deferred to Task 7: wire `validate_direction_theme_overrides` into strategic direction validation;
+  dedupe `validate_repo` freshness against `check_resolved_bundles_fresh`; consider orphan-bundle
+  detection. Also Task 8: update `docs/client-runtime.md` seed-color reference.
