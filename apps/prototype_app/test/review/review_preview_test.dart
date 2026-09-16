@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prototype_app/review/review_preview.dart';
+import 'package:prototype_app/review/review_screen_decision.dart';
 import 'package:prototype_app/review/review_state.dart';
 import 'package:prototype_app/runtime/prototype_runtime.dart';
 
@@ -16,7 +17,7 @@ ReviewState stateWith(PrototypeRuntime runtime, String? selectedDirection) {
     reviewRound: 1,
     status: ReviewStatus.inReview,
     selectedDirection: selectedDirection,
-    screenSelections: const <String, String>{},
+    screenSelections: const <String, ReviewScreenDecision>{},
     comments: const <ReviewComment>[],
   );
 }

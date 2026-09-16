@@ -20,11 +20,17 @@ import '../support/runtime_fixtures.dart';
 
 /// Keys that belong to the review-state contract. They must never appear inside
 /// the B.1B runtime bundle input (review state is separate from the runtime).
+///
+/// `direction`/`sections` are the nested ReviewState v2 decision keys introduced
+/// by C.3 (`screen_selections.<screen>.{direction,sections}`); they must not leak
+/// into runtime data either.
 const Set<String> _reviewStateKeys = {
   'review_round',
   'selected_direction',
   'screen_selections',
   'comments',
+  'direction',
+  'sections',
 };
 
 /// Recursively collects every map key reachable from [node].
@@ -167,9 +173,10 @@ void main() {
       final controller = ReviewController(
         clientId: runtime.clientId,
         repository: MemoryReviewRepository(),
+        runtime: runtime,
       );
       await controller.selectDirection('b');
-      await controller.selectScreenDirection('commerce.search', 'c');
+      await controller.setScreenDirection('commerce.search', 'a');
       await controller.addComment(
         const ReviewComment(
           id: 'review-1',
@@ -203,7 +210,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(controller.state.selectedDirection, 'b');
-      expect(controller.state.screenSelections['commerce.search'], 'c');
+      expect(controller.state.screenSelections['commerce.search']!.direction, 'a');
       expect(controller.state.reviewRound, 2);
 
       expect(runtime.directions.keys.toSet(), equals(directionsBefore.keys.toSet()));
@@ -353,6 +360,7 @@ void main() {
       final controller = ReviewController(
         clientId: 'prototype-demo',
         repository: MemoryReviewRepository(),
+        runtime: _threeDirectionRuntime(),
       );
 
       expect(controller.state.selectedDirection, isNull);
@@ -366,6 +374,7 @@ void main() {
       final controller = ReviewController(
         clientId: runtime.clientId,
         repository: MemoryReviewRepository(),
+        runtime: runtime,
       );
 
       await tester.pumpWidget(

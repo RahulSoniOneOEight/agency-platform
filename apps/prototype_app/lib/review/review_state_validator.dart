@@ -1,4 +1,6 @@
 import '../runtime/prototype_runtime.dart';
+import 'review_section_compatibility.dart';
+import 'review_section_registry.dart';
 import 'review_state.dart';
 
 List<String> validateReviewState(
@@ -30,15 +32,72 @@ List<String> validateReviewState(
 
   for (final entry in state.screenSelections.entries) {
     final screenId = entry.key;
-    final directionId = entry.value;
+    final decision = entry.value;
     if (!screenIds.contains(screenId)) {
       errors.add('unknown screen id: $screenId');
       continue;
     }
-    if (!directionIds.contains(directionId)) {
-      errors.add(
-        'screen $screenId direction $directionId is not present in runtime directions',
+    final screenDirection = decision.direction;
+    var screenDirectionValid = true;
+    if (screenDirection != null) {
+      if (!directionIds.contains(screenDirection)) {
+        errors.add(
+          'screen $screenId direction $screenDirection is not present in runtime directions',
+        );
+        screenDirectionValid = false;
+      } else if (!runtime.directions[screenDirection]!.patterns.contains(screenId)) {
+        errors.add(
+          'screen $screenId direction $screenDirection does not include this screen',
+        );
+        screenDirectionValid = false;
+      } else if (screenDirection == selectedDirection) {
+        errors.add('redundant screen override: $screenId');
+      }
+    }
+
+    if (decision.direction == null && decision.sections.isEmpty) {
+      errors.add('empty screen decision: $screenId');
+    }
+
+    // Skip dependent section checks when the screen's own direction is invalid;
+    // section findings would otherwise be misleading cascades.
+    if (!screenDirectionValid) {
+      continue;
+    }
+
+    final effectiveScreen = screenDirection ?? selectedDirection;
+    for (final section in decision.sections.entries) {
+      final sectionId = section.key;
+      final sectionDirection = section.value;
+      final definition = ReviewSectionRegistry.definition(sectionId);
+      if (definition == null) {
+        errors.add('unknown section id: $sectionId');
+        continue;
+      }
+      if (definition.screenId != screenId) {
+        errors.add('section $sectionId does not belong to screen $screenId');
+        continue;
+      }
+      if (effectiveScreen == null) {
+        errors.add('section $sectionId has no effective screen direction');
+        continue;
+      }
+      if (sectionDirection == effectiveScreen) {
+        errors.add('redundant section override: $sectionId');
+        continue;
+      }
+      final result = ReviewSectionCompatibility.evaluate(
+        runtime: runtime,
+        screenId: screenId,
+        sectionId: sectionId,
+        sourceDirectionId: sectionDirection,
+        baseDirectionId: effectiveScreen,
       );
+      if (!result.allowed) {
+        errors.add(
+          'section $sectionId source $sectionDirection is not mixable: ${result.reason}',
+        );
+      }
     }
   }
 

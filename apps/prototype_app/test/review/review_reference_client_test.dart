@@ -10,8 +10,11 @@ import 'package:prototype_app/review/review_comparison_host.dart';
 import 'package:prototype_app/review/review_comparison_layout.dart';
 import 'package:prototype_app/review/review_controller.dart';
 import 'package:prototype_app/review/review_direction_comparison.dart';
+import 'package:prototype_app/review/review_mixed_preview.dart';
 import 'package:prototype_app/review/review_screen_availability.dart';
 import 'package:prototype_app/review/review_screen_comparison.dart';
+import 'package:prototype_app/review/review_section_compatibility.dart';
+import 'package:prototype_app/review/review_section_registry.dart';
 import 'package:prototype_app/runtime/prototype_runtime.dart';
 
 /// Loads the committed reference-client bundle exactly as the app does.
@@ -28,6 +31,7 @@ PrototypeRuntime _loadReferenceRuntime() {
 ReviewController _freshController(PrototypeRuntime runtime) => ReviewController(
       clientId: runtime.clientId,
       repository: MemoryReviewRepository(),
+      runtime: runtime,
     );
 
 Future<void> _pumpScreenComparison(
@@ -266,6 +270,195 @@ void main() {
           reason: 'missing real direction name for $id',
         );
       }
+    });
+  });
+
+  group('reference client · section availability and compatibility', () {
+    ReviewSectionCompatibilityResult evaluate({
+      required String screenId,
+      required String sectionId,
+      required String source,
+      String base = 'a',
+    }) {
+      return ReviewSectionCompatibility.evaluate(
+        runtime: runtime,
+        screenId: screenId,
+        sectionId: sectionId,
+        sourceDirectionId: source,
+        baseDirectionId: base,
+      );
+    }
+
+    test('governed sections exist for the composed reference screens', () {
+      expect(
+        ReviewSectionRegistry.sectionsForScreen('commerce.plp').map((d) => d.id),
+        contains('plp.product-grid'),
+      );
+      expect(
+        ReviewSectionRegistry.sectionsForScreen('commerce.pdp').map((d) => d.id),
+        contains('pdp.price'),
+      );
+    });
+
+    test('plp.product-grid mixes from c into a base a (both declare plp)', () {
+      final result = evaluate(
+        screenId: 'commerce.plp',
+        sectionId: 'plp.product-grid',
+        source: 'c',
+      );
+      expect(result.allowed, isTrue);
+    });
+
+    test('pdp.price mixes from c into a base a (both declare pdp)', () {
+      final result = evaluate(
+        screenId: 'commerce.pdp',
+        sectionId: 'pdp.price',
+        source: 'c',
+      );
+      expect(result.allowed, isTrue);
+    });
+
+    test('plp.product-grid is unavailable from b (b does not declare plp)', () {
+      final result = evaluate(
+        screenId: 'commerce.plp',
+        sectionId: 'plp.product-grid',
+        source: 'b',
+      );
+      expect(result.allowed, isFalse);
+      expect(result.reason, 'Not present in Direction B');
+    });
+
+    test('search.search-field is unavailable from c (c does not declare search)', () {
+      final result = evaluate(
+        screenId: 'commerce.search',
+        sectionId: 'search.search-field',
+        source: 'c',
+      );
+      expect(result.allowed, isFalse);
+      expect(result.reason, 'Not present in Direction C');
+    });
+  });
+
+  group('reference client · controller mix and live preview', () {
+    late MemoryReviewRepository repository;
+    late ReviewController controller;
+
+    setUp(() {
+      repository = MemoryReviewRepository();
+      controller = ReviewController(
+        clientId: runtime.clientId,
+        repository: repository,
+        runtime: runtime,
+      );
+    });
+
+    test('plp.product-grid mixes from c into a base a through the controller',
+        () async {
+      await controller.selectDirection('a');
+      await controller.setSectionDirection(
+        'commerce.plp',
+        'plp.product-grid',
+        'c',
+      );
+
+      expect(
+        controller.state.screenSelections['commerce.plp']!
+            .sections['plp.product-grid'],
+        'c',
+      );
+
+      final persisted = await repository.load('prototype-demo');
+      expect(persisted!.toJson()['version'], 2);
+      expect(
+        (persisted.toJson()['screen_selections'] as Map<String, dynamic>)[
+            'commerce.plp'],
+        {
+          'sections': {'plp.product-grid': 'c'},
+        },
+      );
+    });
+
+    testWidgets(
+        'pdp.price mixes from c into a base a and the preview applies the source theme',
+        (tester) async {
+      await controller.selectDirection('a');
+      await controller.setSectionDirection('commerce.pdp', 'pdp.price', 'c');
+
+      expect(
+        controller.state.screenSelections['commerce.pdp']!.sections['pdp.price'],
+        'c',
+      );
+
+      await tester.binding.setSurfaceSize(const Size(1200, 1200));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ReviewMixedPreview(
+              runtime: runtime,
+              fixtures: FixtureRepository.fromRuntime(runtime),
+              screenId: 'commerce.pdp',
+              state: controller.state,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final base = AgencyTheme.light(runtime.themeForDirection('a'));
+      final source = AgencyTheme.light(runtime.themeForDirection('c'));
+      expect(
+        base.extension<AgencyThemeTokens>()!.cardRadius,
+        isNot(source.extension<AgencyThemeTokens>()!.cardRadius),
+      );
+
+      expect(
+        find.byKey(ReviewMixedPreview.overrideThemeKey('pdp.price')),
+        findsOneWidget,
+      );
+
+      final priceFinder = find.descendant(
+        of: find.byKey(ReviewMixedPreview.sectionKey('pdp.price')),
+        matching: find.byType(PriceSection),
+      );
+      expect(priceFinder, findsOneWidget);
+      final priceTheme = Theme.of(tester.element(priceFinder));
+      expect(priceTheme.colorScheme.primary, source.colorScheme.primary);
+      expect(
+        AgencyThemeTokens.of(tester.element(priceFinder)).cardRadius,
+        source.extension<AgencyThemeTokens>()!.cardRadius,
+      );
+
+      // An inherited sibling section stays under the base screen theme.
+      final imageFinder = find.byType(ProductImageSection);
+      expect(imageFinder, findsOneWidget);
+      final imageTheme = Theme.of(tester.element(imageFinder));
+      expect(imageTheme.colorScheme.primary, base.colorScheme.primary);
+      expect(
+        AgencyThemeTokens.of(tester.element(imageFinder)).cardRadius,
+        base.extension<AgencyThemeTokens>()!.cardRadius,
+      );
+      expect(tester.takeException(), isNull);
+    });
+
+    test('an unavailable section source is rejected with a deterministic reason',
+        () async {
+      await controller.selectDirection('a');
+      final before = controller.state;
+
+      await expectLater(
+        controller.setSectionDirection('commerce.plp', 'plp.product-grid', 'b'),
+        throwsA(isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          'Not present in Direction B',
+        )),
+      );
+
+      expect(identical(controller.state, before), isTrue);
+      final persisted = await repository.load('prototype-demo');
+      expect(persisted!.selectedDirection, 'a');
+      expect(persisted.screenSelections, isEmpty);
     });
   });
 }

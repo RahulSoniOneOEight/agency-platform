@@ -4,6 +4,7 @@ Map<String, dynamic> canonicalDirection({
   String name = 'Search-led Trade',
   String strategicGoal = 'reduce known-item order time',
   List<String> patterns = const ['commerce.search'],
+  List<String> components = const ['commerce.product-card'],
 }) {
   return {
     'id': id,
@@ -16,7 +17,7 @@ Map<String, dynamic> canonicalDirection({
     'density': density,
     'transaction_model': 'checkout-plus-rfq',
     'patterns': patterns,
-    'components': ['commerce.product-card'],
+    'components': components,
     'component_variants': [
       {'component': 'commerce.product-card', 'variant': 'b2b'},
     ],
@@ -109,6 +110,8 @@ Map<String, dynamic> canonicalBundle({
   Map<String, String>? names,
   Map<String, String>? strategicGoals,
   Map<String, List<String>>? patterns,
+  Map<String, List<String>>? components,
+  Map<String, String>? densities,
   Map<String, dynamic>? fixtures,
   Map<String, dynamic>? resources,
   Map<String, Object?>? theme,
@@ -122,9 +125,11 @@ Map<String, dynamic> canonicalBundle({
       for (final id in directionIds)
         id: canonicalDirection(
           id: id,
+          density: densities?[id] ?? 'compact',
           name: names?[id] ?? 'Search-led Trade',
           strategicGoal: strategicGoals?[id] ?? 'reduce known-item order time',
           patterns: patterns?[id] ?? const ['commerce.search'],
+          components: components?[id] ?? const ['commerce.product-card'],
         ),
     },
     'fixtures': fixtures ?? defaultFixtures(),

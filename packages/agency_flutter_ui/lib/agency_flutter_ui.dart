@@ -18,6 +18,8 @@ export 'domain/credit_summary.dart';
 export 'domain/merchandising_split_tile.dart';
 export 'patterns/pattern_registry.dart';
 export 'patterns/pattern_shell.dart';
+export 'sections/pattern_section.dart';
+export 'sections/commerce_sections.dart';
 export 'patterns/home_pattern.dart';
 export 'patterns/search_pattern.dart';
 export 'patterns/plp_pattern.dart';

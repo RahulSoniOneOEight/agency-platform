@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:prototype_app/review/review_screen_decision.dart';
 import 'package:prototype_app/review/review_state.dart';
 
 Map<String, dynamic> canonicalStateJson({
@@ -40,22 +41,29 @@ void main() {
         ],
       });
 
-      expect(state.version, 1);
+      expect(state.version, ReviewState.currentVersion);
       expect(state.clientId, 'prototype-demo');
       expect(state.reviewRound, 1);
       expect(state.status, ReviewStatus.inReview);
       expect(state.selectedDirection, isNull);
-      expect(state.screenSelections, {'home': 'a'});
+      expect(state.screenSelections, {
+        'home': ReviewScreenDecision(direction: 'a'),
+      });
       expect(state.comments, hasLength(1));
       expect(state.comments.single.scope, ReviewCommentScope.general);
 
       expect(state.toJson(), {
-        'version': 1,
+        'version': 2,
         'client_id': 'prototype-demo',
         'review_round': 1,
         'status': 'in_review',
         'selected_direction': null,
-        'screen_selections': {'home': 'a'},
+        'screen_selections': {
+          'home': {
+            'direction': 'a',
+            'sections': <String, dynamic>{},
+          },
+        },
         'comments': [
           {
             'id': 'review-001',
@@ -152,9 +160,11 @@ void main() {
       );
     });
 
-    test('parses an unsupported version structurally so the validator can reject it', () {
-      final state = ReviewState.fromJson(canonicalStateJson(version: 2));
-      expect(state.version, 2);
+    test('rejects an unsupported persisted version', () {
+      expect(
+        () => ReviewState.fromJson(canonicalStateJson(version: 3)),
+        throwsFormatException,
+      );
     });
 
     test('throws FormatException for an unknown status wire value', () {
@@ -218,7 +228,9 @@ void main() {
     });
 
     test('wraps constructor collections so state stays immutable', () {
-      final selections = <String, String>{'home': 'a'};
+      final selections = <String, ReviewScreenDecision>{
+        'home': ReviewScreenDecision(direction: 'a'),
+      };
       final comments = <ReviewComment>[
         const ReviewComment(
           id: 'c1',
@@ -227,7 +239,7 @@ void main() {
         ),
       ];
       final state = ReviewState(
-        version: 1,
+        version: ReviewState.currentVersion,
         clientId: 'prototype-demo',
         reviewRound: 1,
         status: ReviewStatus.inReview,
@@ -237,7 +249,7 @@ void main() {
       );
 
       expect(
-        () => state.screenSelections['home'] = 'b',
+        () => state.screenSelections['home'] = ReviewScreenDecision(direction: 'b'),
         throwsUnsupportedError,
       );
       expect(
@@ -251,8 +263,8 @@ void main() {
         throwsUnsupportedError,
       );
 
-      selections['home'] = 'b';
-      expect(state.screenSelections['home'], 'a');
+      selections['home'] = ReviewScreenDecision(direction: 'b');
+      expect(state.screenSelections['home']!.direction, 'a');
     });
   });
 }

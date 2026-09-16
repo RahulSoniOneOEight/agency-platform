@@ -5,6 +5,7 @@ import 'package:prototype_app/review/review_comparison_layout.dart';
 import 'package:prototype_app/review/review_controller.dart';
 import 'package:prototype_app/review/review_direction_comparison.dart';
 import 'package:prototype_app/review/review_direction_summary.dart';
+import 'package:prototype_app/review/review_screen_decision.dart';
 import 'package:prototype_app/review/review_state.dart';
 import 'package:prototype_app/runtime/prototype_runtime.dart';
 
@@ -23,6 +24,7 @@ void main() {
     controller = ReviewController(
       clientId: runtime.clientId,
       repository: MemoryReviewRepository(),
+      runtime: runtime,
     );
   });
 
@@ -30,13 +32,14 @@ void main() {
     return ReviewController(
       clientId: runtime.clientId,
       repository: MemoryReviewRepository(),
+      runtime: runtime,
       initialState: ReviewState(
         version: ReviewState.currentVersion,
         clientId: runtime.clientId,
         reviewRound: 1,
         status: ReviewStatus.inReview,
         selectedDirection: selectedDirection,
-        screenSelections: const <String, String>{},
+        screenSelections: const <String, ReviewScreenDecision>{},
         comments: const <ReviewComment>[],
       ),
     );
@@ -66,6 +69,7 @@ void main() {
     controller = ReviewController(
       clientId: runtime.clientId,
       repository: MemoryReviewRepository(),
+      runtime: runtime,
     );
 
     await pumpComparison(tester, const Size(1200, 800));
@@ -90,6 +94,7 @@ void main() {
     controller = ReviewController(
       clientId: runtime.clientId,
       repository: MemoryReviewRepository(),
+      runtime: runtime,
     );
 
     await pumpComparison(tester, const Size(400, 800));
@@ -165,6 +170,7 @@ void main() {
     controller = ReviewController(
       clientId: runtime.clientId,
       repository: MemoryReviewRepository(),
+      runtime: runtime,
     );
 
     await pumpComparison(tester, const Size(1200, 800));

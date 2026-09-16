@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prototype_app/review/memory_review_repository.dart';
 import 'package:prototype_app/review/review_repository.dart';
+import 'package:prototype_app/review/review_screen_decision.dart';
 import 'package:prototype_app/review/review_state.dart';
 
 ReviewState buildState({
@@ -8,7 +9,7 @@ ReviewState buildState({
   int reviewRound = 1,
   ReviewStatus status = ReviewStatus.inReview,
   String? selectedDirection,
-  Map<String, String> screenSelections = const {},
+  Map<String, ReviewScreenDecision>? screenSelections,
   List<ReviewComment> comments = const [],
 }) {
   return ReviewState(
@@ -17,7 +18,7 @@ ReviewState buildState({
     reviewRound: reviewRound,
     status: status,
     selectedDirection: selectedDirection,
-    screenSelections: screenSelections,
+    screenSelections: screenSelections ?? const {},
     comments: comments,
   );
 }
@@ -28,7 +29,9 @@ void main() {
       final ReviewRepository repository = MemoryReviewRepository();
       final state = buildState(
         selectedDirection: 'b',
-        screenSelections: const {'search': 'b'},
+        screenSelections: {
+          'search': ReviewScreenDecision(direction: 'b'),
+        },
         comments: const [
           ReviewComment(
             id: 'c1',
