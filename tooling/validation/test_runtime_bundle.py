@@ -24,9 +24,13 @@ from tooling.design_contract.generate_resolved_themes import (
 )
 from tooling.design_contract.theme_contract import CANONICAL_GROUPS, resolve_theme
 from tooling.knowledge.index_design_contract import build_indexes
-from tooling.prototype.build_runtime_bundle import build_runtime_bundle
+from tooling.prototype.build_runtime_bundle import (
+    build_runtime_bundle,
+    compose_runtime_bundle,
+)
 from tooling.prototype import validate_runtime_bundle as runtime_bundle_validator
 from tooling.prototype.project_direction import project_direction
+from tooling.prototype.refinement_notes import validate_refinement_notes
 
 
 validate_runtime_bundle = runtime_bundle_validator.validate_runtime_bundle
@@ -34,6 +38,37 @@ validate_runtime_bundle = runtime_bundle_validator.validate_runtime_bundle
 
 ROOT = Path(__file__).resolve().parents[2]
 _RESOLVED_THEME = resolve_theme(ROOT, "premium-modern")
+_EXAMPLE_REFINEMENT_NOTES = (
+    ROOT
+    / "client-projects"
+    / "examples"
+    / "prototype-demo"
+    / "prototype"
+    / "refinement-notes.yaml"
+)
+_REFINEMENT_NOTE = """version: 1
+changes:
+  - id: home-hero-height
+    screen: home
+    subject: hero
+    change: reduce hero height for the client workshop direction
+    classification: client_override
+    status: reconciled
+    target: theme.spacing.section
+  - id: compact-product-card-spacing
+    component: commerce.product-card
+    change: evaluate tighter compact card spacing across commerce prototypes
+    classification: reusable_candidate
+    status: proposed
+    target: design-contract
+"""
+
+
+def _compose_bundle_bytes(root: Path, client_dir: Path) -> tuple[dict, bytes]:
+    """Compose a bundle and serialize it exactly as ``build_runtime_bundle`` does."""
+    bundle = compose_runtime_bundle(root, client_dir)
+    serialized = json.dumps(bundle, indent=2, sort_keys=True, allow_nan=False) + "\n"
+    return bundle, serialized.encode("utf-8")
 
 
 def _copy_theme_contract(root: Path) -> None:
@@ -966,6 +1001,29 @@ class RuntimeBundleTests(unittest.TestCase):
                 ValueError, "^invalid runtime bundle: .*allowed_directions"
             ):
                 build_runtime_bundle(root, client, root / "output")
+
+    def test_refinement_notes_are_never_runtime_input(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            client = root / "client-projects" / "acme-client"
+            _write_client(client)
+
+            _, before = _compose_bundle_bytes(root, client)
+            (client / "prototype" / "refinement-notes.yaml").write_text(
+                _REFINEMENT_NOTE, encoding="utf-8"
+            )
+            bundle, after = _compose_bundle_bytes(root, client)
+
+        self.assertEqual(before, after)
+        self.assertNotIn("refinement_notes", bundle)
+        self.assertNotIn("refinement-notes", bundle)
+        self.assertNotIn("refinement-notes.yaml", json.dumps(bundle, sort_keys=True))
+
+    def test_example_refinement_notes_validate_clean(self):
+        self.assertTrue(_EXAMPLE_REFINEMENT_NOTES.is_file())
+        self.assertEqual(
+            [], validate_refinement_notes(ROOT, _EXAMPLE_REFINEMENT_NOTES)
+        )
 
 
 def _walk_strings(value):
