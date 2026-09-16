@@ -435,7 +435,10 @@ class _ReviewFeedbackPanelState extends State<ReviewFeedbackPanel> {
                     onPressed: () => _resolve(record.id),
                     child: const Text('Resolve'),
                   ),
-                if (record.status == FeedbackStatus.resolved)
+                // `addressed -> open` and `resolved -> open` are both legal
+                // reviewer reopens; only `open` is non-reopenable.
+                if (record.status == FeedbackStatus.addressed ||
+                    record.status == FeedbackStatus.resolved)
                   TextButton(
                     key: ReviewFeedbackPanel.reopenButtonKey(record.id),
                     onPressed: () => _reopen(record.id),

@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prototype_app/review/review_controller.dart';
+import 'package:prototype_app/review/review_domain_error.dart';
 import 'package:prototype_app/review/review_repository.dart';
 import 'package:prototype_app/review/review_screen_decision.dart';
 import 'package:prototype_app/review/review_state.dart';
@@ -510,9 +511,47 @@ void main() {
       expect(controller.state.status, ReviewStatus.needsRevision);
       expect((await repository.load('prototype-demo'))!.status, ReviewStatus.needsRevision);
     });
+
+    test('rejects ready_for_final_review: readiness is coordinator-owned',
+        () async {
+      var notifications = 0;
+      controller.addListener(() => notifications++);
+
+      await expectLater(
+        () => controller.setStatus(ReviewStatus.readyForFinalReview),
+        throwsA(
+          isA<ReadinessRequiresRoundClose>()
+              .having((error) => error.code, 'code', 'readiness_requires_round_close'),
+        ),
+      );
+
+      expect(controller.state.status, ReviewStatus.inReview);
+      expect(repository.saveCount, 0);
+      expect(notifications, 0);
+    });
   });
 
   group('advanceRound', () {
+    test('starts the new round in in_review', () async {
+      await controller.setStatus(ReviewStatus.needsRevision);
+
+      await controller.advanceRound();
+
+      expect(controller.state.reviewRound, 2);
+      expect(controller.state.status, ReviewStatus.inReview);
+      expect((await repository.load('prototype-demo'))!.status, ReviewStatus.inReview);
+    });
+
+    test('does not carry a ready status into the new round', () async {
+      await controller.applyState(status: ReviewStatus.readyForFinalReview);
+      expect(controller.state.status, ReviewStatus.readyForFinalReview);
+
+      await controller.advanceRound();
+
+      expect(controller.state.reviewRound, 2);
+      expect(controller.state.status, ReviewStatus.inReview);
+    });
+
     test('increments by exactly one and preserves selections and comments', () async {
       await controller.selectDirection('b');
       await controller.setScreenDirection('commerce.search', 'a');

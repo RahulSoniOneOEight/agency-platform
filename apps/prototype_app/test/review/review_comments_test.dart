@@ -109,6 +109,17 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('labels the retained comment capture as legacy back-compat',
+      (tester) async {
+    await pumpComments(tester);
+
+    expect(find.byKey(ReviewComments.legacyCommentsLabelKey), findsOneWidget);
+    expect(
+      find.text('Legacy comments (retained for C.1-C.3 back-compat)'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('adds a general comment, persists it and displays it',
       (tester) async {
     await pumpComments(tester);

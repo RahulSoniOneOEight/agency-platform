@@ -30,6 +30,9 @@ class ReviewComments extends StatefulWidget {
     required this.actor,
   });
 
+  /// Marks the retained C.1–C.3 comment capture as legacy/back-compat.
+  static const Key legacyCommentsLabelKey = Key('review-comments-legacy-label');
+
   static const Key generalTextFieldKey = Key('review-comments-general-text');
   static const Key generalDirectionFieldKey =
       Key('review-comments-general-direction');
@@ -143,6 +146,17 @@ class _ReviewCommentsState extends State<ReviewComments> {
           ),
           const SizedBox(height: 24),
           const Divider(),
+          const SizedBox(height: 16),
+          Text(
+            'Legacy comments (retained for C.1-C.3 back-compat)',
+            key: ReviewComments.legacyCommentsLabelKey,
+            style: Theme.of(context).textTheme.labelLarge,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Superseded by the review feedback panel above.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
           const SizedBox(height: 16),
           Text('Review comments',
               style: Theme.of(context).textTheme.titleMedium),

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../runtime/prototype_runtime.dart';
 import 'review_decision_normalizer.dart';
+import 'review_domain_error.dart';
 import 'review_repository.dart';
 import 'review_screen_decision.dart';
 import 'review_screen_registry.dart';
@@ -235,13 +236,45 @@ final class ReviewController extends ChangeNotifier {
     await _apply(_copyWith(comments: comments));
   }
 
+  /// Sets an interactive review status; `ready_for_final_review` is rejected.
+  ///
+  /// Readiness is coordinator-owned: only `ReviewCoordinator.closeCurrentRound`
+  /// may set it (via [applyState]) after the round eligibility gate passes.
   Future<void> setStatus(ReviewStatus status) async {
+    if (status == ReviewStatus.readyForFinalReview) {
+      throw const ReadinessRequiresRoundClose(
+        'ready_for_final_review is set only by closing the review round',
+      );
+    }
     await _apply(_copyWith(status: status));
   }
 
+  /// Advances to the next round and returns the status to `inReview`.
+  ///
+  /// A new round never carries a prior `readyForFinalReview` forward.
   Future<void> advanceRound() async {
     final next = _state.reviewRound + 1;
-    await _apply(_copyWith(reviewRound: next < 1 ? 1 : next));
+    await _apply(_copyWith(
+      reviewRound: next < 1 ? 1 : next,
+      status: ReviewStatus.inReview,
+    ));
+  }
+
+  /// Normalizes and validates a candidate primitive transition without saving.
+  ///
+  /// Returns the canonical candidate, or throws [StateError] with the findings.
+  /// Cross-domain orchestration uses this to validate a complete candidate
+  /// state before any repository write, so invalid operations stay transactional.
+  ReviewState normalizeAndValidateCandidate({
+    int? reviewRound,
+    ReviewStatus? status,
+    List<String>? feedbackIds,
+  }) {
+    return _normalizeAndValidate(_copyWith(
+      reviewRound: reviewRound,
+      status: status,
+      feedbackIds: feedbackIds,
+    ));
   }
 
   /// Persists a primitive ReviewState transition atomically.
@@ -282,14 +315,20 @@ final class ReviewController extends ChangeNotifier {
   /// Any validation finding aborts before persistence, so an invalid mutation
   /// has zero side effects.
   Future<void> _apply(ReviewState candidate) async {
+    final normalized = _normalizeAndValidate(candidate);
+    await _repository.save(normalized);
+    _state = normalized;
+    notifyListeners();
+  }
+
+  /// Canonicalizes and validates [candidate]; throws [StateError] on findings.
+  ReviewState _normalizeAndValidate(ReviewState candidate) {
     final normalized = normalizeReviewDecisions(candidate, _runtime);
     final errors = _validate(normalized);
     if (errors.isNotEmpty) {
       throw StateError(errors.join('\n'));
     }
-    await _repository.save(normalized);
-    _state = normalized;
-    notifyListeners();
+    return normalized;
   }
 
   ReviewState _copyWith({

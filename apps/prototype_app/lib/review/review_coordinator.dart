@@ -17,7 +17,7 @@ import 'review_state.dart';
 ///
 /// Operations validate the complete candidate first. Invalid operations perform
 /// no repository write, append no history event, mutate no state, and throw a
-/// deterministic typed [ReviewDomainError] (or [StateError] for unknown ids).
+/// deterministic typed [ReviewDomainError].
 final class ReviewCoordinator {
   ReviewCoordinator({
     required ReviewController controller,
@@ -89,7 +89,7 @@ final class ReviewCoordinator {
       throw InvalidFeedbackTarget('target is not valid for $scope feedback');
     }
     if (await _feedback.load(clientId, feedbackId) != null) {
-      throw StateError('feedback record already exists: $feedbackId');
+      throw DuplicateFeedbackId('feedback record already exists: $feedbackId');
     }
 
     final state = _controller.state;
@@ -98,6 +98,23 @@ final class ReviewCoordinator {
     final status = blocking
         ? ReviewStatus.needsRevision
         : (ready ? ReviewStatus.inReview : state.status);
+    final feedbackIds = <String>[...state.feedbackIds, feedbackId];
+
+    // Validate the complete candidate ReviewState before any repository write so
+    // an invalid operation (e.g. duplicate id) performs no persistence at all.
+    try {
+      _controller.normalizeAndValidateCandidate(
+        reviewRound: round,
+        status: status,
+        feedbackIds: feedbackIds,
+      );
+    } on StateError catch (error) {
+      final message = error.message;
+      if (message.contains('duplicate feedback id')) {
+        throw DuplicateFeedbackId(message);
+      }
+      throw InvalidReviewState(message);
+    }
 
     final record = FeedbackRecord(
       id: feedbackId,
@@ -121,7 +138,7 @@ final class ReviewCoordinator {
     await _controller.applyState(
       reviewRound: round,
       status: status,
-      feedbackIds: <String>[...state.feedbackIds, feedbackId],
+      feedbackIds: feedbackIds,
     );
     return record;
   }
@@ -191,6 +208,13 @@ final class ReviewCoordinator {
   }
 
   /// Reopens addressed or resolved feedback; reviewer-only.
+  ///
+  /// Reopening a blocking item while the review is `readyForFinalReview`
+  /// reconciles readiness: the round advances monotonically and the status
+  /// returns to `needsRevision`. Reopening a non-blocking item (or reopening
+  /// while not ready) leaves the review status untouched. The candidate state is
+  /// validated before the feedback write, so a failed operation has no partial
+  /// persistence.
   Future<FeedbackRecord> reopenFeedback({
     required ReviewActor actor,
     required String feedbackId,
@@ -213,15 +237,31 @@ final class ReviewCoordinator {
         ),
       ),
     );
+
+    final state = _controller.state;
+    final reconcile = current.blocking &&
+        state.status == ReviewStatus.readyForFinalReview;
+    final int? nextRound = reconcile ? state.reviewRound + 1 : null;
+    if (reconcile) {
+      _validateCandidate(reviewRound: nextRound, status: ReviewStatus.needsRevision);
+    }
+
     await _feedback.replace(clientId, current, next);
+    if (reconcile) {
+      await _controller.applyState(
+        reviewRound: nextRound,
+        status: ReviewStatus.needsRevision,
+      );
+    }
     return next;
   }
 
   /// Changes the blocking classification; reviewer-only.
   ///
-  /// Setting an item blocking while it is unresolved moves the review to
-  /// `needsRevision` (advancing a ready round first). Setting the same value is a
-  /// no-op with no history event.
+  /// Setting an *unresolved* item blocking moves the review to `needsRevision`
+  /// (advancing a ready round first). A resolved item toggled to blocking does
+  /// not change the review status. Setting the same value is a no-op with no
+  /// history event. The candidate state is validated before the feedback write.
   Future<FeedbackRecord> setBlocking({
     required ReviewActor actor,
     required String feedbackId,
@@ -244,13 +284,23 @@ final class ReviewCoordinator {
         ),
       ),
     );
-    await _feedback.replace(clientId, current, next);
 
-    if (blocking) {
-      final state = _controller.state;
-      final ready = state.status == ReviewStatus.readyForFinalReview;
+    final state = _controller.state;
+    final drivesStatus = blocking && current.status != FeedbackStatus.resolved;
+    final ready = state.status == ReviewStatus.readyForFinalReview;
+    final int? nextRound =
+        drivesStatus && ready ? state.reviewRound + 1 : null;
+    if (drivesStatus) {
+      _validateCandidate(
+        reviewRound: nextRound,
+        status: ReviewStatus.needsRevision,
+      );
+    }
+
+    await _feedback.replace(clientId, current, next);
+    if (drivesStatus) {
       await _controller.applyState(
-        reviewRound: ready ? state.reviewRound + 1 : state.reviewRound,
+        reviewRound: nextRound,
         status: ReviewStatus.needsRevision,
       );
     }
@@ -292,10 +342,23 @@ final class ReviewCoordinator {
   List<FeedbackEvent> _append(FeedbackRecord record, FeedbackEvent event) =>
       <FeedbackEvent>[...record.history, event];
 
+  /// Validates a candidate primitive transition, mapping controller findings to
+  /// a typed [InvalidReviewState] so callers never see a bare [StateError].
+  void _validateCandidate({int? reviewRound, ReviewStatus? status}) {
+    try {
+      _controller.normalizeAndValidateCandidate(
+        reviewRound: reviewRound,
+        status: status,
+      );
+    } on StateError catch (error) {
+      throw InvalidReviewState(error.message);
+    }
+  }
+
   Future<FeedbackRecord> _requireFeedback(String feedbackId) async {
     final record = await _feedback.load(clientId, feedbackId);
     if (record == null) {
-      throw StateError('unknown feedback id: $feedbackId');
+      throw FeedbackNotFound('unknown feedback id: $feedbackId');
     }
     return record;
   }

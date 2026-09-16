@@ -114,14 +114,22 @@ void main() {
       expect(controller.state.status, ReviewStatus.inReview);
     });
 
-    test('rejects a duplicate id without a second state write', () async {
+    test('rejects a duplicate id with a typed error and no writes', () async {
       await create();
       final stateBefore = controller.state;
+      final savesBefore = await feedback.list('prototype-demo');
 
-      await expectLater(() => create(), throwsStateError);
+      await expectLater(
+        () => create(),
+        throwsA(
+          isA<DuplicateFeedbackId>()
+              .having((error) => error.code, 'code', 'duplicate_feedback_id'),
+        ),
+      );
 
       expect(controller.state.feedbackIds, ['feedback-1']);
       expect(identical(controller.state, stateBefore), isTrue);
+      expect((await feedback.list('prototype-demo')).length, savesBefore.length);
     });
 
     test('rejects an invalid target with a typed error and no writes', () async {
@@ -275,10 +283,16 @@ void main() {
       );
     });
 
-    test('unknown feedback ids fail without mutating state', () async {
+    test('unknown feedback ids fail with a typed error and no mutation',
+        () async {
+      final stateBefore = controller.state;
+
       await expectLater(
         () => coordinator.resolveFeedback(actor: reviewer, feedbackId: 'missing'),
-        throwsStateError,
+        throwsA(
+          isA<FeedbackNotFound>()
+              .having((error) => error.code, 'code', 'feedback_not_found'),
+        ),
       );
       await expectLater(
         () => coordinator.setBlocking(
@@ -286,8 +300,14 @@ void main() {
           feedbackId: 'missing',
           blocking: false,
         ),
-        throwsStateError,
+        throwsA(isA<FeedbackNotFound>()),
       );
+      await expectLater(
+        () => coordinator.reopenFeedback(actor: reviewer, feedbackId: 'missing'),
+        throwsA(isA<FeedbackNotFound>()),
+      );
+
+      expect(identical(controller.state, stateBefore), isTrue);
     });
   });
 
@@ -336,6 +356,39 @@ void main() {
       expect(same, created);
       expect(same.history, hasLength(1));
       expect(identical(controller.state, stateBefore), isTrue);
+    });
+
+    test('drives needsRevision for an addressed (unresolved) item', () async {
+      await create(blocking: false);
+      await coordinator.markAddressed(actor: agent, feedbackId: 'feedback-1');
+      expect(controller.state.status, ReviewStatus.inReview);
+
+      await coordinator.setBlocking(
+        actor: reviewer,
+        feedbackId: 'feedback-1',
+        blocking: true,
+      );
+
+      expect(controller.state.status, ReviewStatus.needsRevision);
+    });
+
+    test('does not change review status for a resolved item', () async {
+      await create(blocking: false);
+      await coordinator.markAddressed(actor: agent, feedbackId: 'feedback-1');
+      await coordinator.resolveFeedback(actor: reviewer, feedbackId: 'feedback-1');
+      final statusBefore = controller.state.status;
+      final roundBefore = controller.state.reviewRound;
+
+      final updated = await coordinator.setBlocking(
+        actor: reviewer,
+        feedbackId: 'feedback-1',
+        blocking: true,
+      );
+
+      expect(updated.blocking, isTrue);
+      expect(updated.status, FeedbackStatus.resolved);
+      expect(controller.state.status, statusBefore);
+      expect(controller.state.reviewRound, roundBefore);
     });
   });
 
@@ -462,6 +515,54 @@ void main() {
     });
   });
 
+  group('readiness reconciliation on reopen', () {
+    test('reopening a blocking item from ready advances the round and revises',
+        () async {
+      await create(blocking: true);
+      await coordinator.markAddressed(actor: agent, feedbackId: 'feedback-1');
+      await coordinator.resolveFeedback(actor: reviewer, feedbackId: 'feedback-1');
+      await coordinator.closeCurrentRound(actor: reviewer);
+      expect(controller.state.status, ReviewStatus.readyForFinalReview);
+      expect(controller.state.reviewRound, 1);
+
+      final reopened = await coordinator.reopenFeedback(
+        actor: reviewer,
+        feedbackId: 'feedback-1',
+      );
+
+      expect(reopened.status, FeedbackStatus.open);
+      expect(controller.state.status, ReviewStatus.needsRevision);
+      expect(controller.state.reviewRound, 2);
+      expect(controller.state.feedbackIds, ['feedback-1']);
+    });
+
+    test('reopening a non-blocking item from ready leaves readiness unchanged',
+        () async {
+      await create(id: 'feedback-nb', blocking: false);
+      await coordinator.markAddressed(actor: agent, feedbackId: 'feedback-nb');
+      await coordinator.closeCurrentRound(actor: reviewer);
+      expect(controller.state.status, ReviewStatus.readyForFinalReview);
+
+      await coordinator.reopenFeedback(actor: reviewer, feedbackId: 'feedback-nb');
+
+      expect(controller.state.status, ReviewStatus.readyForFinalReview);
+      expect(controller.state.reviewRound, 1);
+    });
+
+    test('reopening a blocking item when not ready leaves status unchanged',
+        () async {
+      await create(blocking: true);
+      await coordinator.markAddressed(actor: agent, feedbackId: 'feedback-1');
+      expect(controller.state.status, ReviewStatus.needsRevision);
+      expect(controller.state.reviewRound, 1);
+
+      await coordinator.reopenFeedback(actor: reviewer, feedbackId: 'feedback-1');
+
+      expect(controller.state.status, ReviewStatus.needsRevision);
+      expect(controller.state.reviewRound, 1);
+    });
+  });
+
   group('read helpers', () {
     test('feedbackForRound filters by creation round', () async {
       await create(id: 'feedback-1');
@@ -508,6 +609,12 @@ void main() {
         'blocking_feedback_unresolved',
       );
       expect(const ReviewRoundNotClosable('x').code, 'review_round_not_closable');
+      expect(
+        const ReadinessRequiresRoundClose('x').code,
+        'readiness_requires_round_close',
+      );
+      expect(const DuplicateFeedbackId('x').code, 'duplicate_feedback_id');
+      expect(const FeedbackNotFound('x').code, 'feedback_not_found');
     });
 
     test('are exceptions with a message', () {

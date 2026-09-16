@@ -55,3 +55,39 @@ final class ReviewRoundNotClosable extends ReviewDomainError {
   @override
   String get code => 'review_round_not_closable';
 }
+
+/// Readiness was requested outside the coordinator's round-close authority.
+///
+/// `ready_for_final_review` is reachable only through
+/// `ReviewCoordinator.closeCurrentRound`; the interactive status control must
+/// never set it directly.
+final class ReadinessRequiresRoundClose extends ReviewDomainError {
+  const ReadinessRequiresRoundClose(super.message);
+
+  @override
+  String get code => 'readiness_requires_round_close';
+}
+
+/// A feedback id that is already referenced or persisted.
+final class DuplicateFeedbackId extends ReviewDomainError {
+  const DuplicateFeedbackId(super.message);
+
+  @override
+  String get code => 'duplicate_feedback_id';
+}
+
+/// A referenced feedback record does not exist.
+final class FeedbackNotFound extends ReviewDomainError {
+  const FeedbackNotFound(super.message);
+
+  @override
+  String get code => 'feedback_not_found';
+}
+
+/// A candidate ReviewState failed normalization/validation.
+final class InvalidReviewState extends ReviewDomainError {
+  const InvalidReviewState(super.message);
+
+  @override
+  String get code => 'invalid_review_state';
+}

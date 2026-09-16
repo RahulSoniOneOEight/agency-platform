@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:prototype_app/direction/prototype_direction.dart';
 import 'package:prototype_app/review/memory_review_repository.dart';
 import 'package:prototype_app/review/review_controller.dart';
+import 'package:prototype_app/review/review_domain_error.dart';
 import 'package:prototype_app/review/review_overview.dart';
 import 'package:prototype_app/review/review_screen_decision.dart';
 import 'package:prototype_app/review/review_state.dart';
@@ -133,11 +134,15 @@ void main() {
   });
 
   group('status control', () {
-    testWidgets('sets each C.1 status through the controller', (tester) async {
+    testWidgets('sets each interactive C.1 status through the controller',
+        (tester) async {
       await pumpOverview(tester);
       expect(controller.state.status, ReviewStatus.inReview);
 
-      for (final status in ReviewStatus.values) {
+      for (final status in const [
+        ReviewStatus.needsRevision,
+        ReviewStatus.inReview,
+      ]) {
         await tester.tap(
           find.descendant(
             of: find.byKey(ReviewOverview.statusControlKey),
@@ -150,11 +155,11 @@ void main() {
 
       expect(
         (await repository.load('prototype-demo'))!.status,
-        ReviewStatus.readyForFinalReview,
+        ReviewStatus.inReview,
       );
     });
 
-    testWidgets('offers exactly the three C.1 statuses', (tester) async {
+    testWidgets('offers only the two interactive C.1 statuses', (tester) async {
       await pumpOverview(tester);
 
       final rendered = tester
@@ -169,12 +174,26 @@ void main() {
 
       expect(
         rendered,
-        equals(<String>{
-          'in_review',
-          'needs_revision',
-          'ready_for_final_review',
-        }),
+        equals(<String>{'in_review', 'needs_revision'}),
       );
+    });
+
+    testWidgets('never sets readiness: it is coordinator-owned', (tester) async {
+      await pumpOverview(tester);
+
+      expect(
+        find.descendant(
+          of: find.byKey(ReviewOverview.statusControlKey),
+          matching: find.text('ready_for_final_review'),
+        ),
+        findsNothing,
+      );
+
+      await expectLater(
+        () => controller.setStatus(ReviewStatus.readyForFinalReview),
+        throwsA(isA<ReadinessRequiresRoundClose>()),
+      );
+      expect(controller.state.status, ReviewStatus.inReview);
     });
   });
 

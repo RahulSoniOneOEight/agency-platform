@@ -224,6 +224,26 @@ void main() {
       );
     });
 
+    testWidgets('a reviewer can reopen an addressed item directly',
+        (tester) async {
+      await seed(id: 'feedback-1', blocking: true);
+      await coordinator.markAddressed(actor: agent, feedbackId: 'feedback-1');
+
+      await pump(tester, reviewer);
+
+      expect(
+        find.byKey(ReviewFeedbackPanel.reopenButtonKey('feedback-1')),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(ReviewFeedbackPanel.reopenButtonKey('feedback-1')));
+      await tester.pumpAndSettle();
+
+      expect(
+        (await coordinator.loadFeedback('feedback-1'))!.status,
+        FeedbackStatus.open,
+      );
+    });
+
     testWidgets('a reviewer can toggle blocking classification', (tester) async {
       await seed(id: 'feedback-1', blocking: false);
       await pump(tester, reviewer);
