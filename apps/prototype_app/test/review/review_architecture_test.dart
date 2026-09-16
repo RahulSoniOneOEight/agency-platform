@@ -20,11 +20,17 @@ import '../support/runtime_fixtures.dart';
 
 /// Keys that belong to the review-state contract. They must never appear inside
 /// the B.1B runtime bundle input (review state is separate from the runtime).
+///
+/// `direction`/`sections` are the nested ReviewState v2 decision keys introduced
+/// by C.3 (`screen_selections.<screen>.{direction,sections}`); they must not leak
+/// into runtime data either.
 const Set<String> _reviewStateKeys = {
   'review_round',
   'selected_direction',
   'screen_selections',
   'comments',
+  'direction',
+  'sections',
 };
 
 /// Recursively collects every map key reachable from [node].

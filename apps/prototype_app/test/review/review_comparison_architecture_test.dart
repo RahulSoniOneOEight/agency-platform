@@ -487,6 +487,36 @@ void main() {
       expect(ReviewState.fromJson(state.toJson()), equals(state));
     });
 
+    test('canonical v2 decisions keep the seven-key contract and round-trip', () {
+      final state = ReviewState.fromJson({
+        'version': 2,
+        'client_id': 'prototype-demo',
+        'review_round': 2,
+        'status': 'in_review',
+        'selected_direction': 'a',
+        'screen_selections': {
+          'commerce.plp': {
+            'direction': 'c',
+            'sections': {'plp.product-grid': 'a'},
+          },
+        },
+        'comments': [
+          {'id': 'c1', 'scope': 'general', 'text': 'hello'},
+        ],
+      });
+
+      final json = state.toJson();
+      expect(json.keys.toSet(), equals(canonicalKeys));
+      expect(
+        (json['screen_selections'] as Map<String, dynamic>)['commerce.plp'],
+        {
+          'direction': 'c',
+          'sections': {'plp.product-grid': 'a'},
+        },
+      );
+      expect(ReviewState.fromJson(json), equals(state));
+    });
+
     testWidgets('comparison viewing interactions never mutate controller state',
         (tester) async {
       final runtime = _comparisonRuntime();
@@ -530,6 +560,75 @@ void main() {
       expect(controller.state.selectedDirection, isNull);
       expect(controller.state.screenSelections, isEmpty);
       expect(controller.state.comments, isEmpty);
+    });
+  });
+
+  group('C.3 section mix decisions stay display-only in comparison', () {
+    testWidgets('a persisted section mix never changes comparison panels',
+        (tester) async {
+      final runtime = PrototypeRuntime.fromMap(
+        canonicalBundle(
+          directionIds: const ['a', 'b', 'c'],
+          patterns: const {
+            'a': ['commerce.plp', 'commerce.search'],
+            'b': ['commerce.search', 'commerce.plp'],
+            'c': ['commerce.pdp', 'commerce.plp'],
+          },
+          components: const {
+            'a': ['commerce.product-card'],
+            'b': ['commerce.product-card'],
+            'c': ['commerce.product-card'],
+          },
+          theme: resolvedThemeMap(cardSpacing: 12, tileGap: 8),
+          directionThemes: {
+            'a': resolvedThemeMap(primary: '#1155CC', cardSpacing: 12, tileGap: 8),
+            'b': resolvedThemeMap(primary: '#CC1155', cardSpacing: 12, tileGap: 8),
+            'c': resolvedThemeMap(primary: '#11CC55', cardSpacing: 12, tileGap: 8),
+          },
+        ),
+      );
+      final controller = _freshController(runtime);
+      await controller.selectDirection('a');
+      await controller.setSectionDirection(
+        'commerce.plp',
+        'plp.product-grid',
+        'c',
+      );
+      expect(
+        controller.state.screenSelections['commerce.plp']!
+            .sections['plp.product-grid'],
+        'c',
+      );
+
+      await _pumpScreenComparison(
+        tester,
+        runtime,
+        controller,
+        const Size(1600, 900),
+      );
+      await tester.tap(
+        find.byKey(ReviewScreenComparison.screenChipKey('commerce.plp')),
+      );
+      await tester.pumpAndSettle();
+
+      // commerce.plp is supported by a, b and c. Every comparison panel keeps
+      // its own direction-resolved theme; the persisted C.3 section mix is not
+      // consulted by the display-only comparison surfaces.
+      for (final id in const ['a', 'b', 'c']) {
+        final expected = AgencyTheme.light(runtime.themeForDirection(id));
+        final host = find.descendant(
+          of: find.byKey(ReviewComparisonLayout.panelKey(id)),
+          matching: find.byType(ReviewComparisonHost),
+        );
+        final rendered = tester.widget<Theme>(
+          find.descendant(of: host, matching: find.byType(Theme)).first,
+        );
+        expect(
+          rendered.data.colorScheme.primary,
+          expected.colorScheme.primary,
+          reason: 'direction $id panel was contaminated by the section mix',
+        );
+      }
     });
   });
 
