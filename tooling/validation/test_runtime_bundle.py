@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import copy
 import inspect
 import json
+import shutil
 import tempfile
 import unittest
 from datetime import date
@@ -13,6 +15,11 @@ from tooling.design_contract.flutter_bindings import (
     load_flutter_bindings,
     runtime_binding_errors,
 )
+from tooling.design_contract.generate_resolved_themes import (
+    check_resolved_bundles_fresh,
+    write_resolved_bundles,
+)
+from tooling.design_contract.theme_contract import CANONICAL_GROUPS, resolve_theme
 from tooling.knowledge.index_design_contract import build_indexes
 from tooling.prototype.build_runtime_bundle import build_runtime_bundle
 from tooling.prototype import validate_runtime_bundle as runtime_bundle_validator
@@ -23,6 +30,16 @@ validate_runtime_bundle = runtime_bundle_validator.validate_runtime_bundle
 
 
 ROOT = Path(__file__).resolve().parents[2]
+_RESOLVED_THEME = resolve_theme(ROOT, "premium-modern")
+
+
+def _copy_theme_contract(root: Path) -> None:
+    for catalog in ("tokens", "themes"):
+        source = ROOT / "design-contract" / catalog
+        destination = root / "design-contract" / catalog
+        destination.mkdir(parents=True, exist_ok=True)
+        for path in sorted(source.glob("*.yaml")):
+            shutil.copyfile(path, destination / path.name)
 
 
 def _direction(direction_id: str, *, density: str = "compact") -> dict:
@@ -82,7 +99,10 @@ def _bundle(direction_ids: tuple[str, ...] = ("a", "b")) -> dict:
         "default_direction": "a",
         "directions": directions,
         "fixtures": _fixtures(),
-        "theme": {"seed_color": "#6750A4"},
+        "theme": copy.deepcopy(_RESOLVED_THEME),
+        "direction_themes": {
+            direction_id: copy.deepcopy(_RESOLVED_THEME) for direction_id in direction_ids
+        },
         "resources": {"asset.home.hero": _resource_binding()},
         "review": {
             "query_parameter": "direction",
@@ -113,7 +133,23 @@ def _write_design_contract(
 
 
 def _write_client(client_dir: Path, direction_ids: tuple[str, ...] = ("a", "b")) -> None:
-    _write_design_contract(client_dir.parents[1])
+    root = client_dir.parents[1]
+    _write_design_contract(root)
+    _copy_theme_contract(root)
+    brand_dir = client_dir / "input" / "brand"
+    brand_dir.mkdir(parents=True)
+    (brand_dir / "brand-input.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "version": 1,
+                "provided": True,
+                "facts": [],
+                "visual": {"preset": "premium-modern"},
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
     runtime_dir = client_dir / "prototype" / "runtime"
     fixture_dir = client_dir / "prototype" / "fixtures"
     runtime_dir.mkdir(parents=True)
@@ -138,7 +174,7 @@ def _write_client(client_dir: Path, direction_ids: tuple[str, ...] = ("a", "b"))
         "default_direction": "a",
         "directions": direction_paths,
         "fixture_pack": "prototype/fixtures/demo.yaml",
-        "theme": {"seed_color": "#6750A4"},
+        "theme": {"preset": "premium-modern"},
         "resources": {
             "asset.home.hero": {
                 "candidate_id": "pexels-42",
@@ -595,6 +631,7 @@ class RuntimeBundleTests(unittest.TestCase):
                 patterns={"other.pattern": "approved"},
                 components={"other.component": "approved"},
             )
+            _copy_theme_contract(root)
 
             with self.assertRaisesRegex(
                 ValueError,
@@ -635,8 +672,8 @@ class RuntimeBundleTests(unittest.TestCase):
     def test_validator_reports_invalid_theme_and_resource_bindings(self):
         cases = {}
         bad_theme = _bundle()
-        bad_theme["theme"]["seed_color"] = "6750A4"
-        cases["theme"] = (bad_theme, "seed_color")
+        bad_theme["theme"]["color"]["primary"] = "6750A4"
+        cases["theme"] = (bad_theme, "color.primary")
 
         unknown_id = _bundle()
         unknown_id["resources"] = {
@@ -816,7 +853,7 @@ class RuntimeBundleTests(unittest.TestCase):
             "non-finite number": lambda manifest, fixtures: fixtures["products"][0].update(
                 {"price": float("nan")}
             ),
-            "yaml date": lambda manifest, fixtures: manifest["theme"].update(
+            "yaml date": lambda manifest, fixtures: manifest["review"].update(
                 {"generated_on": date(2026, 9, 15)}
             ),
             "yaml set": lambda manifest, fixtures: manifest["resources"][
@@ -918,6 +955,133 @@ class RuntimeBundleTests(unittest.TestCase):
                 ValueError, "^invalid runtime bundle: .*allowed_directions"
             ):
                 build_runtime_bundle(root, client, root / "output")
+
+
+def _walk_strings(value):
+    if isinstance(value, dict):
+        for item in value.values():
+            yield from _walk_strings(item)
+    elif isinstance(value, list):
+        for item in value:
+            yield from _walk_strings(item)
+    elif isinstance(value, str):
+        yield value
+
+
+class ResolvedThemeBundleTests(unittest.TestCase):
+    def test_bundle_theme_is_compiled_and_reference_free(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            client = root / "client-projects" / "acme-client"
+            _write_client(client)
+
+            bundle = json.loads(
+                build_runtime_bundle(root, client, root / "output").read_text(
+                    encoding="utf-8"
+                )
+            )
+            manifest = yaml.safe_load(
+                (client / "prototype" / "prototype-manifest.yaml").read_text(
+                    encoding="utf-8"
+                )
+            )
+
+        self.assertEqual({"preset": "premium-modern"}, manifest["theme"])
+        self.assertEqual(1, bundle["theme"]["version"])
+        self.assertEqual(
+            sorted(CANONICAL_GROUPS),
+            sorted(key for key in bundle["theme"] if key != "version"),
+        )
+        self.assertFalse(
+            [value for value in _walk_strings(bundle["theme"]) if "{foundation." in value]
+        )
+        self.assertFalse(
+            [
+                value
+                for value in _walk_strings(bundle["direction_themes"])
+                if "{foundation." in value
+            ]
+        )
+
+    def test_direction_themes_use_canonical_direction_density(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            client = root / "client-projects" / "acme-client"
+            _write_client(client, ("a", "b"))
+
+            bundle = json.loads(
+                build_runtime_bundle(root, client, root / "output").read_text(
+                    encoding="utf-8"
+                )
+            )
+
+        self.assertEqual("compact", bundle["direction_themes"]["a"]["density"]["default"])
+        self.assertEqual("compact", bundle["direction_themes"]["b"]["density"]["default"])
+
+    def test_bundle_theme_matches_fresh_resolve(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            client = root / "client-projects" / "acme-client"
+            _write_client(client)
+
+            bundle = json.loads(
+                build_runtime_bundle(root, client, root / "output").read_text(
+                    encoding="utf-8"
+                )
+            )
+
+            expected = resolve_theme(root, "premium-modern", {"preset": "premium-modern"}, None)
+
+        self.assertEqual(expected, bundle["theme"])
+
+    def test_validator_rejects_unresolved_theme_reference(self):
+        bundle = _bundle()
+        bundle["theme"]["color"]["primary"] = "{foundation.color.blue.600}"
+
+        errors = validate_runtime_bundle(bundle)
+
+        self.assertTrue(any("theme.color.primary" in error for error in errors), errors)
+
+    def test_validator_rejects_missing_theme_group(self):
+        bundle = _bundle()
+        del bundle["theme"]["motion"]
+
+        errors = validate_runtime_bundle(bundle)
+
+        self.assertTrue(any("motion" in error for error in errors), errors)
+
+    def test_validator_rejects_unknown_direction_theme(self):
+        bundle = _bundle()
+        bundle["direction_themes"]["z"] = copy.deepcopy(_RESOLVED_THEME)
+
+        errors = validate_runtime_bundle(bundle)
+
+        self.assertTrue(any("direction_themes.z" in error for error in errors), errors)
+
+    def test_resolved_bundle_freshness_detects_stale(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            client = root / "client-projects" / "acme-client"
+            _write_client(client)
+
+            write_resolved_bundles(root)
+            self.assertEqual([], check_resolved_bundles_fresh(root))
+
+            bundle_path = (
+                root
+                / "apps"
+                / "prototype_app"
+                / "assets"
+                / "generated"
+                / "acme-client.json"
+            )
+            data = json.loads(bundle_path.read_text(encoding="utf-8"))
+            data["theme"]["color"]["primary"] = "#000000"
+            bundle_path.write_text(
+                json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            )
+
+            self.assertTrue(check_resolved_bundles_fresh(root))
 
 
 if __name__ == "__main__":

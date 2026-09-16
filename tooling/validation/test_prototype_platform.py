@@ -64,9 +64,38 @@ def _write_design_contract(root: Path) -> None:
             )
 
 
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _copy_theme_contract(root: Path) -> None:
+    for catalog in ("tokens", "themes"):
+        source = _REPO_ROOT / "design-contract" / catalog
+        destination = root / "design-contract" / catalog
+        destination.mkdir(parents=True, exist_ok=True)
+        for path in sorted(source.glob("*.yaml")):
+            destination.joinpath(path.name).write_text(
+                path.read_text(encoding="utf-8"), encoding="utf-8"
+            )
+
+
 def _write_client(root: Path, direction_ids: list[str]) -> Path:
     _write_design_contract(root)
+    _copy_theme_contract(root)
     client = root / "client-projects" / "acme"
+    brand_dir = client / "input" / "brand"
+    brand_dir.mkdir(parents=True)
+    (brand_dir / "brand-input.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "version": 1,
+                "provided": True,
+                "facts": [],
+                "visual": {"preset": "premium-modern"},
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
     directions = client / "directions"
     directions.mkdir(parents=True)
     profile = {

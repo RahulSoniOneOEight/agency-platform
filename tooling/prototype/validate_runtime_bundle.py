@@ -4,13 +4,13 @@ import math
 import re
 from pathlib import Path
 
+from tooling.design_contract.theme_contract import validate_resolved_theme
 from tooling.knowledge.index_design_contract import build_indexes
 
 from .project_direction import validate_runtime_direction
 
 
 _CLIENT_ID = re.compile(r"[A-Za-z0-9._-]+")
-_SEED_COLOR = re.compile(r"#[0-9A-Fa-f]{6}")
 _CANONICAL_RESOURCE_ID = re.compile(
     r"(?:asset|icon|motion|resource)(?:\.[A-Za-z0-9_-]+)+"
 )
@@ -420,9 +420,25 @@ def validate_runtime_bundle(bundle: dict) -> list[str]:
     if not isinstance(theme, dict):
         errors.append("theme must be an object")
     else:
-        seed_color = theme.get("seed_color")
-        if not isinstance(seed_color, str) or not _SEED_COLOR.fullmatch(seed_color):
-            errors.append("theme.seed_color must be a #RRGGBB color")
+        errors.extend(validate_resolved_theme(theme, prefix="theme"))
+
+    direction_themes = bundle.get("direction_themes")
+    if direction_themes is not None:
+        if not isinstance(direction_themes, dict):
+            errors.append("direction_themes must be an object")
+        else:
+            for direction_id, direction_theme in direction_themes.items():
+                if direction_id not in direction_ids:
+                    errors.append(
+                        f"direction_themes.{direction_id}: unknown direction"
+                    )
+                    continue
+                errors.extend(
+                    validate_resolved_theme(
+                        direction_theme,
+                        prefix=f"direction_themes.{direction_id}",
+                    )
+                )
 
     resources = bundle.get("resources")
     errors.extend(_validate_resources(resources, direction_ids))

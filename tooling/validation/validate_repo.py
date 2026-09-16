@@ -166,7 +166,7 @@ def generated_runtime_bundle_errors(root: Path) -> list[str]:
             continue
 
         try:
-            fresh = compose_runtime_bundle(client_dir)
+            fresh = compose_runtime_bundle(root, client_dir)
             expected = (
                 json.dumps(fresh, indent=2, sort_keys=True, allow_nan=False) + "\n"
             )

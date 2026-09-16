@@ -8,7 +8,7 @@ directions:
   c: prototype/runtime/direction-c.json
 fixture_pack: prototype/fixtures/demo.yaml
 theme:
-  seed_color: '#6750A4'
+  preset: premium-modern
 review:
   query_parameter: direction
   allowed_values:

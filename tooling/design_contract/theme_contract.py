@@ -385,33 +385,58 @@ def _validate_semantic_value(
     return []
 
 
-def _validate_semantic(catalog: dict) -> list[str]:
+def _validate_semantic(catalog: dict, *, prefix: str = "semantic") -> list[str]:
     errors: list[str] = []
-    errors.extend(_version_errors("semantic", catalog.get("version")))
+    errors.extend(_version_errors(prefix, catalog.get("version")))
     declared = set(catalog) - {"version"}
     for group in CANONICAL_GROUPS:
         if group not in catalog:
-            errors.append(f"semantic: missing required top-level group '{group}'")
-    for group in sorted(declared - set(CANONICAL_GROUPS)):
-        errors.append(f"semantic: unknown top-level group '{group}'")
+            errors.append(f"{prefix}: missing required top-level group '{group}'")
+    for group in sorted(declared - set(CANONICAL_GROUPS), key=str):
+        errors.append(f"{prefix}: unknown top-level group '{group}'")
     for group in CANONICAL_GROUPS:
         if group not in catalog:
             continue
         value = catalog[group]
         if not isinstance(value, dict):
-            errors.append(f"semantic.{group}: expected a mapping, got {_describe(value)}")
+            errors.append(f"{prefix}.{group}: expected a mapping, got {_describe(value)}")
             continue
         if not value:
-            errors.append(f"semantic.{group}: must not be empty")
+            errors.append(f"{prefix}.{group}: must not be empty")
             continue
         required = SEMANTIC_KEYS[group]
-        for key in sorted(set(required) - set(value)):
-            errors.append(f"semantic.{group}: missing required key '{key}'")
-        for key in sorted(set(value) - set(required)):
-            errors.append(f"semantic.{group}: unknown key '{key}'")
-        for key in sorted(set(value) & set(required)):
-            errors.extend(_validate_semantic_value(group, key, value[key]))
+        for key in sorted(set(required) - set(value), key=str):
+            errors.append(f"{prefix}.{group}: missing required key '{key}'")
+        for key in sorted(set(value) - set(required), key=str):
+            errors.append(f"{prefix}.{group}: unknown key '{key}'")
+        for key in sorted(set(value) & set(required), key=str):
+            errors.extend(_validate_semantic_value(group, key, value[key], prefix=prefix))
     return errors
+
+
+def _walk_leaves(value, path: str = ""):
+    if isinstance(value, dict):
+        for key in sorted(value, key=str):
+            child = f"{path}.{key}" if path else str(key)
+            yield from _walk_leaves(value[key], child)
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            yield from _walk_leaves(item, f"{path}.{index}")
+    else:
+        yield path, value
+
+
+def validate_resolved_theme(theme: object, *, prefix: str = "theme") -> list[str]:
+    """Validate a fully resolved theme object; root-independent, deterministic."""
+    if not isinstance(theme, dict):
+        return [f"{prefix}: expected an object, got {_describe(theme)}"]
+    errors = _validate_semantic(theme, prefix=prefix)
+    for path, value in _walk_leaves(theme):
+        if isinstance(value, str) and "{" in value and "}" in value:
+            errors.append(
+                f"{prefix}.{path}: resolved theme must not contain token references"
+            )
+    return sorted(set(errors))
 
 
 def validate_token_catalogs(root: Path) -> list[str]:
@@ -721,6 +746,8 @@ def resolve_theme(
     preset_id: str,
     client_brand: dict | None = None,
     direction_overrides: dict | None = None,
+    *,
+    density: str | None = None,
 ) -> dict:
     """Compile foundation + semantic defaults + preset + brand + direction to a theme."""
     catalog_errors = validate_token_catalogs(root)
@@ -751,10 +778,18 @@ def resolve_theme(
     if override_errors:
         raise ValueError("; ".join(sorted(set(override_errors))))
 
+    if density is not None and density not in CANONICAL_DENSITIES:
+        raise ValueError(
+            f"invalid density: {density!r}; expected one of "
+            f"{', '.join(CANONICAL_DENSITIES)}"
+        )
+
     theme = copy.deepcopy(semantic)
     theme.pop("version", None)
     for _label, overrides in layers:
         _deep_merge(theme, overrides)
+    if density is not None:
+        theme.setdefault("density", {})["default"] = density
 
     resolved, reference_errors = _resolve_theme_values(theme, foundation)
     if reference_errors:
