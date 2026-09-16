@@ -4,17 +4,25 @@ import '../runtime/prototype_runtime.dart';
 import 'review_controller.dart';
 import 'review_state.dart';
 
-/// Read-only review metadata summary.
+/// Review metadata summary plus the C.1 round/status controls.
 ///
 /// Every value is derived from the loaded [PrototypeRuntime] and the injected
-/// [ReviewController] state. This screen owns no state and never mutates the
-/// runtime bundle.
+/// [ReviewController] state. The explicit advance action is deterministic
+/// (`round + 1`) with no workflow/approval transition logic, and the status
+/// control offers exactly the three C.1 lifecycle statuses; neither is an
+/// approval action. This screen never mutates the runtime bundle.
 class ReviewOverview extends StatelessWidget {
   const ReviewOverview({
     super.key,
     required this.runtime,
     required this.controller,
   });
+
+  /// Explicit review-round advancement action.
+  static const Key advanceRoundButtonKey = Key('review-overview-advance-round');
+
+  /// C.1 status control.
+  static const Key statusControlKey = Key('review-overview-status');
 
   final PrototypeRuntime runtime;
   final ReviewController controller;
@@ -34,7 +42,8 @@ class ReviewOverview extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             _OverviewRow(label: 'Review round', value: '${state.reviewRound}'),
-            _OverviewRow(label: 'Status', value: reviewStatusToWire(state.status)),
+            _OverviewRow(
+                label: 'Status', value: reviewStatusToWire(state.status)),
             _OverviewRow(
               label: 'Overall direction',
               value: state.selectedDirection ?? 'Not selected',
@@ -44,6 +53,36 @@ class ReviewOverview extends StatelessWidget {
               value: '${state.screenSelections.length}',
             ),
             _OverviewRow(label: 'Comments', value: '${state.comments.length}'),
+            const SizedBox(height: 24),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FilledButton.icon(
+                key: advanceRoundButtonKey,
+                onPressed: controller.advanceRound,
+                icon: const Icon(Icons.skip_next),
+                label: const Text('Advance review round'),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Review status',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            SegmentedButton<ReviewStatus>(
+              key: statusControlKey,
+              segments: [
+                for (final status in ReviewStatus.values)
+                  ButtonSegment<ReviewStatus>(
+                    value: status,
+                    label: Text(reviewStatusToWire(status)),
+                  ),
+              ],
+              selected: {state.status},
+              showSelectedIcon: false,
+              onSelectionChanged: (selection) =>
+                  controller.setStatus(selection.first),
+            ),
           ],
         );
       },

@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../fixtures/fixture_repository.dart';
 import '../runtime/prototype_runtime.dart';
+import 'review_comments.dart';
 import 'review_controller.dart';
 import 'review_directions.dart';
 import 'review_overview.dart';
 import 'review_screens.dart';
 import 'review_selection.dart';
-import 'review_state.dart';
 
 /// Width at or above which the review destinations are presented as a rail.
 const double _wideBreakpoint = 900;
@@ -42,7 +42,8 @@ class _ReviewShellState extends State<ReviewShell> {
     _ReviewDestination('Overview', Icons.dashboard_outlined, Icons.dashboard),
     _ReviewDestination('Directions', Icons.explore_outlined, Icons.explore),
     _ReviewDestination('Screens', Icons.layers_outlined, Icons.layers),
-    _ReviewDestination('Selection', Icons.check_circle_outline, Icons.check_circle),
+    _ReviewDestination(
+        'Selection', Icons.check_circle_outline, Icons.check_circle),
     _ReviewDestination('Comments', Icons.comment_outlined, Icons.comment),
   ];
 
@@ -119,11 +120,15 @@ class _ReviewShellState extends State<ReviewShell> {
 
   Widget _buildDestination(int index) {
     return switch (index) {
-      0 => ReviewOverview(runtime: widget.runtime, controller: widget.controller),
-      1 => ReviewDirections(runtime: widget.runtime, controller: widget.controller),
+      0 =>
+        ReviewOverview(runtime: widget.runtime, controller: widget.controller),
+      1 => ReviewDirections(
+          runtime: widget.runtime, controller: widget.controller),
       2 => ReviewScreens(runtime: widget.runtime, fixtures: _fixtures),
-      3 => ReviewSelection(runtime: widget.runtime, controller: widget.controller),
-      _ => _CommentsSummary(controller: widget.controller),
+      3 =>
+        ReviewSelection(runtime: widget.runtime, controller: widget.controller),
+      _ =>
+        ReviewComments(runtime: widget.runtime, controller: widget.controller),
     };
   }
 }
@@ -134,46 +139,4 @@ class _ReviewDestination {
   final String label;
   final IconData icon;
   final IconData selectedIcon;
-}
-
-/// Real read-only comments summary from the controller state.
-///
-/// The comment capture/editor is added by the comments task; this destination is
-/// a genuine list/count rather than a placeholder.
-class _CommentsSummary extends StatelessWidget {
-  const _CommentsSummary({required this.controller});
-
-  final ReviewController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: controller,
-      builder: (context, _) {
-        final comments = controller.state.comments;
-        return ListView(
-          padding: const EdgeInsets.all(24),
-          children: [
-            Text('Review comments', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 12),
-            Text('Comment count: ${comments.length}'),
-            const SizedBox(height: 12),
-            if (comments.isEmpty)
-              const Text('No comments yet.')
-            else
-              for (final comment in comments)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(comment.text),
-                  subtitle: Text(
-                    comment.scope == ReviewCommentScope.screen
-                        ? '${comment.screen} · ${comment.direction ?? 'all directions'}'
-                        : comment.direction ?? 'general',
-                  ),
-                ),
-          ],
-        );
-      },
-    );
-  }
 }
