@@ -12,8 +12,9 @@ void main() {
   );
 
   testWidgets('product card renders product and B2B SKU context', (tester) async {
-    await tester.pumpWidget(const MaterialApp(
-      home: Scaffold(
+    await tester.pumpWidget(MaterialApp(
+      theme: AgencyTheme.lightDefault(),
+      home: const Scaffold(
         body: ProductCard(
           product: product,
           variant: ProductCardVariant.b2b,
@@ -26,19 +27,21 @@ void main() {
   });
 
   testWidgets('credit summary exposes available credit', (tester) async {
-    await tester.pumpWidget(const MaterialApp(
-      home: Scaffold(body: CreditSummary(limit: 100000, used: 35000)),
+    await tester.pumpWidget(MaterialApp(
+      theme: AgencyTheme.lightDefault(),
+      home: const Scaffold(body: CreditSummary(limit: 100000, used: 35000)),
     ));
     expect(find.textContaining('65,000'), findsOneWidget);
   });
 
   testWidgets('merchandising split tile renders two product slots', (tester) async {
-    await tester.pumpWidget(const MaterialApp(
+    await tester.pumpWidget(MaterialApp(
+      theme: AgencyTheme.lightDefault(),
       home: Scaffold(
         body: MerchandisingSplitTile(
           title: 'Complete the setup',
           left: product,
-          right: AgencyProduct(
+          right: const AgencyProduct(
             id: 'p2',
             name: '65W Charger',
             price: AgencyPrice(current: 1799),

@@ -4,3 +4,10 @@ facts:
   - key: name
     value: prototype-demo
 files: []
+visual:
+  preset: premium-modern
+  primary_color: '#1155CC'
+  secondary_color: '#EF8A23'
+  font_family: Inter
+  font_fallback: Roboto
+  visual_character: soft

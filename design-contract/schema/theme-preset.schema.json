@@ -1,0 +1,188 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "design-contract/schema/theme-preset.schema.json",
+  "title": "Agency Theme Preset",
+  "description": "Reusable visual theme preset containing approved semantic overrides only. Documentation/CI asset; tooling/design_contract/theme_contract.py is authoritative.",
+  "type": "object",
+  "required": ["id", "status", "semantic_overrides"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {"type": "string", "minLength": 1},
+    "status": {"enum": ["experimental", "approved", "deprecated"]},
+    "semantic_overrides": {
+      "type": "object",
+      "additionalProperties": false,
+      "propertyNames": {
+        "enum": [
+          "color",
+          "typography",
+          "spacing",
+          "radius",
+          "elevation",
+          "size",
+          "density",
+          "motion",
+          "breakpoints"
+        ]
+      },
+      "properties": {
+        "color": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": false,
+          "propertyNames": {
+            "enum": [
+              "primary",
+              "on_primary",
+              "secondary",
+              "on_secondary",
+              "surface",
+              "surface_muted",
+              "text_primary",
+              "text_secondary",
+              "border",
+              "error",
+              "on_error"
+            ]
+          },
+          "patternProperties": {
+            ".*": {
+              "oneOf": [
+                {"$ref": "#/$defs/reference"},
+                {"$ref": "#/$defs/color"}
+              ]
+            }
+          }
+        },
+        "typography": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": false,
+          "properties": {
+            "font_family": {
+              "oneOf": [
+                {"$ref": "#/$defs/reference"},
+                {"$ref": "#/$defs/literalString"}
+              ]
+            },
+            "font_fallback": {
+              "oneOf": [
+                {"$ref": "#/$defs/reference"},
+                {"$ref": "#/$defs/literalString"}
+              ]
+            },
+            "display": {"$ref": "#/$defs/referenceOrNumber"},
+            "headline": {"$ref": "#/$defs/referenceOrNumber"},
+            "title": {"$ref": "#/$defs/referenceOrNumber"},
+            "body": {"$ref": "#/$defs/referenceOrNumber"},
+            "label": {"$ref": "#/$defs/referenceOrNumber"},
+            "line_height_body": {"$ref": "#/$defs/referenceOrNumber"},
+            "weight_regular": {"$ref": "#/$defs/referenceOrNumber"},
+            "weight_emphasis": {"$ref": "#/$defs/referenceOrNumber"},
+            "heading_emphasis": {
+              "oneOf": [
+                {"$ref": "#/$defs/reference"},
+                {"$ref": "#/$defs/literalString"}
+              ]
+            }
+          }
+        },
+        "spacing": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": false,
+          "propertyNames": {"enum": ["inline", "control", "card", "tile", "section"]},
+          "patternProperties": {
+            ".*": {"$ref": "#/$defs/referenceOrNumber"}
+          }
+        },
+        "radius": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": false,
+          "propertyNames": {"enum": ["control", "card"]},
+          "patternProperties": {
+            ".*": {"$ref": "#/$defs/referenceOrNumber"}
+          }
+        },
+        "elevation": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": false,
+          "propertyNames": {"enum": ["card", "overlay"]},
+          "patternProperties": {
+            ".*": {"$ref": "#/$defs/referenceOrNumber"}
+          }
+        },
+        "size": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": false,
+          "propertyNames": {"enum": ["control_height", "control_height_compact", "icon"]},
+          "patternProperties": {
+            ".*": {"$ref": "#/$defs/referenceOrNumber"}
+          }
+        },
+        "density": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": false,
+          "properties": {
+            "default": {
+              "oneOf": [
+                {"$ref": "#/$defs/reference"},
+                {"enum": ["compact", "normal", "spacious"]}
+              ]
+            }
+          }
+        },
+        "motion": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": false,
+          "properties": {
+            "fast_ms": {"$ref": "#/$defs/referenceOrNumber"},
+            "normal_ms": {"$ref": "#/$defs/referenceOrNumber"},
+            "slow_ms": {"$ref": "#/$defs/referenceOrNumber"},
+            "easing": {
+              "oneOf": [
+                {"$ref": "#/$defs/reference"},
+                {"$ref": "#/$defs/literalString"}
+              ]
+            }
+          }
+        },
+        "breakpoints": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": false,
+          "propertyNames": {"enum": ["mobile", "tablet", "desktop"]},
+          "patternProperties": {
+            ".*": {"$ref": "#/$defs/referenceOrNumber"}
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "reference": {
+      "type": "string",
+      "pattern": "^\\{foundation\\.[A-Za-z0-9_]+(?:\\.[A-Za-z0-9_]+)*\\}$"
+    },
+    "color": {
+      "type": "string",
+      "pattern": "^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+    },
+    "literalString": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!\\{)"
+    },
+    "referenceOrNumber": {
+      "oneOf": [
+        {"$ref": "#/$defs/reference"},
+        {"type": "number", "minimum": 0}
+      ]
+    }
+  }
+}

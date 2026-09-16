@@ -1,0 +1,11 @@
+id: premium-modern
+status: approved
+semantic_overrides:
+  density:
+    default: spacious
+  spacing:
+    section: "{foundation.spacing.10}"
+  radius:
+    card: "{foundation.radius.lg}"
+  typography:
+    heading_emphasis: strong

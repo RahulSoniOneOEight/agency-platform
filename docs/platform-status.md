@@ -56,6 +56,16 @@ Implemented on `milestone-b-prototype-platform` / PR #6 pending review/merge:
   - hand-maintained canonical pattern adapter removed
   - component variant/density parity validated end-to-end
   - repository validation covers all current runtime directions
+- B.1E — token + theme contract: implemented on `milestone-b1e-token-theme-contract`
+  (PR pending review/merge):
+  - governed foundation + semantic token contracts under `design-contract/tokens/`
+  - approved reusable theme presets under `design-contract/themes/`
+  - one deterministic compiler resolving foundation < semantic < preset < client brand < direction
+  - governed client brand (`visual:`) and direction (`theme_overrides:`) override allowlists
+  - runtime bundles carry a versioned fully resolved `theme` plus per-direction `direction_themes`
+  - Flutter consumes the resolved theme via `ThemeData` + `AgencyThemeTokens` (no seed-color authority)
+  - high-value active surfaces migrated to semantic tokens
+  - token/theme validation and byte-exact resolved-bundle freshness enforced in repository validation/CI
 
 ## Still deferred to later milestones
 

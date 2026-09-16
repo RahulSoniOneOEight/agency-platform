@@ -18,7 +18,14 @@ from tooling.design_contract.flutter_bindings import (  # noqa: E402
 from tooling.design_contract.generate_flutter_bindings import (  # noqa: E402
     check_flutter_bindings_fresh,
 )
-from tooling.prototype.build_runtime_bundle import compose_runtime_bundle  # noqa: E402
+from tooling.design_contract.generate_resolved_themes import (  # noqa: E402
+    check_resolved_bundles_fresh,
+)
+from tooling.design_contract.theme_contract import (  # noqa: E402
+    validate_direction_theme_overrides,
+    validate_theme_presets,
+    validate_token_catalogs,
+)
 from tooling.prototype.validate_runtime_bundle import (  # noqa: E402
     validate_runtime_bundle,
     validate_runtime_bundle_against_design_contract,
@@ -86,6 +93,20 @@ REQUIRED_PATHS = (
     "tooling/visual-review",
     "tooling/workflow/client_input.py",
     "design-contract/schema/flutter-binding.schema.json",
+    "design-contract/schema/foundation-tokens.schema.json",
+    "design-contract/schema/semantic-tokens.schema.json",
+    "design-contract/schema/theme-preset.schema.json",
+    "design-contract/tokens/foundation.yaml",
+    "design-contract/tokens/semantic.yaml",
+    "design-contract/themes/premium-modern.yaml",
+    "design-contract/themes/compact-commerce.yaml",
+    "design-contract/themes/editorial-commerce.yaml",
+    "tooling/design_contract/theme_contract.py",
+    "tooling/design_contract/generate_resolved_themes.py",
+    "tooling/validation/test_theme_contract.py",
+    "packages/agency_flutter_ui/lib/themes/generated_agency_default_theme.dart",
+    "apps/prototype_app/lib/runtime/runtime_theme.dart",
+    "packages/agency_flutter_ui/lib/themes/agency_theme_tokens.dart",
     "design-contract/bindings/flutter",
     "tooling/design_contract/flutter_bindings.py",
     "tooling/design_contract/generate_flutter_bindings.py",
@@ -116,11 +137,12 @@ def missing_required_paths(root: Path) -> list[str]:
 
 
 def generated_runtime_bundle_errors(root: Path) -> list[str]:
-    """Return B.1B generated client runtime bundle errors under *root*.
+    """Return B.1B generated client runtime bundle structural errors under *root*.
 
     Every checked client whose prototype manifest exists must have a generated
-    bundle that is valid, approved against the design contract, and identical to
-    a fresh projection of its strategic sources.
+    bundle that exists, parses, and is valid against the runtime contract and the
+    design contract. Freshness against a fresh compile is enforced separately by
+    ``theme_contract_errors`` (single source of truth).
     """
     errors: list[str] = []
     projects = root / "client-projects"
@@ -163,24 +185,42 @@ def generated_runtime_bundle_errors(root: Path) -> list[str]:
         )
         if bundle_errors:
             errors.extend(f"{bundle_path}: {error}" for error in sorted(bundle_errors))
-            continue
-
-        try:
-            fresh = compose_runtime_bundle(client_dir)
-            expected = (
-                json.dumps(fresh, indent=2, sort_keys=True, allow_nan=False) + "\n"
-            )
-        except (OSError, UnicodeError, ValueError) as exc:
-            errors.append(f"{bundle_path}: cannot recompose runtime bundle: {exc}")
-            continue
-
-        if bundle_path.read_text(encoding="utf-8") != expected:
-            errors.append(
-                f"{bundle_path}: generated runtime bundle is stale; "
-                "regenerate from source"
-            )
 
     return errors
+
+
+def theme_contract_errors(root: Path) -> list[str]:
+    """Return B.1E token/theme contract, freshness, and direction-override errors.
+
+    Reuses the compiler/validator APIs: token catalogs, theme presets, checked
+    resolved-bundle freshness, and strategic direction theme-override allowlists.
+    """
+    errors: list[str] = []
+    errors.extend(validate_token_catalogs(root))
+    errors.extend(validate_theme_presets(root))
+    errors.extend(check_resolved_bundles_fresh(root))
+
+    projects = root / "client-projects"
+    if projects.exists():
+        direction_paths = sorted(
+            [
+                *projects.glob("**/directions/direction-*.yaml"),
+                *projects.glob("**/directions/direction-*.yml"),
+            ]
+        )
+        for direction_path in direction_paths:
+            try:
+                direction = yaml.safe_load(direction_path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeError, yaml.YAMLError) as exc:
+                errors.append(f"{direction_path}: cannot read direction: {exc}")
+                continue
+            overrides = (
+                direction.get("theme_overrides") if isinstance(direction, dict) else None
+            )
+            for error in validate_direction_theme_overrides(overrides):
+                errors.append(f"{direction_path}: {error}")
+
+    return sorted(set(errors))
 
 
 def flutter_binding_errors(root: Path) -> list[str]:
@@ -216,7 +256,8 @@ def main() -> int:
     missing = missing_required_paths(root)
     bundle_errors = generated_runtime_bundle_errors(root)
     binding_errors = flutter_binding_errors(root)
-    if missing or bundle_errors or binding_errors:
+    theme_errors = theme_contract_errors(root)
+    if missing or bundle_errors or binding_errors or theme_errors:
         print("Repository validation failed.")
         if missing:
             print("Missing required paths:")
@@ -230,11 +271,16 @@ def main() -> int:
             print("Flutter design binding errors:")
             for error in binding_errors:
                 print(f"- {error}")
+        if theme_errors:
+            print("Token/theme contract errors:")
+            for error in theme_errors:
+                print(f"- {error}")
         return 1
 
     print(
         f"Repository validation passed: {len(REQUIRED_PATHS)} required paths present, "
-        "generated runtime bundles are fresh, and Flutter design bindings are valid."
+        "generated runtime bundles are fresh, Flutter design bindings are valid, and "
+        "token/theme contracts are valid."
     )
     return 0
 

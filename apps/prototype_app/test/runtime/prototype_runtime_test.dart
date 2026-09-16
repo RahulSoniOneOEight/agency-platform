@@ -1,4 +1,5 @@
 import 'package:agency_flutter_ui/agency_flutter_ui.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prototype_app/direction/prototype_direction.dart';
 import 'package:prototype_app/runtime/prototype_runtime.dart';
@@ -94,7 +95,8 @@ void main() {
       expect(runtime.directions.keys, ['a', 'b']);
       expect(runtime.allowedDirections, ['a', 'b']);
       expect(runtime.queryParameter, 'direction');
-      expect(runtime.seedColor, '#6750A4');
+      expect(runtime.theme.color('primary'), const Color(0xFF1155CC));
+      expect(runtime.theme.density, 'normal');
       expect(runtime.fixtures['industry'], 'electronics-appliances');
 
       final hero = runtime.resource('asset.home.hero');
@@ -170,12 +172,59 @@ void main() {
 
       expect(() => PrototypeRuntime.fromMap(bundle), throwsFormatException);
     });
+  });
 
-    test('rejects an invalid theme seed color', () {
-      final bundle = canonicalBundle();
-      bundle['theme'] = {'seed_color': '6750A4'};
+  group('PrototypeRuntime resolved theme', () {
+    test('requires a resolved theme object', () {
+      final bundle = canonicalBundle()..remove('theme');
 
       expect(() => PrototypeRuntime.fromMap(bundle), throwsFormatException);
+    });
+
+    test('rejects a malformed resolved theme', () {
+      final bundle = canonicalBundle();
+      ((bundle['theme']! as Map)['color']! as Map)['primary'] = 'not-a-color';
+
+      expect(() => PrototypeRuntime.fromMap(bundle), throwsFormatException);
+    });
+
+    test('parses direction_themes keyed by declared directions', () {
+      final runtime = PrototypeRuntime.fromMap(
+        canonicalBundle(directionThemes: {
+          'a': resolvedThemeMap(density: 'compact', section: 24),
+        }),
+      );
+
+      expect(runtime.themeForDirection('a').density, 'compact');
+      expect(runtime.themeForDirection('a').spacing['section'], 24);
+      expect(runtime.themeForDirection('b'), same(runtime.theme));
+    });
+
+    test('falls back to the base theme when a direction has no entry', () {
+      final runtime = PrototypeRuntime.fromMap(canonicalBundle());
+
+      expect(runtime.directionThemes, isEmpty);
+      expect(runtime.themeForDirection('b'), same(runtime.theme));
+    });
+
+    test('rejects direction_themes for unknown directions', () {
+      expect(
+        () => PrototypeRuntime.fromMap(
+          canonicalBundle(directionThemes: {'z': resolvedThemeMap()}),
+        ),
+        throwsFormatException,
+      );
+    });
+
+    test('rejects a malformed direction theme', () {
+      expect(
+        () => PrototypeRuntime.fromMap(
+          canonicalBundle(directionThemes: {
+            'a': {'version': 1},
+          }),
+        ),
+        throwsFormatException,
+      );
     });
   });
 }

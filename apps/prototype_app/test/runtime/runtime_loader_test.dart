@@ -43,6 +43,9 @@ void main() {
     expect(runtime.direction('b').navigationModel, 'dashboard');
     expect(runtime.direction('a').density.name, 'dense');
     expect(runtime.resource('asset.home.hero')!.candidateId, 'pexels-fixture-1001');
+    expect(runtime.theme.color('primary'), const Color(0xFF1155CC));
+    expect(runtime.themeForDirection('a').density, 'compact');
+    expect(runtime.themeForDirection('b').density, 'normal');
   });
 
   test('preserves canonical B.1C resource bindings from the checked-in bundle', () async {

@@ -67,7 +67,7 @@ class _PrototypeBootstrapState extends State<PrototypeBootstrap> {
   Widget _shell(Widget home) => MaterialApp(
         debugShowCheckedModeBanner: false,
         title: 'Agency Prototype',
-        theme: AgencyTheme.light(),
+        theme: AgencyTheme.lightDefault(),
         home: home,
       );
 }

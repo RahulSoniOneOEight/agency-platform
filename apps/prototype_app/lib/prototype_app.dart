@@ -54,12 +54,11 @@ class _PrototypeAppState extends State<PrototypeApp> {
   @override
   Widget build(BuildContext context) {
     final error = _error;
-    final theme = AgencyTheme.light(seedColor: _seedColor(widget.runtime.seedColor));
     if (error != null) {
       return MaterialApp(
         debugShowCheckedModeBanner: false,
         title: 'Agency Prototype',
-        theme: theme,
+        theme: AgencyTheme.light(widget.runtime.theme),
         home: RuntimeErrorScreen(error: error),
       );
     }
@@ -68,7 +67,7 @@ class _PrototypeAppState extends State<PrototypeApp> {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Agency Prototype',
-      theme: theme,
+      theme: AgencyTheme.light(widget.runtime.themeForDirection(direction.id)),
       home: Scaffold(
         appBar: AppBar(
           title: Text(direction.name),
@@ -110,9 +109,4 @@ class _PrototypeAppState extends State<PrototypeApp> {
       ),
     );
   }
-}
-
-Color _seedColor(String hex) {
-  final value = int.parse(hex.substring(1), radix: 16);
-  return Color(0xFF000000 | value);
 }

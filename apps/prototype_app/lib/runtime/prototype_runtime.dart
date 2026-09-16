@@ -1,7 +1,6 @@
 import '../direction/prototype_direction.dart';
 import 'resource_binding.dart';
-
-final RegExp _seedColor = RegExp(r'^#[0-9A-Fa-f]{6}$');
+import 'runtime_theme.dart';
 
 /// Immutable aggregate of one generated client runtime bundle.
 ///
@@ -16,6 +15,7 @@ class PrototypeRuntime {
     required this.directions,
     required this.fixtures,
     required this.theme,
+    required this.directionThemes,
     required this.resources,
     required this.directionOverrides,
     required this.allowedDirections,
@@ -26,7 +26,13 @@ class PrototypeRuntime {
   final String defaultDirection;
   final Map<String, PrototypeDirection> directions;
   final Map<String, dynamic> fixtures;
-  final Map<String, dynamic> theme;
+
+  /// Resolved base theme (preset + brand, preset density).
+  final RuntimeTheme theme;
+
+  /// Resolved per-direction themes keyed by direction id.
+  final Map<String, RuntimeTheme> directionThemes;
+
   final Map<String, ResourceBinding> resources;
 
   /// Canonical resources scoped to a specific direction, keyed by canonical
@@ -36,7 +42,10 @@ class PrototypeRuntime {
   final List<String> allowedDirections;
   final String? queryParameter;
 
-  String get seedColor => theme['seed_color'] as String;
+  /// The active resolved theme: the direction theme when declared, otherwise
+  /// the resolved base theme. Never a seed fallback.
+  RuntimeTheme themeForDirection(String directionId) =>
+      directionThemes[directionId] ?? theme;
 
   PrototypeDirection direction(String id) {
     final value = directions[id];
@@ -106,8 +115,40 @@ class PrototypeRuntime {
     }
 
     final rawTheme = map['theme'];
-    if (rawTheme is! Map || rawTheme['seed_color'] is! String || !_seedColor.hasMatch(rawTheme['seed_color'] as String)) {
-      throw const FormatException('Runtime theme.seed_color must be a #RRGGBB color');
+    if (rawTheme is! Map) {
+      throw const FormatException('Runtime theme must be a resolved theme object');
+    }
+    final RuntimeTheme theme;
+    try {
+      theme = RuntimeTheme.fromJson(rawTheme.cast<String, Object?>());
+    } on FormatException catch (error) {
+      throw FormatException('Runtime theme is invalid: ${error.message}');
+    }
+
+    final rawDirectionThemes = map['direction_themes'] ?? const <String, dynamic>{};
+    if (rawDirectionThemes is! Map) {
+      throw const FormatException('Runtime direction_themes must be an object');
+    }
+    final directionThemes = <String, RuntimeTheme>{};
+    for (final entry in rawDirectionThemes.entries) {
+      final directionId = entry.key;
+      if (directionId is! String || !directions.containsKey(directionId)) {
+        throw FormatException(
+          'Runtime direction_themes references unknown direction: $directionId',
+        );
+      }
+      final value = entry.value;
+      if (value is! Map) {
+        throw FormatException('Runtime direction_themes[$directionId] must be an object');
+      }
+      try {
+        directionThemes[directionId] =
+            RuntimeTheme.fromJson(value.cast<String, Object?>());
+      } on FormatException catch (error) {
+        throw FormatException(
+          'Runtime direction_themes[$directionId] is invalid: ${error.message}',
+        );
+      }
     }
 
     final rawResources = map['resources'] ?? const <String, dynamic>{};
@@ -161,7 +202,8 @@ class PrototypeRuntime {
       defaultDirection: defaultDirection,
       directions: Map<String, PrototypeDirection>.unmodifiable(directions),
       fixtures: Map<String, dynamic>.from(rawFixtures),
-      theme: Map<String, dynamic>.from(rawTheme),
+      theme: theme,
+      directionThemes: Map<String, RuntimeTheme>.unmodifiable(directionThemes),
       resources: Map<String, ResourceBinding>.unmodifiable(resources),
       directionOverrides: Map<String, Map<String, ResourceBinding>>.unmodifiable(
         directionOverrides.map(

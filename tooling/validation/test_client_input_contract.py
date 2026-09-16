@@ -176,6 +176,61 @@ class ClientInputContractTests(unittest.TestCase):
             )
             self.assertEqual([], validate_client_input(ROOT, client))
 
+    def test_brand_visual_contract_is_schema_validated(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            client = Path(tmp) / "acme"
+            (client / "input" / "brand").mkdir(parents=True, exist_ok=True)
+            content = _minimal_input()
+            content["collections"]["brand"] = "brand/brand-input.yaml"
+            _write_input(client, content)
+            brand_path = client / "input" / "brand" / "brand-input.yaml"
+
+            brand_path.write_text(
+                yaml.safe_dump(
+                    {
+                        "version": 1,
+                        "provided": True,
+                        "facts": [],
+                        "visual": {
+                            "preset": "premium-modern",
+                            "primary_color": "#1155CC",
+                            "font_family": "Inter",
+                            "visual_character": "soft",
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            self.assertEqual([], validate_client_input(ROOT, client))
+
+            brand_path.write_text(
+                yaml.safe_dump(
+                    {
+                        "version": 1,
+                        "provided": True,
+                        "facts": [],
+                        "visual": {"primary_color": "not-a-color"},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            errors = validate_client_input(ROOT, client)
+            self.assertTrue(any("primary_color" in error for error in errors), errors)
+
+            brand_path.write_text(
+                yaml.safe_dump(
+                    {
+                        "version": 1,
+                        "provided": True,
+                        "facts": [],
+                        "visual": {"nope": 1},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            errors = validate_client_input(ROOT, client)
+            self.assertTrue(errors)
+
     def test_reference_prototype_demo_validates_end_to_end(self):
         root = Path(__file__).resolve().parents[2]
         client = root / "client-projects" / "examples" / "prototype-demo"

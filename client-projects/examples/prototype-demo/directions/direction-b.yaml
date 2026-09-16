@@ -24,6 +24,9 @@ transaction_model: account-ordering
 patterns: [commerce.trade-dashboard, commerce.reorder, commerce.cart]
 components: [commerce.credit-summary, commerce.quote-card, commerce.product-card]
 component_variants: []
+theme_overrides:
+  spacing:
+    card: "{foundation.spacing.4}"
 required_resources: []
 strengths: [strong repeat-order workflow, account visibility]
 tradeoffs: [weaker first-time catalogue discovery]

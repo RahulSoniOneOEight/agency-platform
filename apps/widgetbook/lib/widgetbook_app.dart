@@ -169,7 +169,7 @@ Widget buildAgencyWidgetbook() {
     ],
     appBuilder: (context, child) => MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: AgencyTheme.light(),
+      theme: AgencyTheme.lightDefault(),
       home: Scaffold(
         body: Center(
           child: Padding(

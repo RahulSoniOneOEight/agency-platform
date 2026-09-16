@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../foundation/agency_tokens.dart';
+import '../themes/agency_theme_tokens.dart';
 
 class CategoryTile extends StatelessWidget {
   const CategoryTile({super.key, required this.label, this.icon = Icons.category_outlined, this.onTap});
@@ -10,18 +10,23 @@ class CategoryTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = AgencyThemeTokens.of(context);
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(AgencyTokens.radiusMd),
+      borderRadius: BorderRadius.circular(tokens.cardRadius),
       child: Container(
-        padding: const EdgeInsets.all(AgencyTokens.spaceMd),
+        padding: EdgeInsets.all(tokens.cardSpacing),
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(AgencyTokens.radiusMd),
+          borderRadius: BorderRadius.circular(tokens.cardRadius),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          children: [Icon(icon), const SizedBox(height: 8), Text(label, textAlign: TextAlign.center)],
+          children: [
+            Icon(icon),
+            SizedBox(height: tokens.tileGap),
+            Text(label, textAlign: TextAlign.center),
+          ],
         ),
       ),
     );

@@ -28,6 +28,11 @@ components: [commerce.product-card, commerce.price-display, commerce.search-fiel
 component_variants:
   - component: commerce.product-card
     variant: b2b
+theme_overrides:
+  spacing:
+    section: "{foundation.spacing.6}"
+  radius:
+    card: "{foundation.radius.md}"
 required_resources: []
 strengths: [fast SKU discovery, high information density]
 tradeoffs: [less inspirational discovery]

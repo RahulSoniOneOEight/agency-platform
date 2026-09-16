@@ -22,6 +22,21 @@ def _load_yaml(path: Path) -> dict:
     return data
 
 
+def _brand_preset(client_dir: Path) -> str:
+    path = client_dir / "input" / "brand" / "brand-input.yaml"
+    if not path.exists():
+        raise ValueError("brand input missing: input/brand/brand-input.yaml")
+    data = _load_yaml(path)
+    visual = data.get("visual")
+    if (
+        not isinstance(visual, dict)
+        or not isinstance(visual.get("preset"), str)
+        or not visual["preset"]
+    ):
+        raise ValueError("brand input visual.preset must be an approved preset id")
+    return visual["preset"]
+
+
 def _discover_direction_paths(client_dir: Path) -> list[tuple[str, Path]]:
     directions_dir = client_dir / "directions"
     found = []
@@ -114,7 +129,7 @@ def compose_prototype(root: Path, client_dir: Path) -> Path:
         "default_direction": available_ids[0],
         "directions": directions,
         "fixture_pack": "prototype/fixtures/demo.yaml",
-        "theme": {"seed_color": "#6750A4"},
+        "theme": {"preset": _brand_preset(client_dir)},
         "review": {"query_parameter": "direction", "allowed_values": available_ids},
     }
     resources = _resource_bindings(root, client_dir)

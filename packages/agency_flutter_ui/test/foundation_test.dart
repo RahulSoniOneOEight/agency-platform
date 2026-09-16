@@ -9,14 +9,16 @@ void main() {
   });
 
   test('theme factory returns Material 3 theme', () {
-    final theme = AgencyTheme.light(seedColor: const Color(0xFF6750A4));
+    final theme = AgencyTheme.lightDefault();
     expect(theme.useMaterial3, isTrue);
     expect(theme.colorScheme.primary, isNotNull);
+    expect(theme.extension<AgencyThemeTokens>(), isNotNull);
   });
 
   testWidgets('agency button renders label and callback', (tester) async {
     var tapped = false;
     await tester.pumpWidget(MaterialApp(
+      theme: AgencyTheme.lightDefault(),
       home: Scaffold(
         body: AgencyButton(label: 'Continue', onPressed: () => tapped = true),
       ),

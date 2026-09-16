@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../domain/credit_summary.dart';
 import '../domain/quote_card.dart';
 import '../primitives/agency_button.dart';
+import '../themes/agency_theme_tokens.dart';
 import 'pattern_shell.dart';
 
 class TradeDashboardPattern extends StatelessWidget {
@@ -9,6 +10,7 @@ class TradeDashboardPattern extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = AgencyThemeTokens.of(context);
     return AgencyPatternShell(
       title: 'Trade dashboard',
       subtitle: 'Orders, quotes and credit in one place.',
@@ -17,7 +19,7 @@ class TradeDashboardPattern extends StatelessWidget {
         const QuoteCard(quoteId: 'QT-24017', status: 'Awaiting approval', total: 78600),
         const QuoteCard(quoteId: 'QT-24012', status: 'Approved', total: 42500),
         Wrap(
-          spacing: 12,
+          spacing: tokens.tileGap,
           children: [
             AgencyButton(label: 'Quick order', onPressed: () {}),
             AgencyButton(
