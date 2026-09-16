@@ -1,6 +1,9 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import '../runtime/prototype_runtime.dart';
+import 'bugdrop_visual_feedback_provider.dart';
 import 'feedback_record.dart';
 import 'review_actor.dart';
 import 'review_controller.dart';
@@ -8,6 +11,8 @@ import 'review_coordinator.dart';
 import 'review_domain_error.dart';
 import 'review_screen_registry.dart';
 import 'review_section_registry.dart';
+import 'visual_attachment.dart';
+import 'visual_feedback_provider.dart';
 
 /// Reviewer-facing C.4 feedback surface.
 ///
@@ -23,6 +28,7 @@ class ReviewFeedbackPanel extends StatefulWidget {
     required this.controller,
     required this.coordinator,
     required this.actor,
+    this.visualFeedbackProvider = const BugDropVisualFeedbackProvider(),
   });
 
   static const Key textFieldKey = Key('review-feedback-text');
@@ -31,6 +37,7 @@ class ReviewFeedbackPanel extends StatefulWidget {
   static const Key sectionFieldKey = Key('review-feedback-section');
   static const Key directionFieldKey = Key('review-feedback-direction');
   static const Key blockingFieldKey = Key('review-feedback-blocking');
+  static const Key visualPayloadFieldKey = Key('review-feedback-visual-payload');
   static const Key createButtonKey = Key('review-feedback-create');
   static const Key closeRoundButtonKey = Key('review-feedback-close-round');
   static const Key eligibilityBannerKey = Key('review-feedback-eligible');
@@ -40,6 +47,9 @@ class ReviewFeedbackPanel extends StatefulWidget {
       ValueKey<String>('review-feedback-round-$round');
 
   static Key tileKey(String id) => ValueKey<String>('review-feedback-$id');
+
+  static Key attachmentKey(String id) =>
+      ValueKey<String>('review-feedback-attachment-$id');
 
   static Key statusChipKey(String id) =>
       ValueKey<String>('review-feedback-status-$id');
@@ -58,6 +68,7 @@ class ReviewFeedbackPanel extends StatefulWidget {
     FeedbackScope.screen,
     FeedbackScope.section,
     FeedbackScope.decision,
+    FeedbackScope.visualAnnotation,
   ];
 
   final PrototypeRuntime runtime;
@@ -65,12 +76,17 @@ class ReviewFeedbackPanel extends StatefulWidget {
   final ReviewCoordinator coordinator;
   final ReviewActor actor;
 
+  /// Adapter used to normalize provider visual-evidence payloads. It has no
+  /// lifecycle authority; the coordinator still owns feedback creation.
+  final VisualFeedbackProvider visualFeedbackProvider;
+
   @override
   State<ReviewFeedbackPanel> createState() => _ReviewFeedbackPanelState();
 }
 
 class _ReviewFeedbackPanelState extends State<ReviewFeedbackPanel> {
   final TextEditingController _text = TextEditingController();
+  final TextEditingController _visualPayload = TextEditingController();
 
   FeedbackScope _scope = FeedbackScope.general;
   String? _screenId;
@@ -96,6 +112,7 @@ class _ReviewFeedbackPanelState extends State<ReviewFeedbackPanel> {
   void dispose() {
     widget.controller.removeListener(_onControllerChanged);
     _text.dispose();
+    _visualPayload.dispose();
     super.dispose();
   }
 
@@ -129,7 +146,35 @@ class _ReviewFeedbackPanelState extends State<ReviewFeedbackPanel> {
         final direction = _direction;
         return direction == null ? null : FeedbackTarget(direction: direction);
       case FeedbackScope.visualAnnotation:
-        return const FeedbackTarget();
+        final screen = _screenId;
+        return screen == null ? const FeedbackTarget() : FeedbackTarget(screen: screen);
+    }
+  }
+
+  /// Normalizes the provider payload for visual-annotation feedback.
+  ///
+  /// Returns `null` (with a form error set) when the payload is missing or
+  /// malformed, so the coordinator is never called with invalid evidence.
+  VisualAttachment? _normalizeVisualAttachment() {
+    final payloadText = _visualPayload.text.trim();
+    if (payloadText.isEmpty) {
+      setState(() => _formError = 'Visual evidence payload is required.');
+      return null;
+    }
+    try {
+      final decoded = jsonDecode(payloadText);
+      if (decoded is! Map || decoded.keys.any((key) => key is! String)) {
+        setState(() => _formError = 'Visual evidence payload must be a JSON object.');
+        return null;
+      }
+      return widget.visualFeedbackProvider
+          .normalize(decoded.cast<String, Object?>());
+    } on FormatException catch (error) {
+      setState(() => _formError = 'Invalid visual payload: ${error.message}');
+      return null;
+    } on ReviewDomainError catch (error) {
+      setState(() => _formError = error.message);
+      return null;
     }
   }
 
@@ -157,6 +202,13 @@ class _ReviewFeedbackPanelState extends State<ReviewFeedbackPanel> {
       _formError = null;
       _actionError = null;
     });
+    VisualAttachment? visualAttachment;
+    if (_scope == FeedbackScope.visualAnnotation) {
+      visualAttachment = _normalizeVisualAttachment();
+      if (visualAttachment == null) {
+        return;
+      }
+    }
     try {
       await widget.coordinator.createFeedback(
         actor: widget.actor,
@@ -165,9 +217,11 @@ class _ReviewFeedbackPanelState extends State<ReviewFeedbackPanel> {
         text: text,
         target: target,
         blocking: _blocking,
+        visualAttachment: visualAttachment,
       );
       if (!mounted) return;
       _text.clear();
+      _visualPayload.clear();
       setState(() {
         _blocking = true;
         _screenId = null;
@@ -278,7 +332,9 @@ class _ReviewFeedbackPanelState extends State<ReviewFeedbackPanel> {
             });
           },
         ),
-        if (_scope == FeedbackScope.screen || _scope == FeedbackScope.section) ...[
+        if (_scope == FeedbackScope.screen ||
+            _scope == FeedbackScope.section ||
+            _scope == FeedbackScope.visualAnnotation) ...[
           const SizedBox(height: 12),
           DropdownButton<String>(
             key: ReviewFeedbackPanel.screenFieldKey,
@@ -330,6 +386,19 @@ class _ReviewFeedbackPanelState extends State<ReviewFeedbackPanel> {
                 ),
             ],
             onChanged: (value) => setState(() => _direction = value),
+          ),
+        ],
+        if (_scope == FeedbackScope.visualAnnotation) ...[
+          const SizedBox(height: 12),
+          TextField(
+            key: ReviewFeedbackPanel.visualPayloadFieldKey,
+            controller: _visualPayload,
+            maxLines: 4,
+            decoration: const InputDecoration(
+              labelText: 'Visual evidence (provider payload)',
+              helperText: 'Normalized by the configured provider adapter.',
+              border: OutlineInputBorder(),
+            ),
           ),
         ],
         const SizedBox(height: 12),
@@ -413,6 +482,14 @@ class _ReviewFeedbackPanelState extends State<ReviewFeedbackPanel> {
             'round ${record.createdRound}',
             style: theme.textTheme.bodySmall,
           ),
+          if (record.visualAttachment != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              _attachmentLabel(record.visualAttachment!),
+              key: ReviewFeedbackPanel.attachmentKey(record.id),
+              style: theme.textTheme.bodySmall,
+            ),
+          ],
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
@@ -483,6 +560,14 @@ class _ReviewFeedbackPanelState extends State<ReviewFeedbackPanel> {
       if (record.target.direction != null) record.target.direction!,
     ];
     return parts.isEmpty ? 'no target' : parts.join(' · ');
+  }
+
+  String _attachmentLabel(VisualAttachment attachment) {
+    final region = attachment.annotation;
+    return 'evidence ${attachment.screenshotRef} · '
+        '${attachment.providerName} · ${attachment.screenId}'
+        '${attachment.sectionId == null ? '' : ' · ${attachment.sectionId}'} · '
+        'region (${region.x}, ${region.y}, ${region.width}, ${region.height})';
   }
 }
 

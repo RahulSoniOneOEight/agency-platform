@@ -4,6 +4,7 @@ import 'package:agency_flutter_ui/agency_flutter_ui.dart';
 import 'package:flutter/material.dart';
 
 import 'prototype_app.dart';
+import 'review/memory_approval_repository.dart';
 import 'review/memory_feedback_repository.dart';
 import 'review/memory_review_repository.dart';
 import 'review/review_actor.dart';
@@ -118,6 +119,7 @@ class _PrototypeBootstrapState extends State<PrototypeBootstrap> {
     final coordinator = ReviewCoordinator(
       controller: controller,
       feedbackRepository: MemoryFeedbackRepository(),
+      approvalRepository: MemoryApprovalRepository(),
     );
     _reviewCoordinator = coordinator;
     return coordinator;

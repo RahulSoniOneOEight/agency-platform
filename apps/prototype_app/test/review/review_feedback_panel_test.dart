@@ -1,6 +1,9 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prototype_app/review/feedback_record.dart';
+import 'package:prototype_app/review/memory_approval_repository.dart';
 import 'package:prototype_app/review/memory_feedback_repository.dart';
 import 'package:prototype_app/review/memory_review_repository.dart';
 import 'package:prototype_app/review/review_actor.dart';
@@ -42,6 +45,22 @@ PrototypeRuntime buildRuntime() {
   );
 }
 
+Map<String, Object?> bugdropPayload() {
+  return {
+    'screenshot_ref': 'review-home-round-1',
+    'viewport': {'width': 1440, 'height': 1200},
+    'context': {
+      'client_id': 'prototype-demo',
+      'review_round': 1,
+      'screen': 'commerce.home',
+      'effective_direction': 'a',
+      'source_commit_sha': 'abc123',
+    },
+    'bounds': {'left': 0.4, 'top': 0.3, 'right': 0.6, 'bottom': 0.4},
+    'provider_item_id': 'provider-item-1',
+  };
+}
+
 void main() {
   late PrototypeRuntime runtime;
   late ReviewController controller;
@@ -59,6 +78,7 @@ void main() {
     coordinator = ReviewCoordinator(
       controller: controller,
       feedbackRepository: feedback,
+      approvalRepository: MemoryApprovalRepository(),
     );
   });
 
@@ -337,6 +357,66 @@ void main() {
       expect(find.byKey(ReviewFeedbackPanel.roundSectionKey(2)), findsOneWidget);
       expect(find.text('Round one note'), findsOneWidget);
       expect(find.text('Round two note'), findsOneWidget);
+    });
+  });
+
+  group('visual feedback entry', () {
+    testWidgets('accepts a normalized provider payload and shows evidence',
+        (tester) async {
+      await pump(tester, reviewer);
+
+      await chooseDropdown(
+        tester,
+        ReviewFeedbackPanel.scopeFieldKey,
+        'visual_annotation',
+      );
+      await tester.enterText(
+        find.byKey(ReviewFeedbackPanel.visualPayloadFieldKey),
+        jsonEncode(bugdropPayload()),
+      );
+      await tester.enterText(
+        find.byKey(ReviewFeedbackPanel.textFieldKey),
+        'Align the price block',
+      );
+      await tester.tap(find.byKey(ReviewFeedbackPanel.createButtonKey));
+      await tester.pumpAndSettle();
+
+      final record = (await coordinator.allFeedback()).single;
+      expect(record.scope, FeedbackScope.visualAnnotation);
+      expect(record.visualAttachment, isNotNull);
+      expect(record.visualAttachment!.providerName, 'bugdrop');
+      expect(record.visualAttachment!.screenshotRef, 'review-home-round-1');
+      expect(
+        find.byKey(ReviewFeedbackPanel.attachmentKey(record.id)),
+        findsOneWidget,
+      );
+      expect(find.textContaining('review-home-round-1'), findsOneWidget);
+      // Provider evidence never drives readiness; the reviewer/round flow does.
+      expect(controller.state.status, isNot(ReviewStatus.readyForFinalReview));
+    });
+
+    testWidgets('rejects a malformed provider payload without writing feedback',
+        (tester) async {
+      await pump(tester, reviewer);
+
+      await chooseDropdown(
+        tester,
+        ReviewFeedbackPanel.scopeFieldKey,
+        'visual_annotation',
+      );
+      await tester.enterText(
+        find.byKey(ReviewFeedbackPanel.visualPayloadFieldKey),
+        '{not json',
+      );
+      await tester.enterText(
+        find.byKey(ReviewFeedbackPanel.textFieldKey),
+        'Broken evidence',
+      );
+      await tester.tap(find.byKey(ReviewFeedbackPanel.createButtonKey));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(ReviewFeedbackPanel.errorKey), findsOneWidget);
+      expect(await coordinator.allFeedback(), isEmpty);
     });
   });
 }
