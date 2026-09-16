@@ -739,6 +739,35 @@ void main() {
       expect(loaded.state.selectedDirection, 'a');
     });
   });
+
+  group('applyState (cross-domain primitive)', () {
+    test('persists round, status and feedback references atomically', () async {
+      await controller.applyState(
+        reviewRound: 2,
+        status: ReviewStatus.needsRevision,
+        feedbackIds: const ['feedback-1', 'feedback-2'],
+      );
+
+      expect(controller.state.reviewRound, 2);
+      expect(controller.state.status, ReviewStatus.needsRevision);
+      expect(controller.state.feedbackIds, ['feedback-1', 'feedback-2']);
+      expect(repository.saveCount, 1);
+      expect(
+        (await repository.load('prototype-demo'))!.feedbackIds,
+        ['feedback-1', 'feedback-2'],
+      );
+    });
+
+    test('preserves feedback references across decision mutations', () async {
+      await controller.applyState(feedbackIds: const ['feedback-1']);
+
+      await controller.selectDirection('b');
+      await controller.setScreenDirection('commerce.search', 'a');
+      await controller.advanceRound();
+
+      expect(controller.state.feedbackIds, ['feedback-1']);
+    });
+  });
 }
 
 /// Repository whose save always fails, to prove the save-before-adopt contract.

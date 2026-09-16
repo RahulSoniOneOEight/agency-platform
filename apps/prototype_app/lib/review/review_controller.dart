@@ -44,6 +44,7 @@ final class ReviewController extends ChangeNotifier {
       selectedDirection: null,
       screenSelections: const <String, ReviewScreenDecision>{},
       comments: const <ReviewComment>[],
+      feedbackIds: const <String>[],
     );
   }
 
@@ -243,6 +244,23 @@ final class ReviewController extends ChangeNotifier {
     await _apply(_copyWith(reviewRound: next < 1 ? 1 : next));
   }
 
+  /// Persists a primitive ReviewState transition atomically.
+  ///
+  /// This is the minimal surface cross-domain orchestration needs (round,
+  /// status and feedback references). Workflow rules stay in `ReviewCoordinator`;
+  /// the C.3 `normalize -> validate -> save -> adopt` path is unchanged.
+  Future<void> applyState({
+    int? reviewRound,
+    ReviewStatus? status,
+    List<String>? feedbackIds,
+  }) async {
+    await _apply(_copyWith(
+      reviewRound: reviewRound,
+      status: status,
+      feedbackIds: feedbackIds,
+    ));
+  }
+
   Future<void> _clearSection(String screenId, String sectionId) async {
     final existing = _state.screenSelections[screenId];
     if (existing == null || !existing.sections.containsKey(sectionId)) {
@@ -280,6 +298,7 @@ final class ReviewController extends ChangeNotifier {
     Object? selectedDirection = _unset,
     Map<String, ReviewScreenDecision>? screenSelections,
     List<ReviewComment>? comments,
+    List<String>? feedbackIds,
   }) {
     return ReviewState(
       version: _state.version,
@@ -291,6 +310,7 @@ final class ReviewController extends ChangeNotifier {
           : selectedDirection as String?,
       screenSelections: screenSelections ?? _state.screenSelections,
       comments: comments ?? _state.comments,
+      feedbackIds: feedbackIds ?? _state.feedbackIds,
     );
   }
 }
