@@ -70,8 +70,11 @@ BRAND_OVERRIDE_MAP: dict[str, tuple[str, str]] = {
     "font_fallback": ("typography", "font_fallback"),
 }
 
-# Approved raw client brand visual fields (R2/R8).
+# Approved raw client brand visual fields (R2/R8). ``preset`` selects the theme
+# preset and is tolerated here (it is consumed by the runtime bundle builder);
+# ``visual_character`` is validated metadata with no semantic mapping in v1 (R12).
 BRAND_VISUAL_FIELDS = (
+    "preset",
     "primary_color",
     "secondary_color",
     "font_family",
@@ -488,7 +491,7 @@ def _override_path_errors(label: str, overrides) -> list[str]:
             f"{label}: semantic overrides must be a mapping, got {_describe(overrides)}"
         ]
     errors: list[str] = []
-    for group in sorted(overrides):
+    for group in sorted(overrides, key=str):
         value = overrides[group]
         if group not in SEMANTIC_KEYS:
             errors.append(f"{label}: unknown override group '{group}'")
@@ -499,7 +502,7 @@ def _override_path_errors(label: str, overrides) -> list[str]:
                 f"got {_describe(value)}"
             )
             continue
-        for key in sorted(value):
+        for key in sorted(value, key=str):
             if key not in SEMANTIC_KEYS[group]:
                 errors.append(f"{label}: unknown override key '{group}.{key}'")
     return errors
@@ -572,7 +575,7 @@ def validate_client_brand_visual(brand: object) -> list[str]:
     if not isinstance(brand, dict):
         return [f"client brand visual: expected a mapping, got {_describe(brand)}"]
     errors: list[str] = []
-    for key in sorted(set(brand) - set(BRAND_VISUAL_FIELDS)):
+    for key in sorted(set(brand) - set(BRAND_VISUAL_FIELDS), key=str):
         errors.append(f"client brand visual: unknown key '{key}'")
     for key in ("primary_color", "secondary_color"):
         if key in brand:
@@ -582,7 +585,7 @@ def validate_client_brand_visual(brand: object) -> list[str]:
                     f"client brand visual.{key}: invalid color {value!r}; "
                     f"expected #RRGGBB or #AARRGGBB"
                 )
-    for key in ("font_family", "font_fallback"):
+    for key in ("preset", "font_family", "font_fallback"):
         if key in brand:
             value = brand[key]
             if not isinstance(value, str) or not value:
@@ -606,15 +609,28 @@ def validate_direction_theme_overrides(overrides: object) -> list[str]:
             f"direction theme_overrides: expected a mapping, got {_describe(overrides)}"
         ]
     errors: list[str] = []
-    for group in sorted(overrides):
+    allowed_groups = {group for group, _key in DIRECTION_OVERRIDE_ALLOWLIST}
+    for group in sorted(overrides, key=str):
         value = overrides[group]
+        if group not in SEMANTIC_KEYS:
+            errors.append(f"direction theme_overrides: unknown override group '{group}'")
+            continue
+        if group not in allowed_groups:
+            errors.append(
+                f"direction theme_overrides: group '{group}' is not an approved "
+                f"override group"
+            )
+            continue
         if not isinstance(value, dict):
             errors.append(
                 f"direction theme_overrides.{group}: must be a mapping, "
                 f"got {_describe(value)}"
             )
             continue
-        for key in sorted(value):
+        if not value:
+            errors.append(f"direction theme_overrides.{group}: must not be empty")
+            continue
+        for key in sorted(value, key=str):
             if (group, key) not in DIRECTION_OVERRIDE_ALLOWLIST:
                 errors.append(
                     f"direction theme_overrides: '{group}.{key}' is not an approved "

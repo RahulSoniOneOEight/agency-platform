@@ -504,10 +504,18 @@ class DirectionAndBrandOverrideTests(unittest.TestCase):
                     resolve_theme(root, "premium-modern", None, overrides)
 
     def test_direction_override_validator_reports_allowlist(self):
-        errors = validate_direction_theme_overrides({"color": {"primary": "#000000"}})
+        group_errors = validate_direction_theme_overrides(
+            {"color": {"primary": "#000000"}}
+        )
+        self.assertTrue(
+            _has_error(group_errors, "not an approved override group"), group_errors
+        )
 
-        self.assertTrue(_has_error(errors, "not an approved override path"), errors)
-        self.assertEqual(sorted(errors), errors)
+        key_errors = validate_direction_theme_overrides({"spacing": {"nope": 1}})
+        self.assertTrue(
+            _has_error(key_errors, "not an approved override path"), key_errors
+        )
+        self.assertEqual(sorted(key_errors), key_errors)
 
     def test_brand_visual_validation(self):
         self.assertEqual(
@@ -533,6 +541,25 @@ class DirectionAndBrandOverrideTests(unittest.TestCase):
                 validate_client_brand_visual({"visual_character": "loud"}),
                 "visual_character",
             )
+        )
+
+    def test_validators_never_raise_on_mixed_keys(self):
+        self.assertIsInstance(validate_client_brand_visual({1: "a", "b": 2}), list)
+        self.assertIsInstance(
+            validate_direction_theme_overrides({1: {}, "spacing": {}}), list
+        )
+
+    def test_empty_disallowed_direction_group_is_rejected(self):
+        for group in ("color", "motion", "density", "ProductCard"):
+            with self.subTest(group=group):
+                self.assertTrue(validate_direction_theme_overrides({group: {}}), group)
+
+    def test_brand_visual_preset_is_tolerated(self):
+        self.assertEqual(
+            [],
+            validate_client_brand_visual(
+                {"preset": "premium-modern", "primary_color": "#1155CC"}
+            ),
         )
 
     def test_unknown_brand_key_is_rejected_by_resolve_theme(self):
@@ -778,10 +805,10 @@ class ThemeResolutionTests(unittest.TestCase):
 
         with self.assertRaises(ValueError) as ctx2:
             resolve_theme(ROOT, "premium-modern", None, {"color": {"nope": "#fff"}})
-        self.assertIn("color.nope", str(ctx2.exception))
+        self.assertIn("color", str(ctx2.exception))
 
         with self.assertRaises(ValueError) as ctx3:
-            resolve_theme(ROOT, "premium-modern", None, {"color": "#fff"})
+            resolve_theme(ROOT, "premium-modern", None, {"spacing": "#fff"})
         self.assertIn("must be a mapping", str(ctx3.exception))
 
     def test_invalid_token_catalogs_raise(self):
