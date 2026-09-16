@@ -82,16 +82,79 @@
 
 | Task | Scope | Status | Commit |
 |------|-------|--------|--------|
-| 1 | ReviewState v2 + v1 migration | PENDING | — |
-| 2 | Governed section registry + compatibility | PENDING | — |
-| 3 | Canonical decision normalizer | PENDING | — |
-| 4 | Hierarchical ReviewController mutations | PENDING | — |
-| 5 | Mixed preview + source-direction theming | PENDING | — |
-| 6 | Select + Mix client workspace | PENDING | — |
-| 7 | Reference-client + architecture regressions | PENDING | — |
-| 8 | Full verification + final review + PR | PENDING | — |
+| 1 | ReviewState v2 + v1 migration | ACCEPTED | `11c0e52` |
+| 2 | Governed section registry + compatibility | ACCEPTED | `0956781` + `eb9d921` |
+| 3 | Canonical decision normalizer | ACCEPTED | `c08a8fa` |
+| 4 | Hierarchical ReviewController mutations | ACCEPTED | `7a843ea` |
+| 5 | Mixed preview + source-direction theming | ACCEPTED | `d97c5e9` |
+| 6 | Select + Mix client workspace | ACCEPTED | `cabc085` + `7ddc23b` |
+| 7 | Reference-client + architecture regressions | ACCEPTED | `ca57011` |
+| 8 | Full verification + final review + PR | IN_PROGRESS | — |
 
 ## Progress log
 
 - 2026-09-16 — Preflight complete. Branch created from C.2 baseline; spec/plan present. R1–R8 recorded;
   section-seam ruling R2/R3 established because B.1D has no section model.
+- 2026-09-16 — Task 1 implemented (`11c0e52`, 233 review tests / 295 app tests green):
+  `ReviewScreenDecision` immutable value object; `ReviewState.currentVersion = 2` with
+  `Map<String, ReviewScreenDecision>`; deterministic v1→v2 migration (v1 `screen -> direction`),
+  malformed legacy rejected; validator structural rules; controller/selection adapted. Independent
+  review found one major (`review_selection.dart` force-unwrapped a nullable `direction`, crashing on
+  a valid section-only decision) — fixed with a null-aware selection set and a regression test;
+  also hardened v2 screen-map key parsing. Deferred to later tasks per plan: minimal-persistence
+  normalization (Task 3) and registry/availability/compatibility validator rules (Tasks 2/3).
+  ACCEPTED.
+- 2026-09-16 — Task 2 implemented (`0956781` + `eb9d921`, 317 app / 42 shared tests green):
+  R2 section seam — `PatternSection`/`PatternComposition` + shared section widgets in
+  `agency_flutter_ui/lib/sections/`; home/plp/search/pdp refactored to compose from them (rendering
+  preserved; pattern widget types retained so C.1 reuse tests still pass); `PrototypeRegistry
+  .compositionFor` exposes the composition. R3 governed section set: home.product-grid,
+  plp.product-grid, search.search-field, search.results-grid, pdp.price. `ReviewSectionRegistry` +
+  `ReviewSectionCompatibility` (availability = source declares screen AND governed component;
+  compatibility adds B.1D binding + density support). Independent review: no blockers/majors; applied
+  minors (widget-type mapping guard, test rename, doc fix). Deferred/accepted: compositionFor vs
+  buildPattern mapping mirror (structural, both call the same builders), variant/state constraints
+  (no current renderer constraint). ACCEPTED.
+- 2026-09-16 — Task 3 implemented (`c08a8fa`, 272 review tests green):
+  `review_decision_normalizer.dart` (pure `effectiveScreenDirection`/`effectiveSectionDirection`/
+  `normalizeReviewDecisions`: drop redundant screen/section overrides, drop stale/unknown/
+  incompatible sections, drop empty screens, preserve everything else, deterministic + idempotent,
+  never invents a null overall). Validator extended with canonical v2 semantic rules. Independent
+  review: no blockers/majors. R9 added: a screen direction override must be a direction that declares
+  the screen (`screen <id> direction <d> does not include this screen`), with dependent section checks
+  short-circuited. Also fixed comment rule numbering, base-layout validator test, and screen
+  availability test. ACCEPTED.
+- 2026-09-16 — Task 4 implemented (`7a843ea`, 294 review tests green): `ReviewController` now requires
+  `runtime`; single `_apply` path (normalize → validate → save → adopt → notify); new
+  `setScreenDirection`/`setSectionDirection`/`clearScreenDirection`/`clearSectionDirection`/
+  `resetScreenMix`; `selectScreenDirection` removed; `load` normalizes before validating. Independent
+  review found one major (the still-live C.2 Selection UI offered unavailable directions and now hit
+  the validating throw) — fixed by filtering screen direction options to directions that declare the
+  screen; also added a failing-save transactional test, a redundant-v1 load-normalization test, and
+  updated the selection availability test. ACCEPTED.
+- 2026-09-16 — Task 5 implemented (`d97c5e9`, 362 app tests green): `ReviewMixedPreview` — base
+  shell/layout = effective screen direction under its resolved theme; inherited sections under base
+  theme; explicit overrides render the same shared section widget built for the source direction,
+  scoped in that direction's resolved theme (siblings/base uncontaminated); unresolved/absent base
+  handled neutrally; runtime never mutated; no synthetic runtime. ACCEPTED.
+- 2026-09-16 — Task 5 review fix (`b8d3635`): non-section screens now render under the base
+  direction's resolved theme; the preview guards override availability/compatibility before applying
+  (defense in depth); added explicit-screen-override, unknown-base, incompatible-override fallback,
+  non-section-screen theme, and token-isolation tests. ACCEPTED.
+- 2026-09-16 — Task 6 implemented (`cabc085` + `7ddc23b`, 371 app tests green): `ReviewSelection`
+  is now the Select + Mix workspace (nullable overall, per-screen `Inherit from overall (X)` +
+  disabled-with-reason unavailable directions, per-section `Inherit from <Screen> (X)` +
+  compatibility reasons, effective summary, per-screen reset with confirmation, live
+  `ReviewMixedPreview` reading controller state, responsive wide/compact). Independent review: no
+  blockers/majors; fixed empty-screen guard and empty-reset disabling. Deferred minor: a screen that
+  inherits an overall direction which does not declare it still shows a base label (model question,
+  no false rendering). ACCEPTED.
+- 2026-09-16 — Task 7 implemented (`ca57011`, 324 review tests green): `review_mix_architecture_test.dart`
+  (runtime/bundle immutability across mix ops, no file I/O in `lib/review`, no concrete pattern
+  widgets, `ReviewSectionRegistry` sole section-id authority, no component-level mix API, no
+  refinement, no approval artifacts, v1→v2 migration) + real reference-client mix regressions
+  (`plp.product-grid`/`pdp.price` c→a compatible; `pdp.price` rendered with source theme; unavailable
+  from b rejected with zero side effects) + extended C.1/C.2 architecture guarantees. ACCEPTED.
+- 2026-09-16 — Task 8 verification: app `flutter test` 387, analyze clean; agency_flutter_ui 42 +
+  clean; widgetbook 1 + clean; `flutter build web` built; Python 283 unittest OK + validate_repo (98
+  paths) + knowledge/workflow/prototype validators; B.1D/B.1E freshness fresh.
