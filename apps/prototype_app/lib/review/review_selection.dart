@@ -111,7 +111,9 @@ class ReviewSelection extends StatelessWidget {
                   emptySelectionAllowed: true,
                   showSelectedIcon: false,
                   onSelectionChanged: (selection) {
-                    if (selection.isNotEmpty) {
+                    if (selection.isEmpty) {
+                      controller.clearScreenDirection(screenId);
+                    } else {
                       controller.selectScreenDirection(screenId, selection.first);
                     }
                   },

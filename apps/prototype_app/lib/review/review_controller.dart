@@ -52,6 +52,17 @@ final class ReviewController extends ChangeNotifier {
     await _persistAndNotify();
   }
 
+  /// Removes a single screen's direction mix; a no-op when it is not mixed.
+  Future<void> clearScreenDirection(String screenId) async {
+    if (!_state.screenSelections.containsKey(screenId)) {
+      return;
+    }
+    final selections = Map<String, String>.of(_state.screenSelections)
+      ..remove(screenId);
+    _state = _copyWith(screenSelections: selections);
+    await _persistAndNotify();
+  }
+
   Future<void> addComment(ReviewComment comment) async {
     if (_state.comments.any((existing) => existing.id == comment.id)) {
       throw StateError('Comment with id "${comment.id}" already exists');

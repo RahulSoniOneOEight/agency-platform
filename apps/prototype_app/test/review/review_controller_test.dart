@@ -219,5 +219,23 @@ void main() {
       expect(await repository.load('prototype-demo'), persistedBefore);
       expect(controller.state.comments.single.text, 'note');
     });
+
+    test('clearScreenDirection removes only that screen and persists', () async {
+      await controller.selectScreenDirection('search', 'b');
+      await controller.selectScreenDirection('home', 'a');
+
+      await controller.clearScreenDirection('search');
+
+      expect(controller.state.screenSelections.containsKey('search'), isFalse);
+      expect(controller.state.screenSelections['home'], 'a');
+      final persisted = await repository.load('prototype-demo');
+      expect(persisted!.screenSelections.containsKey('search'), isFalse);
+      expect(persisted.screenSelections['home'], 'a');
+
+      var notifications = 0;
+      controller.addListener(() => notifications++);
+      await controller.clearScreenDirection('search');
+      expect(notifications, 0);
+    });
   });
 }

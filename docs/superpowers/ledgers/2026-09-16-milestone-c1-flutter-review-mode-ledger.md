@@ -116,7 +116,7 @@
 | 2 | Persistence abstraction + controller | ACCEPTED | `e7021b5` + `89d2600` |
 | 3 | Governed screen registry + comparison host | ACCEPTED | `c16f18b` + `e423a3b` |
 | 4 | Deterministic review entry point | ACCEPTED | `940d7d1` + `bf483a1` |
-| 5 | Review shell + Overview/Directions/Screens | PENDING | — |
+| 5 | Review shell + Overview/Directions/Screens | ACCEPTED | `6edef59` + `398ca46` |
 | 6 | Overall selection + per-screen mix | PENDING | — |
 | 7 | Comments + review-round controls | PENDING | — |
 | 8 | Architecture regressions + full verification + PR | PENDING | — |
@@ -146,3 +146,10 @@
   takes an injected controller (storage chosen in the composition root), `?direction=` only affects
   prototype mode, empty-client and `&direction=b` tests. 144 full tests green. ACCEPTED.
   Deviation recorded: Task 4 created `review_shell.dart` (plan assigns creation to Task 5) — R11.
+- 2026-09-16 — Task 5 implemented (`6edef59`, 11 tests): responsive five-destination shell
+  (Overview/Directions/Screens/Selection/Comments), Directions preview≠selection with explicit
+  select, Screens via governed registry + comparison host, real read-only Selection/Comments
+  summaries. Review found no blockers; corrections `398ca46`: ledger R11 recorded, back-to-prototype
+  exit path, `load()` wired at the composition root, Directions doc fix, compact-width Screens test
+  (compact fixture spacing keeps the shared ProductCard inside its grid cell). 156 full tests green.
+  ACCEPTED.

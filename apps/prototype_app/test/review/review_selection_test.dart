@@ -186,4 +186,21 @@ void main() {
       expect(runtime.directions[id]!.patterns, equals(patternsSnapshot[id]));
     }
   });
+
+  testWidgets('deselecting a screen mix clears only that screen', (tester) async {
+    await controller.selectScreenDirection('commerce.search', 'b');
+    await controller.selectScreenDirection('commerce.home', 'a');
+    await pumpSelection(tester);
+
+    final searchGroup = find.byKey(ReviewSelection.screenGroupKey('commerce.search'));
+    await tester.tap(find.descendant(of: searchGroup, matching: find.text('B')));
+    await tester.pumpAndSettle();
+
+    expect(controller.state.screenSelections.containsKey('commerce.search'), isFalse);
+    expect(controller.state.screenSelections['commerce.home'], 'a');
+    expect(
+      (await repository.load('prototype-demo'))!.screenSelections.containsKey('commerce.search'),
+      isFalse,
+    );
+  });
 }
