@@ -304,7 +304,10 @@ void main() {
       final current = batch('batch-1');
       await batchRepository.create('prototype-demo', current);
 
-      final stale = current.copyWith(updatedAt: DateTime.utc(2026, 9, 17, 11));
+      final stale = current.editDraft(
+        actorId: 'reviewer-123',
+        at: DateTime.utc(2026, 9, 17, 11),
+      );
       await expectLater(
         () => batchRepository.replace('prototype-demo', stale, current),
         throwsStateError,
@@ -314,7 +317,10 @@ void main() {
         current,
       );
 
-      final next = current.copyWith(updatedAt: DateTime.utc(2026, 9, 17, 12));
+      final next = current.editDraft(
+        actorId: 'reviewer-123',
+        at: DateTime.utc(2026, 9, 17, 12),
+      );
       await batchRepository.replace('prototype-demo', current, next);
       expect(
         await batchRepository.load('prototype-demo', 'batch-1'),

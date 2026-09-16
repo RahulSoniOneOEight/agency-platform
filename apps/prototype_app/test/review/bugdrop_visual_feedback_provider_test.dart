@@ -114,7 +114,7 @@ void main() {
       );
     });
 
-    test('rejects out-of-range bounds with a typed annotation error', () {
+    test('rejects malformed bounds with an ingestion-typed error', () {
       expect(
         () => provider.normalize(
           bugdropPayload(
@@ -126,7 +126,13 @@ void main() {
             },
           ),
         ),
-        throwsA(isA<InvalidVisualAnnotation>()),
+        throwsA(
+          isA<UnsupportedVisualProviderPayload>().having(
+            (error) => error.code,
+            'code',
+            'unsupported_visual_provider_payload',
+          ),
+        ),
       );
       expect(
         () => provider.normalize(
@@ -139,7 +145,7 @@ void main() {
             },
           ),
         ),
-        throwsA(isA<InvalidVisualAnnotation>()),
+        throwsA(isA<UnsupportedVisualProviderPayload>()),
       );
     });
   });

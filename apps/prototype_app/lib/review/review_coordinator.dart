@@ -8,6 +8,7 @@ import 'refinement_batch.dart';
 import 'refinement_batch_repository.dart';
 import 'refinement_execution_result.dart';
 import 'review_domain_error.dart';
+import 'review_screen_availability.dart';
 import 'review_screen_registry.dart';
 import 'review_section_registry.dart';
 import 'review_state.dart';
@@ -104,6 +105,9 @@ final class ReviewCoordinator {
     if (!target.isValidForScope(scope)) {
       throw InvalidFeedbackTarget('target is not valid for $scope feedback');
     }
+    if (scope != FeedbackScope.visualAnnotation) {
+      _validateGovernedTarget(target);
+    }
     if (visualAttachment != null && scope != FeedbackScope.visualAnnotation) {
       throw const InvalidVisualAnnotation(
         'visual evidence is only valid for visual_annotation feedback',
@@ -166,40 +170,6 @@ final class ReviewCoordinator {
       feedbackIds: feedbackIds,
     );
     return record;
-  }
-
-  /// Marks feedback `open -> addressed`; the agent/OpenCode authority.
-  Future<FeedbackRecord> markAddressed({
-    required ReviewActor actor,
-    required String feedbackId,
-    String? batchId,
-  }) async {
-    if (!actor.isAgent) {
-      throw const UnauthorizedReviewAction(
-        'only an agent may mark feedback addressed',
-      );
-    }
-    final current = await _requireFeedback(feedbackId);
-    if (current.status != FeedbackStatus.open) {
-      throw InvalidFeedbackTransition(
-        'cannot mark ${current.status.name} feedback addressed',
-      );
-    }
-    final next = current.copyWith(
-      status: FeedbackStatus.addressed,
-      history: _append(
-        current,
-        FeedbackEvent(
-          type: FeedbackEventType.addressed,
-          actorId: actor.id,
-          at: DateTime.now().toUtc(),
-          round: _controller.state.reviewRound,
-          batchId: batchId,
-        ),
-      ),
-    );
-    await _feedback.replace(clientId, current, next);
-    return next;
   }
 
   /// Resolves addressed feedback; reviewer-only.
@@ -678,9 +648,14 @@ final class ReviewCoordinator {
       );
     }
     if (result.passed) {
-      if (result.checks.isEmpty || !result.checks.any((check) => check.passed)) {
+      if (result.checks.isEmpty) {
         throw BatchValidationRequired(
-          'refinement batch $batchId requires at least one passed validation check',
+          'refinement batch $batchId requires at least one validation check',
+        );
+      }
+      if (!result.batchValidation.allPassed) {
+        throw BatchValidationFailed(
+          'refinement batch $batchId requires every validation check to pass',
         );
       }
       if (await _hasVisualLinkedFeedback(current) && result.evidence.isEmpty) {
@@ -879,6 +854,44 @@ final class ReviewCoordinator {
   void _requireAgent(ReviewActor actor, String action) {
     if (!actor.isAgent) {
       throw UnauthorizedReviewAction('agent role required to $action');
+    }
+  }
+
+  /// Validates a non-visual feedback target against the governed registries.
+  ///
+  /// A named screen must be a runtime-declared pattern, a named section must
+  /// belong to the named screen, and a named direction must exist (and, when a
+  /// screen is also named, be compatible with that screen). Failures throw a
+  /// typed [InvalidFeedbackTarget] before any write.
+  void _validateGovernedTarget(FeedbackTarget target) {
+    final runtime = _controller.runtime;
+    final screen = target.screen;
+    if (screen != null &&
+        !ReviewScreenRegistry.screenIdsFor(runtime).contains(screen)) {
+      throw InvalidFeedbackTarget('unknown feedback target screen: $screen');
+    }
+    final section = target.section;
+    if (section != null) {
+      final definition = ReviewSectionRegistry.definition(section);
+      if (definition == null || definition.screenId != screen) {
+        throw InvalidFeedbackTarget(
+          'feedback section $section does not belong to screen $screen',
+        );
+      }
+    }
+    final direction = target.direction;
+    if (direction != null) {
+      if (!runtime.directions.containsKey(direction)) {
+        throw InvalidFeedbackTarget(
+          'unknown feedback target direction: $direction',
+        );
+      }
+      if (screen != null &&
+          !ReviewScreenAvailability.isSupported(runtime, direction, screen)) {
+        throw InvalidFeedbackTarget(
+          'feedback screen $screen is not supported by direction $direction',
+        );
+      }
     }
   }
 

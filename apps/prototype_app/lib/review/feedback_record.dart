@@ -84,6 +84,47 @@ FeedbackStatus feedbackStatusForHistory(List<FeedbackEvent> history) {
   return status;
 }
 
+/// Validates that an append-only history is a legal lifecycle walk.
+///
+/// `created` opens the item; `addressed` is only legal from `open`; `resolved`
+/// only from `addressed`; `reopened` only from `addressed`/`resolved`; and
+/// `blockingChanged` may occur at any point. Illegal sequences (for example
+/// `created -> resolved -> addressed`) throw a [FormatException].
+void _validateHistoryTransitions(List<FeedbackEvent> history) {
+  var current = FeedbackStatus.open;
+  for (var index = 1; index < history.length; index++) {
+    switch (history[index].type) {
+      case FeedbackEventType.created:
+        throw const FormatException(
+          'Feedback history must not repeat the created event',
+        );
+      case FeedbackEventType.addressed:
+        if (current != FeedbackStatus.open) {
+          throw FormatException(
+            'Illegal feedback history: addressed from ${current.name}',
+          );
+        }
+        current = FeedbackStatus.addressed;
+      case FeedbackEventType.resolved:
+        if (current != FeedbackStatus.addressed) {
+          throw FormatException(
+            'Illegal feedback history: resolved from ${current.name}',
+          );
+        }
+        current = FeedbackStatus.resolved;
+      case FeedbackEventType.reopened:
+        if (current == FeedbackStatus.open) {
+          throw const FormatException(
+            'Illegal feedback history: reopened from open',
+          );
+        }
+        current = FeedbackStatus.open;
+      case FeedbackEventType.blockingChanged:
+        break;
+    }
+  }
+}
+
 /// What a feedback item points at. Which fields are legal depends on scope.
 final class FeedbackTarget {
   const FeedbackTarget({this.screen, this.section, this.direction});
@@ -314,11 +355,7 @@ final class FeedbackRecord {
     if (this.history.first.type != FeedbackEventType.created) {
       throw const FormatException('Feedback history must start with a created event');
     }
-    for (var index = 1; index < this.history.length; index++) {
-      if (this.history[index].type == FeedbackEventType.created) {
-        throw const FormatException('Feedback history must not repeat the created event');
-      }
-    }
+    _validateHistoryTransitions(this.history);
     if (feedbackStatusForHistory(this.history) != status) {
       throw const FormatException('Feedback status does not match its history');
     }

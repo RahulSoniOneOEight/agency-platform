@@ -326,6 +326,48 @@ void main() {
       );
     });
 
+    test('a passed result with a failing check is rejected', () {
+      final batch = inProgressBatch();
+      expect(
+        () => batch.recordValidation(
+          actorId: 'opencode',
+          at: t1,
+          validation: BatchValidation(
+            status: BatchValidationStatus.passed,
+            checks: const [
+              ValidationCheck(name: 'flutter test', passed: true, details: 'ok'),
+              ValidationCheck(
+                name: 'flutter analyze',
+                passed: false,
+                details: 'issue',
+              ),
+            ],
+          ),
+          execution: execution(),
+        ),
+        throwsA(
+          isA<BatchValidationFailed>().having(
+            (error) => error.code,
+            'code',
+            'batch_validation_failed',
+          ),
+        ),
+      );
+    });
+
+    test('a passed result with no checks is rejected', () {
+      final batch = inProgressBatch();
+      expect(
+        () => batch.recordValidation(
+          actorId: 'opencode',
+          at: t1,
+          validation: BatchValidation(status: BatchValidationStatus.passed),
+          execution: execution(),
+        ),
+        throwsA(isA<BatchValidationRequired>()),
+      );
+    });
+
     test('a pending result is not a valid record', () {
       expect(
         () => inProgressBatch().recordValidation(

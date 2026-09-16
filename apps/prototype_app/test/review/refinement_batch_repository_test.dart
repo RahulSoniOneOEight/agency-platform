@@ -57,14 +57,20 @@ void runRepositoryContract(
       final current = batch('batch-1');
       await repository.create('prototype-demo', current);
 
-      final stale = current.copyWith(updatedAt: DateTime.utc(2026, 9, 17, 11));
+      final stale = current.editDraft(
+        actorId: 'reviewer-123',
+        at: DateTime.utc(2026, 9, 17, 11),
+      );
       await expectLater(
         () => repository.replace('prototype-demo', stale, current),
         throwsStateError,
       );
       expect(await repository.load('prototype-demo', 'batch-1'), current);
 
-      final next = current.copyWith(updatedAt: DateTime.utc(2026, 9, 17, 12));
+      final next = current.editDraft(
+        actorId: 'reviewer-123',
+        at: DateTime.utc(2026, 9, 17, 12),
+      );
       await repository.replace('prototype-demo', current, next);
       expect(await repository.load('prototype-demo', 'batch-1'), next);
     });

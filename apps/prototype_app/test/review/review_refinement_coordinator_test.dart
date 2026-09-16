@@ -131,8 +131,10 @@ void main() {
   late MemoryApprovalRepository approvals;
   late MemoryRefinementBatchRepository batches;
   late ReviewCoordinator coordinator;
+  var seedBatchCounter = 0;
 
   setUp(() {
+    seedBatchCounter = 0;
     runtime = buildRuntime();
     controller = ReviewController(
       clientId: runtime.clientId,
@@ -208,6 +210,31 @@ void main() {
     return coordinator.markBatchReady(actor: reviewer, batchId: id);
   }
 
+  /// Drives `open -> addressed` through a full refinement batch, mirroring the
+  /// only production path (there is no public `markAddressed` bypass).
+  Future<void> addressFeedback(String feedbackId) async {
+    final batchId = 'seed-batch-${++seedBatchCounter}';
+    await coordinator.createDraftBatch(
+      actor: reviewer,
+      id: batchId,
+      feedbackIds: [feedbackId],
+      intendedScope: homeScope(),
+      proposed: ChangeClassification.implementationOnly,
+    );
+    await coordinator.confirmBatchClassification(
+      actor: reviewer,
+      batchId: batchId,
+      confirmed: ChangeClassification.implementationOnly,
+    );
+    await coordinator.markBatchReady(actor: reviewer, batchId: batchId);
+    await coordinator.startBatch(actor: agent, batchId: batchId);
+    await coordinator.recordBatchValidation(
+      actor: agent,
+      batchId: batchId,
+      result: passedResult(),
+    );
+  }
+
   group('createDraftBatch authority', () {
     test('is reviewer-only and persists nothing for other roles', () async {
       await create();
@@ -230,13 +257,14 @@ void main() {
 
     test('rejects feedback that is not open (already addressed)', () async {
       await create();
-      await coordinator.markAddressed(actor: agent, feedbackId: 'feedback-1');
+      await addressFeedback('feedback-1');
+      final batchesBefore = await batches.list('prototype-demo');
 
       await expectLater(
         () => createDraft(),
         throwsA(isA<InvalidBatchTransition>()),
       );
-      expect(await batches.list('prototype-demo'), isEmpty);
+      expect(await batches.list('prototype-demo'), hasLength(batchesBefore.length));
     });
 
     test('rejects a duplicate batch id with a typed error', () async {
@@ -444,7 +472,7 @@ void main() {
 
     test('OpenCode cannot resolve or reopen feedback', () async {
       await create();
-      await coordinator.markAddressed(actor: agent, feedbackId: 'feedback-1');
+      await addressFeedback('feedback-1');
       await expectLater(
         () => coordinator.resolveFeedback(actor: agent, feedbackId: 'feedback-1'),
         throwsA(
@@ -516,7 +544,7 @@ void main() {
           FeedbackStatus.open);
     });
 
-    test('a passing result without a passed check is rejected', () async {
+    test('a passing result with only a failing check is rejected', () async {
       await create();
       await readyBatch();
       await coordinator.startBatch(actor: agent, batchId: 'batch-1');
@@ -531,6 +559,56 @@ void main() {
             checks: const [
               ValidationCheck(name: 'flutter analyze', passed: false, details: 'x'),
             ],
+          ),
+        ),
+        throwsA(
+          isA<BatchValidationFailed>().having(
+            (error) => error.code,
+            'code',
+            'batch_validation_failed',
+          ),
+        ),
+      );
+      expect((await feedback.load('prototype-demo', 'feedback-1'))!.status,
+          FeedbackStatus.open);
+    });
+
+    test('a passing result with any failing check is rejected', () async {
+      await create();
+      await readyBatch();
+      await coordinator.startBatch(actor: agent, batchId: 'batch-1');
+
+      await expectLater(
+        () => coordinator.recordBatchValidation(
+          actor: agent,
+          batchId: 'batch-1',
+          result: RefinementExecutionResult(
+            status: RefinementExecutionStatus.passed,
+            commitSha: 'abc123',
+            checks: const [
+              ValidationCheck(name: 'flutter test', passed: true, details: 'ok'),
+              ValidationCheck(name: 'flutter analyze', passed: false, details: 'x'),
+            ],
+          ),
+        ),
+        throwsA(isA<BatchValidationFailed>()),
+      );
+      expect((await feedback.load('prototype-demo', 'feedback-1'))!.status,
+          FeedbackStatus.open);
+    });
+
+    test('a passing result with no checks is rejected', () async {
+      await create();
+      await readyBatch();
+      await coordinator.startBatch(actor: agent, batchId: 'batch-1');
+
+      await expectLater(
+        () => coordinator.recordBatchValidation(
+          actor: agent,
+          batchId: 'batch-1',
+          result: RefinementExecutionResult(
+            status: RefinementExecutionStatus.passed,
+            commitSha: 'abc123',
           ),
         ),
         throwsA(
@@ -580,8 +658,8 @@ void main() {
       await create(id: 'feedback-2');
       await readyBatch(feedbackIds: const ['feedback-1', 'feedback-2']);
       await coordinator.startBatch(actor: agent, batchId: 'batch-1');
-      // feedback-2 is addressed outside the batch before validation completes.
-      await coordinator.markAddressed(actor: agent, feedbackId: 'feedback-2');
+      // feedback-2 is addressed by a separate batch before this one completes.
+      await addressFeedback('feedback-2');
 
       await coordinator.recordBatchValidation(
         actor: agent,
@@ -693,7 +771,7 @@ void main() {
     test('appends a deterministic reopened event with cause/evidence/batchId',
         () async {
       await create();
-      await coordinator.markAddressed(actor: agent, feedbackId: 'feedback-1');
+      await addressFeedback('feedback-1');
 
       final reopened = await coordinator.reopenAddressedForRegression(
         actor: agent,
@@ -727,7 +805,7 @@ void main() {
         throwsA(isA<UnauthorizedFeedbackResolution>()),
       );
 
-      await coordinator.markAddressed(actor: agent, feedbackId: 'feedback-1');
+      await addressFeedback('feedback-1');
       await coordinator.resolveFeedback(actor: reviewer, feedbackId: 'feedback-1');
       await expectLater(
         () => coordinator.reopenAddressedForRegression(
@@ -743,7 +821,7 @@ void main() {
 
     test('requires a cause, evidence, and batch id', () async {
       await create();
-      await coordinator.markAddressed(actor: agent, feedbackId: 'feedback-1');
+      await addressFeedback('feedback-1');
       await expectLater(
         () => coordinator.reopenAddressedForRegression(
           actor: agent,

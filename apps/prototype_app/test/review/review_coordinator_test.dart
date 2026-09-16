@@ -6,6 +6,8 @@ import 'package:prototype_app/review/memory_approval_repository.dart';
 import 'package:prototype_app/review/memory_feedback_repository.dart';
 import 'package:prototype_app/review/memory_refinement_batch_repository.dart';
 import 'package:prototype_app/review/memory_review_repository.dart';
+import 'package:prototype_app/review/refinement_batch.dart';
+import 'package:prototype_app/review/refinement_execution_result.dart';
 import 'package:prototype_app/review/review_actor.dart';
 import 'package:prototype_app/review/review_controller.dart';
 import 'package:prototype_app/review/review_coordinator.dart';
@@ -88,8 +90,10 @@ void main() {
   late MemoryFeedbackRepository feedback;
   late MemoryApprovalRepository approvals;
   late ReviewCoordinator coordinator;
+  var batchSequence = 0;
 
   setUp(() {
+    batchSequence = 0;
     runtime = buildRuntime();
     controller = ReviewController(
       clientId: runtime.clientId,
@@ -120,6 +124,37 @@ void main() {
       text: 'Increase spacing',
       target: target,
       blocking: blocking,
+    );
+  }
+
+  /// Drives `open -> addressed` through a full refinement batch. There is no
+  /// public `markAddressed` bypass: batch validation is the only production path.
+  Future<void> addressFeedback(String feedbackId) async {
+    final batchId = 'seed-batch-${++batchSequence}';
+    await coordinator.createDraftBatch(
+      actor: reviewer,
+      id: batchId,
+      feedbackIds: [feedbackId],
+      intendedScope: IntendedScope(screens: const ['commerce.home']),
+      proposed: ChangeClassification.implementationOnly,
+    );
+    await coordinator.confirmBatchClassification(
+      actor: reviewer,
+      batchId: batchId,
+      confirmed: ChangeClassification.implementationOnly,
+    );
+    await coordinator.markBatchReady(actor: reviewer, batchId: batchId);
+    await coordinator.startBatch(actor: agent, batchId: batchId);
+    await coordinator.recordBatchValidation(
+      actor: agent,
+      batchId: batchId,
+      result: RefinementExecutionResult(
+        status: RefinementExecutionStatus.passed,
+        commitSha: 'abc123',
+        checks: const [
+          ValidationCheck(name: 'flutter test', passed: true, details: 'ok'),
+        ],
+      ),
     );
   }
 
@@ -207,30 +242,104 @@ void main() {
       expect(record.target.screen, 'commerce.home');
       expect(record.target.section, 'home.product-grid');
     });
+
+    test('rejects a ghost screen with a typed error and no writes', () async {
+      final stateBefore = controller.state;
+
+      await expectLater(
+        () => create(
+          scope: FeedbackScope.screen,
+          target: const FeedbackTarget(screen: 'commerce.ghost'),
+        ),
+        throwsA(
+          isA<InvalidFeedbackTarget>()
+              .having((error) => error.code, 'code', 'invalid_feedback_target'),
+        ),
+      );
+
+      expect(await feedback.list('prototype-demo'), isEmpty);
+      expect(identical(controller.state, stateBefore), isTrue);
+    });
+
+    test('rejects a ghost section and a section on the wrong screen', () async {
+      for (final target in const [
+        FeedbackTarget(screen: 'commerce.home', section: 'ghost.section'),
+        FeedbackTarget(screen: 'commerce.home', section: 'plp.product-grid'),
+      ]) {
+        await expectLater(
+          () => create(
+            id: 'feedback-${target.section}',
+            scope: FeedbackScope.section,
+            target: target,
+          ),
+          throwsA(isA<InvalidFeedbackTarget>()),
+        );
+      }
+
+      expect(await feedback.list('prototype-demo'), isEmpty);
+      expect(controller.state.feedbackIds, isEmpty);
+    });
+
+    test('rejects a ghost or unsupported direction', () async {
+      for (final target in const [
+        FeedbackTarget(direction: 'ghost'),
+        FeedbackTarget(screen: 'commerce.home', direction: 'c'),
+      ]) {
+        await expectLater(
+          () => create(
+            id: 'feedback-${target.direction}',
+            scope: FeedbackScope.decision,
+            target: target,
+          ),
+          throwsA(isA<InvalidFeedbackTarget>()),
+        );
+      }
+
+      expect(await feedback.list('prototype-demo'), isEmpty);
+      expect(controller.state.feedbackIds, isEmpty);
+    });
+
+    test('accepts governed screen, section, and direction targets', () async {
+      final screen = await create(
+        id: 'feedback-screen',
+        scope: FeedbackScope.screen,
+        target: const FeedbackTarget(screen: 'commerce.plp'),
+      );
+      expect(screen.target.screen, 'commerce.plp');
+
+      final decision = await create(
+        id: 'feedback-decision',
+        scope: FeedbackScope.decision,
+        target: const FeedbackTarget(
+          screen: 'commerce.search',
+          direction: 'a',
+        ),
+      );
+      expect(decision.target.direction, 'a');
+      expect(decision.target.screen, 'commerce.search');
+    });
   });
 
   group('feedback lifecycle transitions', () {
-    test('an agent may move open feedback to addressed', () async {
+    test('batch validation is the only path that moves feedback to addressed',
+        () async {
       await create();
-      final addressed = await coordinator.markAddressed(
-        actor: agent,
-        feedbackId: 'feedback-1',
-        batchId: 'batch-007',
-      );
+      await addressFeedback('feedback-1');
 
+      final addressed = (await coordinator.loadFeedback('feedback-1'))!;
       expect(addressed.status, FeedbackStatus.addressed);
       expect(addressed.history.map((event) => event.type), [
         FeedbackEventType.created,
         FeedbackEventType.addressed,
       ]);
-      expect(addressed.history.last.batchId, 'batch-007');
-      // Marking addressed never auto-resolves or changes review status.
+      expect(addressed.history.last.batchId, startsWith('seed-batch-'));
+      // Addressing never auto-resolves or changes review status.
       expect(controller.state.status, ReviewStatus.needsRevision);
     });
 
     test('a reviewer may resolve addressed feedback', () async {
       await create();
-      await coordinator.markAddressed(actor: agent, feedbackId: 'feedback-1');
+      await addressFeedback('feedback-1');
 
       final resolved = await coordinator.resolveFeedback(
         actor: reviewer,
@@ -244,7 +353,7 @@ void main() {
 
     test('a reviewer may reopen addressed or resolved feedback', () async {
       await create(id: 'feedback-addressed');
-      await coordinator.markAddressed(actor: agent, feedbackId: 'feedback-addressed');
+      await addressFeedback('feedback-addressed');
       final reopenedAddressed = await coordinator.reopenFeedback(
         actor: reviewer,
         feedbackId: 'feedback-addressed',
@@ -253,7 +362,7 @@ void main() {
       expect(reopenedAddressed.history.last.type, FeedbackEventType.reopened);
 
       await create(id: 'feedback-resolved');
-      await coordinator.markAddressed(actor: agent, feedbackId: 'feedback-resolved');
+      await addressFeedback('feedback-resolved');
       await coordinator.resolveFeedback(
         actor: reviewer,
         feedbackId: 'feedback-resolved',
@@ -287,7 +396,7 @@ void main() {
 
     test('an agent cannot resolve feedback', () async {
       await create();
-      await coordinator.markAddressed(actor: agent, feedbackId: 'feedback-1');
+      await addressFeedback('feedback-1');
 
       await expectLater(
         () => coordinator.resolveFeedback(actor: agent, feedbackId: 'feedback-1'),
@@ -296,27 +405,6 @@ void main() {
       await expectLater(
         () => coordinator.reopenFeedback(actor: agent, feedbackId: 'feedback-1'),
         throwsA(isA<UnauthorizedReviewAction>()),
-      );
-    });
-
-    test('only an agent may mark feedback addressed', () async {
-      await create();
-
-      for (final actor in const [reviewer, approver]) {
-        await expectLater(
-          () => coordinator.markAddressed(actor: actor, feedbackId: 'feedback-1'),
-          throwsA(isA<UnauthorizedReviewAction>()),
-        );
-      }
-    });
-
-    test('re-addressing an addressed item is an illegal transition', () async {
-      await create();
-      await coordinator.markAddressed(actor: agent, feedbackId: 'feedback-1');
-
-      await expectLater(
-        () => coordinator.markAddressed(actor: agent, feedbackId: 'feedback-1'),
-        throwsA(isA<InvalidFeedbackTransition>()),
       );
     });
 
@@ -406,7 +494,7 @@ void main() {
 
     test('drives needsRevision for an addressed (unresolved) item', () async {
       await create(blocking: false);
-      await coordinator.markAddressed(actor: agent, feedbackId: 'feedback-1');
+      await addressFeedback('feedback-1');
       expect(controller.state.status, ReviewStatus.inReview);
 
       await coordinator.setBlocking(
@@ -420,7 +508,7 @@ void main() {
 
     test('does not change review status for a resolved item', () async {
       await create(blocking: false);
-      await coordinator.markAddressed(actor: agent, feedbackId: 'feedback-1');
+      await addressFeedback('feedback-1');
       await coordinator.resolveFeedback(actor: reviewer, feedbackId: 'feedback-1');
       final statusBefore = controller.state.status;
       final roundBefore = controller.state.reviewRound;
@@ -441,9 +529,9 @@ void main() {
   group('history append-only', () {
     test('retains every prior event across the lifecycle', () async {
       await create();
-      await coordinator.markAddressed(actor: agent, feedbackId: 'feedback-1');
+      await addressFeedback('feedback-1');
       await coordinator.reopenFeedback(actor: reviewer, feedbackId: 'feedback-1');
-      await coordinator.markAddressed(actor: agent, feedbackId: 'feedback-1');
+      await addressFeedback('feedback-1');
       await coordinator.resolveFeedback(actor: reviewer, feedbackId: 'feedback-1');
 
       final stored = (await feedback.load('prototype-demo', 'feedback-1'))!;
@@ -483,7 +571,7 @@ void main() {
     test('resolving the last blocker makes the round eligible but does not close it',
         () async {
       await create();
-      await coordinator.markAddressed(actor: agent, feedbackId: 'feedback-1');
+      await addressFeedback('feedback-1');
       await coordinator.resolveFeedback(actor: reviewer, feedbackId: 'feedback-1');
 
       expect(await coordinator.isEligibleToCloseRound(), isTrue);
@@ -516,7 +604,7 @@ void main() {
     test('increments the round, returns to in_review and preserves feedback',
         () async {
       await create();
-      await coordinator.markAddressed(actor: agent, feedbackId: 'feedback-1');
+      await addressFeedback('feedback-1');
       await coordinator.resolveFeedback(actor: reviewer, feedbackId: 'feedback-1');
       await coordinator.closeCurrentRound(actor: reviewer);
       final recordBefore = await feedback.load('prototype-demo', 'feedback-1');
@@ -565,7 +653,7 @@ void main() {
     test('reopening a blocking item from ready advances the round and revises',
         () async {
       await create(blocking: true);
-      await coordinator.markAddressed(actor: agent, feedbackId: 'feedback-1');
+      await addressFeedback('feedback-1');
       await coordinator.resolveFeedback(actor: reviewer, feedbackId: 'feedback-1');
       await coordinator.closeCurrentRound(actor: reviewer);
       expect(controller.state.status, ReviewStatus.readyForFinalReview);
@@ -585,7 +673,7 @@ void main() {
     test('reopening a non-blocking item from ready leaves readiness unchanged',
         () async {
       await create(id: 'feedback-nb', blocking: false);
-      await coordinator.markAddressed(actor: agent, feedbackId: 'feedback-nb');
+      await addressFeedback('feedback-nb');
       await coordinator.closeCurrentRound(actor: reviewer);
       expect(controller.state.status, ReviewStatus.readyForFinalReview);
 
@@ -598,7 +686,7 @@ void main() {
     test('reopening a blocking item when not ready leaves status unchanged',
         () async {
       await create(blocking: true);
-      await coordinator.markAddressed(actor: agent, feedbackId: 'feedback-1');
+      await addressFeedback('feedback-1');
       expect(controller.state.status, ReviewStatus.needsRevision);
       expect(controller.state.reviewRound, 1);
 
@@ -629,7 +717,7 @@ void main() {
       await create(id: 'feedback-1', blocking: true);
       await create(id: 'feedback-2', blocking: false);
       await create(id: 'feedback-3', blocking: true);
-      await coordinator.markAddressed(actor: agent, feedbackId: 'feedback-3');
+      await addressFeedback('feedback-3');
       await coordinator.resolveFeedback(actor: reviewer, feedbackId: 'feedback-3');
 
       expect(
@@ -862,10 +950,7 @@ void main() {
           isTrue);
       expect(reasons.any((reason) => reason.contains('feedback-block')), isTrue);
 
-      await coordinator.markAddressed(
-        actor: agent,
-        feedbackId: 'feedback-block',
-      );
+      await addressFeedback('feedback-block');
       await coordinator.resolveFeedback(
         actor: reviewer,
         feedbackId: 'feedback-block',

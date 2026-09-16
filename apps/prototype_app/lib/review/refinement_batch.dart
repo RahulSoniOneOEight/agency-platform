@@ -526,7 +526,7 @@ final class RefinementBatch {
     }
     if (status == RefinementBatchStatus.readyForReview &&
         (validation.status != BatchValidationStatus.passed ||
-            !validation.hasPassedCheck)) {
+            !validation.allPassed)) {
       throw const FormatException(
         'ready_for_review requires a successful validation record',
       );
@@ -694,7 +694,7 @@ final class RefinementBatch {
         'history': [for (final event in history) event.toJson()],
       };
 
-  RefinementBatch copyWith({
+  RefinementBatch _copyWith({
     RefinementBatchStatus? status,
     List<String>? feedbackIds,
     IntendedScope? intendedScope,
@@ -735,7 +735,7 @@ final class RefinementBatch {
         'refinement batch $id scope is frozen after ready',
       );
     }
-    return copyWith(
+    return _copyWith(
       feedbackIds: feedbackIds,
       intendedScope: intendedScope,
       updatedAt: at,
@@ -762,7 +762,7 @@ final class RefinementBatch {
         'refinement batch $id change classification is frozen after ready',
       );
     }
-    return copyWith(
+    return _copyWith(
       changeClassification: ChangeClassificationRecord(
         proposedBy: changeClassification.proposedBy,
         proposed: changeClassification.proposed,
@@ -794,7 +794,7 @@ final class RefinementBatch {
       );
     }
     _assertTransition(RefinementBatchStatus.ready);
-    return copyWith(
+    return _copyWith(
       status: RefinementBatchStatus.ready,
       updatedAt: at,
       history: [
@@ -830,7 +830,7 @@ final class RefinementBatch {
       commitSha: execution.commitSha,
       filesChanged: execution.filesChanged,
     );
-    return copyWith(
+    return _copyWith(
       status: RefinementBatchStatus.inProgress,
       execution: nextExecution,
       validation: BatchValidation(
@@ -869,17 +869,23 @@ final class RefinementBatch {
         'refinement batch $id validation result must be passed or failed',
       );
     }
-    if (validation.status == BatchValidationStatus.passed &&
-        !validation.hasPassedCheck) {
-      throw BatchValidationRequired(
-        'refinement batch $id requires at least one passed validation check',
-      );
+    if (validation.status == BatchValidationStatus.passed) {
+      if (validation.checks.isEmpty) {
+        throw BatchValidationRequired(
+          'refinement batch $id requires at least one validation check',
+        );
+      }
+      if (!validation.allPassed) {
+        throw BatchValidationFailed(
+          'refinement batch $id requires every validation check to pass',
+        );
+      }
     }
     final target = validation.status == BatchValidationStatus.passed
         ? RefinementBatchStatus.readyForReview
         : RefinementBatchStatus.validationFailed;
     _assertTransition(target);
-    return copyWith(
+    return _copyWith(
       status: target,
       validation: validation,
       execution: execution,
@@ -905,7 +911,7 @@ final class RefinementBatch {
   }) {
     _assertNotCompleted();
     _assertTransition(RefinementBatchStatus.completed);
-    return copyWith(
+    return _copyWith(
       status: RefinementBatchStatus.completed,
       updatedAt: at,
       history: [

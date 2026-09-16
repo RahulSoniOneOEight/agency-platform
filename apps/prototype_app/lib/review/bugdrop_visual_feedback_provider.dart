@@ -22,6 +22,7 @@ final class BugDropVisualFeedbackProvider implements VisualFeedbackProvider {
     final top = _requireDouble(bounds['top'], 'bounds top');
     final right = _requireDouble(bounds['right'], 'bounds right');
     final bottom = _requireDouble(bounds['bottom'], 'bounds bottom');
+    final annotation = _requireAnnotation(left, top, right, bottom);
     return VisualAttachment(
       screenshotRef: _requireString(payload['screenshot_ref'], 'screenshot_ref'),
       viewportWidth: _requireInt(viewport['width'], 'viewport width'),
@@ -33,12 +34,7 @@ final class BugDropVisualFeedbackProvider implements VisualFeedbackProvider {
           _requireString(context['effective_direction'], 'context direction'),
       sourceCommitSha:
           _requireString(context['source_commit_sha'], 'context commit sha'),
-      annotation: NormalizedRect(
-        x: left,
-        y: top,
-        width: right - left,
-        height: bottom - top,
-      ),
+      annotation: annotation,
       providerName: providerName,
       externalRef: _requireString(payload['provider_item_id'], 'provider item id'),
       sectionId: _optionalString(context['section'], 'context section'),
@@ -79,5 +75,25 @@ final class BugDropVisualFeedbackProvider implements VisualFeedbackProvider {
       return value.toDouble();
     }
     throw UnsupportedVisualProviderPayload('missing or invalid $field');
+  }
+
+  /// Converts normalized `bounds` into a [NormalizedRect], surfacing malformed
+  /// bounds as an ingestion-typed [UnsupportedVisualProviderPayload].
+  static NormalizedRect _requireAnnotation(
+    double left,
+    double top,
+    double right,
+    double bottom,
+  ) {
+    try {
+      return NormalizedRect(
+        x: left,
+        y: top,
+        width: right - left,
+        height: bottom - top,
+      );
+    } on InvalidVisualAnnotation catch (error) {
+      throw UnsupportedVisualProviderPayload('invalid bounds: ${error.message}');
+    }
   }
 }

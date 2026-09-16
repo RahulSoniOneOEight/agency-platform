@@ -7,6 +7,8 @@ import 'package:prototype_app/review/memory_approval_repository.dart';
 import 'package:prototype_app/review/memory_refinement_batch_repository.dart';
 import 'package:prototype_app/review/memory_feedback_repository.dart';
 import 'package:prototype_app/review/memory_review_repository.dart';
+import 'package:prototype_app/review/refinement_batch.dart';
+import 'package:prototype_app/review/refinement_execution_result.dart';
 import 'package:prototype_app/review/review_actor.dart';
 import 'package:prototype_app/review/review_controller.dart';
 import 'package:prototype_app/review/review_coordinator.dart';
@@ -67,8 +69,10 @@ void main() {
   late ReviewController controller;
   late MemoryFeedbackRepository feedback;
   late ReviewCoordinator coordinator;
+  var batchSequence = 0;
 
   setUp(() {
+    batchSequence = 0;
     runtime = buildRuntime();
     controller = ReviewController(
       clientId: runtime.clientId,
@@ -98,6 +102,37 @@ void main() {
       text: text,
       target: target,
       blocking: blocking,
+    );
+  }
+
+  /// Drives `open -> addressed` through a refinement batch; there is no public
+  /// `markAddressed` bypass.
+  Future<void> addressFeedback(String feedbackId) async {
+    final batchId = 'seed-batch-${++batchSequence}';
+    await coordinator.createDraftBatch(
+      actor: reviewer,
+      id: batchId,
+      feedbackIds: [feedbackId],
+      intendedScope: IntendedScope(screens: const ['commerce.home']),
+      proposed: ChangeClassification.implementationOnly,
+    );
+    await coordinator.confirmBatchClassification(
+      actor: reviewer,
+      batchId: batchId,
+      confirmed: ChangeClassification.implementationOnly,
+    );
+    await coordinator.markBatchReady(actor: reviewer, batchId: batchId);
+    await coordinator.startBatch(actor: agent, batchId: batchId);
+    await coordinator.recordBatchValidation(
+      actor: agent,
+      batchId: batchId,
+      result: RefinementExecutionResult(
+        status: RefinementExecutionStatus.passed,
+        commitSha: 'abc123',
+        checks: const [
+          ValidationCheck(name: 'flutter test', passed: true, details: 'ok'),
+        ],
+      ),
     );
   }
 
@@ -199,7 +234,7 @@ void main() {
   group('reviewer authority', () {
     testWidgets('non-reviewers get a read-only panel', (tester) async {
       await seed(id: 'feedback-1', blocking: true);
-      await coordinator.markAddressed(actor: agent, feedbackId: 'feedback-1');
+      await addressFeedback('feedback-1');
 
       await pump(tester, agent);
 
@@ -219,7 +254,7 @@ void main() {
     testWidgets('a reviewer can resolve addressed feedback and reopen it',
         (tester) async {
       await seed(id: 'feedback-1', blocking: true);
-      await coordinator.markAddressed(actor: agent, feedbackId: 'feedback-1');
+      await addressFeedback('feedback-1');
 
       await pump(tester, reviewer);
       await tester.tap(find.byKey(ReviewFeedbackPanel.resolveButtonKey('feedback-1')));
@@ -249,7 +284,7 @@ void main() {
     testWidgets('a reviewer can reopen an addressed item directly',
         (tester) async {
       await seed(id: 'feedback-1', blocking: true);
-      await coordinator.markAddressed(actor: agent, feedbackId: 'feedback-1');
+      await addressFeedback('feedback-1');
 
       await pump(tester, reviewer);
 
@@ -281,9 +316,9 @@ void main() {
     testWidgets('show open, addressed and resolved states', (tester) async {
       await seed(id: 'feedback-open');
       await seed(id: 'feedback-addressed');
-      await coordinator.markAddressed(actor: agent, feedbackId: 'feedback-addressed');
+      await addressFeedback('feedback-addressed');
       await seed(id: 'feedback-resolved');
-      await coordinator.markAddressed(actor: agent, feedbackId: 'feedback-resolved');
+      await addressFeedback('feedback-resolved');
       await coordinator.resolveFeedback(
         actor: reviewer,
         feedbackId: 'feedback-resolved',

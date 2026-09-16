@@ -34,6 +34,23 @@ FeedbackEvent createdEvent({
   );
 }
 
+FeedbackEvent addressedEvent() {
+  return FeedbackEvent(
+    type: FeedbackEventType.addressed,
+    actorId: 'opencode',
+    at: DateTime.utc(2026, 9, 17, 11),
+    batchId: 'batch-007',
+  );
+}
+
+FeedbackEvent resolvedEvent() {
+  return FeedbackEvent(
+    type: FeedbackEventType.resolved,
+    actorId: 'reviewer-1',
+    at: DateTime.utc(2026, 9, 17, 12),
+  );
+}
+
 FeedbackRecord record({
   String id = 'feedback-1',
   FeedbackScope scope = FeedbackScope.general,
@@ -281,14 +298,7 @@ void main() {
       final resolved = record(
         status: FeedbackStatus.resolved,
         resolvedRound: 1,
-        history: [
-          createdEvent(),
-          FeedbackEvent(
-            type: FeedbackEventType.resolved,
-            actorId: 'reviewer-1',
-            at: DateTime.utc(2026, 9, 17, 12),
-          ),
-        ],
+        history: [createdEvent(), addressedEvent(), resolvedEvent()],
       );
       expect(resolved.status, FeedbackStatus.resolved);
       expect(resolved.resolvedRound, 1);
@@ -296,19 +306,44 @@ void main() {
       expect(
         () => record(
           status: FeedbackStatus.resolved,
-          history: [
-            createdEvent(),
-            FeedbackEvent(
-              type: FeedbackEventType.resolved,
-              actorId: 'reviewer-1',
-              at: DateTime.utc(2026, 9, 17, 12),
-            ),
-          ],
+          history: [createdEvent(), addressedEvent(), resolvedEvent()],
         ),
         throwsFormatException,
       );
       expect(
         () => record(status: FeedbackStatus.open, resolvedRound: 2),
+        throwsFormatException,
+      );
+    });
+
+    test('rejects an illegal per-step history sequence', () {
+      expect(
+        () => record(
+          status: FeedbackStatus.addressed,
+          history: [createdEvent(), resolvedEvent(), addressedEvent()],
+        ),
+        throwsFormatException,
+      );
+      expect(
+        () => record(
+          status: FeedbackStatus.resolved,
+          resolvedRound: 1,
+          history: [createdEvent(), resolvedEvent()],
+        ),
+        throwsFormatException,
+      );
+      expect(
+        () => record(
+          status: FeedbackStatus.open,
+          history: [
+            createdEvent(),
+            FeedbackEvent(
+              type: FeedbackEventType.reopened,
+              actorId: 'reviewer-1',
+              at: DateTime.utc(2026, 9, 17, 11),
+            ),
+          ],
+        ),
         throwsFormatException,
       );
     });
@@ -398,6 +433,12 @@ void main() {
             at: DateTime.utc(2026, 9, 17, 11, 40),
           ),
           FeedbackEvent(
+            type: FeedbackEventType.addressed,
+            actorId: 'opencode',
+            at: DateTime.utc(2026, 9, 17, 11, 50),
+            batchId: 'batch-008',
+          ),
+          FeedbackEvent(
             type: FeedbackEventType.resolved,
             actorId: 'reviewer-123',
             at: DateTime.utc(2026, 9, 17, 12),
@@ -417,7 +458,7 @@ void main() {
         'screen': 'commerce.home',
         'section': 'home.product-grid',
       });
-      expect((json['history'] as List<dynamic>), hasLength(4));
+      expect((json['history'] as List<dynamic>), hasLength(5));
       expect(
         (json['history'] as List<dynamic>).first,
         {
