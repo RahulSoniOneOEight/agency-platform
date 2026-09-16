@@ -27,8 +27,10 @@ PrototypeRuntime buildRuntime() {
       },
       theme: resolvedThemeMap(cardSpacing: 12, tileGap: 8),
       directionThemes: {
-        'a': resolvedThemeMap(primary: '#1155CC', cardSpacing: 12, tileGap: 8),
-        'c': resolvedThemeMap(primary: '#CC1155', cardSpacing: 12, tileGap: 8),
+        'a': resolvedThemeMap(
+            primary: '#1155CC', cardSpacing: 12, tileGap: 8, cardRadius: 12),
+        'c': resolvedThemeMap(
+            primary: '#CC1155', cardSpacing: 28, tileGap: 8, cardRadius: 28),
       },
     ),
   );
@@ -61,7 +63,11 @@ void main() {
     fixtures = FixtureRepository.fromRuntime(runtime);
   });
 
-  Future<void> pump(WidgetTester tester, ReviewState state) async {
+  Future<void> pump(
+    WidgetTester tester,
+    ReviewState state, {
+    String screenId = 'commerce.plp',
+  }) async {
     await tester.binding.setSurfaceSize(const Size(1200, 1200));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
@@ -70,7 +76,7 @@ void main() {
           body: ReviewMixedPreview(
             runtime: runtime,
             fixtures: fixtures,
-            screenId: 'commerce.plp',
+            screenId: screenId,
             state: state,
           ),
         ),
@@ -128,6 +134,24 @@ void main() {
     final strip = themeAt(tester, find.byType(FilterChipStripSection));
     expect(strip.colorScheme.primary, base.colorScheme.primary);
 
+    // Token isolation (not just color): the override carries source tokens while
+    // the sibling keeps base tokens.
+    final sourceTokens = source.extension<AgencyThemeTokens>()!;
+    final gridTokens = AgencyThemeTokens.of(tester.element(
+      find.descendant(
+        of: find.byKey(ReviewMixedPreview.sectionKey('plp.product-grid')),
+        matching: find.byType(ProductGridSection),
+      ),
+    ));
+    expect(gridTokens.cardRadius, sourceTokens.cardRadius);
+    expect(gridTokens.cardSpacing, sourceTokens.cardSpacing);
+
+    final baseTokens = base.extension<AgencyThemeTokens>()!;
+    final stripTokens =
+        AgencyThemeTokens.of(tester.element(find.byType(FilterChipStripSection)));
+    expect(stripTokens.cardRadius, baseTokens.cardRadius);
+    expect(stripTokens.cardSpacing, baseTokens.cardSpacing);
+
     expect(
       find.byKey(ReviewMixedPreview.overrideThemeKey('plp.product-grid')),
       findsOneWidget,
@@ -165,5 +189,68 @@ void main() {
       expect(identical(runtime.directionThemes[id], themesBefore[id]), isTrue);
     }
     expect(runtime.allowedDirections, allowedBefore);
+  });
+
+  testWidgets('an explicit screen direction override chooses the base',
+      (tester) async {
+    final state = ReviewState(
+      version: ReviewState.currentVersion,
+      clientId: 'prototype-demo',
+      reviewRound: 1,
+      status: ReviewStatus.inReview,
+      selectedDirection: 'a',
+      screenSelections: {
+        'commerce.plp': ReviewScreenDecision(direction: 'c'),
+      },
+      comments: const [],
+    );
+
+    await pump(tester, state);
+
+    final source = AgencyTheme.light(runtime.themeForDirection('c'));
+    final strip = themeAt(tester, find.byType(FilterChipStripSection));
+    expect(strip.colorScheme.primary, source.colorScheme.primary);
+  });
+
+  testWidgets('an unknown base direction renders the neutral prompt',
+      (tester) async {
+    await pump(tester, stateWith(selected: 'zzz'));
+
+    expect(find.byKey(ReviewMixedPreview.noBaseKey), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('an incompatible override falls back to the base section',
+      (tester) async {
+    // Direction b does not declare commerce.plp, so the override must never
+    // reach the renderer.
+    await pump(
+      tester,
+      stateWith(selected: 'a', sections: const {'plp.product-grid': 'b'}),
+    );
+
+    final base = AgencyTheme.light(runtime.themeForDirection('a'));
+    final grid = themeAt(
+      tester,
+      find.descendant(
+        of: find.byKey(ReviewMixedPreview.sectionKey('plp.product-grid')),
+        matching: find.byType(ProductGridSection),
+      ),
+    );
+    expect(grid.colorScheme.primary, base.colorScheme.primary);
+    expect(
+      find.byKey(ReviewMixedPreview.overrideThemeKey('plp.product-grid')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('a non-section screen still uses the base direction theme',
+      (tester) async {
+    await pump(tester, stateWith(selected: 'a'), screenId: 'commerce.cart');
+
+    final base = AgencyTheme.light(runtime.themeForDirection('a'));
+    final cart = themeAt(tester, find.byType(CartPattern));
+    expect(cart.colorScheme.primary, base.colorScheme.primary);
+    expect(tester.takeException(), isNull);
   });
 }

@@ -6,6 +6,7 @@ import '../direction/prototype_direction.dart';
 import '../registry/prototype_registry.dart';
 import '../runtime/prototype_runtime.dart';
 import 'review_decision_normalizer.dart';
+import 'review_section_compatibility.dart';
 import 'review_state.dart';
 
 /// Ephemeral mixed-preview renderer for one governed screen.
@@ -57,8 +58,12 @@ class ReviewMixedPreview extends StatelessWidget {
     final baseComposition =
         PrototypeRegistry.compositionFor(screenId, baseDirection, fixtures);
     if (baseComposition == null) {
-      // Screen is not composed from sections; render it unmixed.
-      return PrototypeRegistry.buildPattern(screenId, baseDirection, fixtures);
+      // Screen is not composed from sections; render it unmixed but still under
+      // the effective base direction's resolved theme.
+      return Theme(
+        data: AgencyTheme.light(runtime.themeForDirection(baseDirectionId)),
+        child: PrototypeRegistry.buildPattern(screenId, baseDirection, fixtures),
+      );
     }
 
     final overrides =
@@ -67,15 +72,28 @@ class ReviewMixedPreview extends StatelessWidget {
     final sections = <PatternSection>[];
     for (final section in baseComposition.sections) {
       final sourceId = overrides[section.id];
-      if (sourceId == null || sourceId == baseDirectionId) {
+      final sourceDirection =
+          sourceId == null ? null : runtime.directions[sourceId];
+      // An override only reaches the renderer when it is explicit, different
+      // from the base, resolvable, and render-compatible. This is defense in
+      // depth: the controller already normalizes persisted state.
+      final applicable = sourceId != null &&
+          sourceId != baseDirectionId &&
+          sourceDirection != null &&
+          ReviewSectionCompatibility.evaluate(
+            runtime: runtime,
+            screenId: screenId,
+            sectionId: section.id,
+            sourceDirectionId: sourceId,
+            baseDirectionId: baseDirectionId,
+          ).allowed;
+
+      if (!applicable) {
         sections.add(_keyed(section.id, section.child));
         continue;
       }
 
-      final sourceDirection = runtime.directions[sourceId];
-      final sourceChild = sourceDirection == null
-          ? null
-          : _sectionChildFor(screenId, section.id, sourceDirection);
+      final sourceChild = _sectionChildFor(screenId, section.id, sourceDirection);
       if (sourceChild == null) {
         // Defensive: an unresolved override falls back to the base section.
         sections.add(_keyed(section.id, section.child));
