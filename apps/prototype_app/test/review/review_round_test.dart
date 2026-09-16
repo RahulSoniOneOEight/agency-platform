@@ -235,4 +235,36 @@ void main() {
       expect(runtime.directions[id]!.patterns, equals(patternsBefore[id]));
     }
   });
+
+  testWidgets('overview renders at ready_for_final_review without asserting',
+      (tester) async {
+    final readyController = ReviewController(
+      clientId: runtime.clientId,
+      repository: MemoryReviewRepository(),
+      runtime: runtime,
+      initialState: ReviewState(
+        version: ReviewState.currentVersion,
+        clientId: runtime.clientId,
+        reviewRound: 2,
+        status: ReviewStatus.readyForFinalReview,
+        selectedDirection: 'a',
+        screenSelections: const {},
+        comments: const [],
+      ),
+    );
+
+    await tester.binding.setSurfaceSize(const Size(1200, 2000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ReviewOverview(runtime: runtime, controller: readyController),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Status: ready_for_final_review'), findsOneWidget);
+  });
 }

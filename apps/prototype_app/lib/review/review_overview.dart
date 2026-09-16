@@ -117,6 +117,7 @@ class ReviewOverview extends StatelessWidget {
               selected: selectableStatuses.contains(state.status)
                   ? <ReviewStatus>{state.status}
                   : const <ReviewStatus>{},
+              emptySelectionAllowed: true,
               showSelectedIcon: false,
               onSelectionChanged: (selection) =>
                   controller.setStatus(selection.first),
