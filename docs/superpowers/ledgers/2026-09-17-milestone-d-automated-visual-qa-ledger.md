@@ -138,6 +138,16 @@
   reviewers performed the Cycle 1, Cycle 2, and Cycle 2 re-review gates, and a final whole-branch
   reviewer closes the milestone. No other subagent types were available.
 
+## Final delivery
+
+- Branch: `milestone-d-visual-qa`
+- Final SHA: `db6cc600b70886016abafa74a7c7af94aef75dea`
+- PR: **#21** — https://github.com/RahulSoniOneOEight/agency-platform/pull/21 (base `main`, state
+  OPEN, MERGEABLE, **not merged**)
+- CI: **green** — `flutter-checks` pass (3m13s), `validate-structure` pass (19s)
+- Lockfiles: `apps/prototype_app/pubspec.lock`, `apps/widgetbook/pubspec.lock`,
+  `packages/agency_flutter_ui/pubspec.lock` remain untracked and uncommitted; no lockfile-policy change.
+
 ## Cycle table
 
 | Cycle | Scope | Status | Commits |
