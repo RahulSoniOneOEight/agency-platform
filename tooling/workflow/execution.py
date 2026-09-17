@@ -206,20 +206,6 @@ def _contract_input_refs(
     return tuple(ref for ref in artifacts_for_paths(client_dir, relevant) if ref.sha256)
 
 
-def _with_input_refs(
-    manifest: ExecutionManifest, refs: Sequence[ArtifactRef]
-) -> ExecutionManifest:
-    """Return *manifest* with *refs* merged into its inputs by path."""
-    by_path = {ref.path: ref for ref in manifest.inputs}
-    order = [ref.path for ref in manifest.inputs]
-    for ref in refs:
-        if not ref.sha256:
-            continue
-        if ref.path not in by_path:
-            order.append(ref.path)
-        by_path[ref.path] = ref
-    return replace(manifest, inputs=tuple(by_path[path] for path in order))
-
 
 def _require_prerequisites(
     client_dir: Path, state: dict, contract: StageContract
