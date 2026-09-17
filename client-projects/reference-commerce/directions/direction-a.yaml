@@ -1,0 +1,39 @@
+id: a
+name: Efficient Commerce
+archetype: efficient-commerce
+strategy_family: efficient-commerce
+thesis: Known-item shoppers and repeat trade buyers should reach a confident purchase in the fewest steps.
+strategic_goal: reduce time from intent to transaction for known-item buyers
+primary_personas: [consumer-shopper, trade-buyer]
+primary_jobs: [find-product, compare-price, add-to-cart]
+rationale: >-
+  Search and comparison dominate known-item commerce; a compact, search-led
+  composition with explicit price and availability support shortens the path to
+  cart for both consumer and trade buyers.
+information_architecture: [search, plp, pdp, cart]
+navigation:
+  model: search-led
+primary_journey:
+  id: search-to-cart
+  steps: [search, plp, pdp, cart]
+secondary_journeys:
+  - id: browse-to-cart
+    steps: [plp, pdp, cart]
+discovery_model: sku-and-facet-search
+search:
+  prominence: high
+merchandising:
+  emphasis: availability-and-price
+density: compact
+transaction_model: direct-checkout
+patterns: [commerce.search, commerce.plp, commerce.pdp, commerce.cart]
+components: [commerce.product-card, commerce.price-display, commerce.search-field]
+component_variants:
+  - component: commerce.product-card
+    variant: b2b
+required_resources: []
+strengths: [fast known-item discovery, dense decision support]
+tradeoffs: [less inspirational discovery]
+risks: [depends on catalog data quality]
+success_metrics: [time-to-cart, search-success-rate]
+score: 0.9

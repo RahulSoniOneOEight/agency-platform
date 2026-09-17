@@ -1,0 +1,8 @@
+version: 1
+client:
+  id: reference-commerce
+  display_name: Reference Commerce
+source_status: synthetic_reference
+modules: {}
+collections: {}
+unresolved_input: false

@@ -1,0 +1,469 @@
+{
+  "client_id": "reference-commerce",
+  "default_direction": "a",
+  "direction_themes": {
+    "a": {
+      "breakpoints": {
+        "desktop": 1200,
+        "mobile": 0,
+        "tablet": 768
+      },
+      "color": {
+        "border": "#E4E6EB",
+        "error": "#D32F2F",
+        "on_error": "#FFFFFF",
+        "on_primary": "#FFFFFF",
+        "on_secondary": "#FFFFFF",
+        "primary": "#0F5FA6",
+        "secondary": "#E8871E",
+        "surface": "#FFFFFF",
+        "surface_muted": "#F7F8FA",
+        "text_primary": "#16181D",
+        "text_secondary": "#626874"
+      },
+      "density": {
+        "default": "compact"
+      },
+      "elevation": {
+        "card": 1,
+        "overlay": 4
+      },
+      "motion": {
+        "easing": "ease-out",
+        "fast_ms": 150,
+        "normal_ms": 250,
+        "slow_ms": 400
+      },
+      "radius": {
+        "card": 20,
+        "control": 12
+      },
+      "size": {
+        "control_height": 44,
+        "control_height_compact": 36,
+        "icon": 20
+      },
+      "spacing": {
+        "card": 16,
+        "control": 12,
+        "inline": 8,
+        "section": 40,
+        "tile": 12
+      },
+      "typography": {
+        "body": 15,
+        "display": 40,
+        "font_fallback": "Roboto",
+        "font_family": "Inter",
+        "heading_emphasis": "strong",
+        "headline": 32,
+        "label": 13,
+        "line_height_body": 1.5,
+        "title": 22,
+        "weight_emphasis": 700,
+        "weight_regular": 400
+      },
+      "version": 1
+    },
+    "b": {
+      "breakpoints": {
+        "desktop": 1200,
+        "mobile": 0,
+        "tablet": 768
+      },
+      "color": {
+        "border": "#E4E6EB",
+        "error": "#D32F2F",
+        "on_error": "#FFFFFF",
+        "on_primary": "#FFFFFF",
+        "on_secondary": "#FFFFFF",
+        "primary": "#0F5FA6",
+        "secondary": "#E8871E",
+        "surface": "#FFFFFF",
+        "surface_muted": "#F7F8FA",
+        "text_primary": "#16181D",
+        "text_secondary": "#626874"
+      },
+      "density": {
+        "default": "spacious"
+      },
+      "elevation": {
+        "card": 1,
+        "overlay": 4
+      },
+      "motion": {
+        "easing": "ease-out",
+        "fast_ms": 150,
+        "normal_ms": 250,
+        "slow_ms": 400
+      },
+      "radius": {
+        "card": 20,
+        "control": 12
+      },
+      "size": {
+        "control_height": 44,
+        "control_height_compact": 36,
+        "icon": 20
+      },
+      "spacing": {
+        "card": 16,
+        "control": 12,
+        "inline": 8,
+        "section": 40,
+        "tile": 12
+      },
+      "typography": {
+        "body": 15,
+        "display": 40,
+        "font_fallback": "Roboto",
+        "font_family": "Inter",
+        "heading_emphasis": "strong",
+        "headline": 32,
+        "label": 13,
+        "line_height_body": 1.5,
+        "title": 22,
+        "weight_emphasis": 700,
+        "weight_regular": 400
+      },
+      "version": 1
+    },
+    "c": {
+      "breakpoints": {
+        "desktop": 1200,
+        "mobile": 0,
+        "tablet": 768
+      },
+      "color": {
+        "border": "#E4E6EB",
+        "error": "#D32F2F",
+        "on_error": "#FFFFFF",
+        "on_primary": "#FFFFFF",
+        "on_secondary": "#FFFFFF",
+        "primary": "#0F5FA6",
+        "secondary": "#E8871E",
+        "surface": "#FFFFFF",
+        "surface_muted": "#F7F8FA",
+        "text_primary": "#16181D",
+        "text_secondary": "#626874"
+      },
+      "density": {
+        "default": "normal"
+      },
+      "elevation": {
+        "card": 1,
+        "overlay": 4
+      },
+      "motion": {
+        "easing": "ease-out",
+        "fast_ms": 150,
+        "normal_ms": 250,
+        "slow_ms": 400
+      },
+      "radius": {
+        "card": 20,
+        "control": 12
+      },
+      "size": {
+        "control_height": 44,
+        "control_height_compact": 36,
+        "icon": 20
+      },
+      "spacing": {
+        "card": 16,
+        "control": 12,
+        "inline": 8,
+        "section": 40,
+        "tile": 12
+      },
+      "typography": {
+        "body": 15,
+        "display": 40,
+        "font_fallback": "Roboto",
+        "font_family": "Inter",
+        "heading_emphasis": "strong",
+        "headline": 32,
+        "label": 13,
+        "line_height_body": 1.5,
+        "title": 22,
+        "weight_emphasis": 700,
+        "weight_regular": 400
+      },
+      "version": 1
+    }
+  },
+  "directions": {
+    "a": {
+      "component_variants": [
+        {
+          "component": "commerce.product-card",
+          "variant": "b2b"
+        }
+      ],
+      "components": [
+        "commerce.product-card",
+        "commerce.price-display",
+        "commerce.search-field"
+      ],
+      "density": "compact",
+      "discovery_model": "sku-and-facet-search",
+      "id": "a",
+      "merchandising_model": "availability-and-price",
+      "name": "Efficient Commerce",
+      "navigation_model": "search-led",
+      "patterns": [
+        "commerce.search",
+        "commerce.plp",
+        "commerce.pdp",
+        "commerce.cart"
+      ],
+      "primary_journey": "search-to-cart",
+      "required_resources": [],
+      "strategic_goal": "reduce time from intent to transaction for known-item buyers",
+      "transaction_model": "direct-checkout"
+    },
+    "b": {
+      "component_variants": [
+        {
+          "component": "commerce.product-card",
+          "variant": "standard"
+        }
+      ],
+      "components": [
+        "commerce.product-card"
+      ],
+      "density": "spacious",
+      "discovery_model": "curated-browse",
+      "id": "b",
+      "merchandising_model": "editorial-and-premium",
+      "name": "Premium Discovery",
+      "navigation_model": "editorial",
+      "patterns": [
+        "commerce.home",
+        "commerce.plp",
+        "commerce.pdp"
+      ],
+      "primary_journey": "browse-to-pdp",
+      "required_resources": [],
+      "strategic_goal": "increase considered-purchase conversion through premium discovery",
+      "transaction_model": "considered-purchase"
+    },
+    "c": {
+      "component_variants": [
+        {
+          "component": "commerce.product-card",
+          "variant": "b2b"
+        }
+      ],
+      "components": [
+        "commerce.credit-summary",
+        "commerce.quote-card",
+        "commerce.product-card"
+      ],
+      "density": "normal",
+      "discovery_model": "account-history-and-catalog",
+      "id": "c",
+      "merchandising_model": "reorder-and-credit",
+      "name": "Trade First",
+      "navigation_model": "dashboard",
+      "patterns": [
+        "commerce.trade-dashboard",
+        "commerce.rfq",
+        "commerce.cart",
+        "commerce.reorder"
+      ],
+      "primary_journey": "reorder-to-order",
+      "required_resources": [],
+      "strategic_goal": "increase repeat trade ordering and account self-service",
+      "transaction_model": "account-ordering"
+    }
+  },
+  "fixtures": {
+    "industry": "electronics-appliances",
+    "products": [
+      {
+        "category": "category-1",
+        "compare_at": 674,
+        "id": "prd-01",
+        "name": "USB-C Hub",
+        "price": 674,
+        "rating": 4.1,
+        "sku": "SKU-ELE-1000",
+        "stock": 18
+      },
+      {
+        "category": "category-2",
+        "compare_at": 1299,
+        "id": "prd-02",
+        "name": "Wireless Mouse",
+        "price": 1049,
+        "rating": 4.8,
+        "sku": "SKU-ELE-1001",
+        "stock": 57
+      },
+      {
+        "category": "category-3",
+        "compare_at": 1674,
+        "id": "prd-03",
+        "name": "Mechanical Keyboard",
+        "price": 1424,
+        "rating": 4.7,
+        "sku": "SKU-ELE-1002",
+        "stock": 56
+      },
+      {
+        "category": "category-4",
+        "compare_at": 1799,
+        "id": "prd-04",
+        "name": "27-inch Monitor",
+        "price": 1799,
+        "rating": 4.2,
+        "sku": "SKU-ELE-1003",
+        "stock": 18
+      },
+      {
+        "category": "category-1",
+        "compare_at": 2424,
+        "id": "prd-05",
+        "name": "Laptop Stand",
+        "price": 2174,
+        "rating": 4.3,
+        "sku": "SKU-ELE-1004",
+        "stock": 31
+      },
+      {
+        "category": "category-2",
+        "compare_at": 2799,
+        "id": "prd-06",
+        "name": "65W Charger",
+        "price": 2549,
+        "rating": 4.2,
+        "sku": "SKU-ELE-1005",
+        "stock": 48
+      },
+      {
+        "category": "category-3",
+        "compare_at": 2924,
+        "id": "prd-07",
+        "name": "Noise-Cancel Headphones",
+        "price": 2924,
+        "rating": 4.2,
+        "sku": "SKU-ELE-1006",
+        "stock": 32
+      },
+      {
+        "category": "category-4",
+        "compare_at": 3549,
+        "id": "prd-08",
+        "name": "Portable SSD",
+        "price": 3299,
+        "rating": 4.1,
+        "sku": "SKU-ELE-1007",
+        "stock": 79
+      }
+    ],
+    "seed": 108,
+    "services": []
+  },
+  "resources": {
+    "asset.brand.logo": {
+      "asset": {
+        "path": "input/brand/brand-assets/logo.svg"
+      },
+      "candidate_id": "client-brand-logo",
+      "source": "client",
+      "type": "image"
+    },
+    "asset.home.hero": {
+      "asset": {
+        "height": 1350,
+        "url": "https://images.pexels.com/photos/fixture/reference-commerce-hero.jpg",
+        "width": 2400
+      },
+      "candidate_id": "pexels-fixture-2001",
+      "source": "pexels",
+      "type": "image"
+    },
+    "icon.commerce.cart": {
+      "asset": {
+        "name": "cart",
+        "provider": "iconoir"
+      },
+      "candidate_id": "iconoir-cart",
+      "source": "agency",
+      "type": "icon"
+    }
+  },
+  "review": {
+    "allowed_directions": [
+      "a",
+      "b",
+      "c"
+    ],
+    "query_parameter": "direction"
+  },
+  "theme": {
+    "breakpoints": {
+      "desktop": 1200,
+      "mobile": 0,
+      "tablet": 768
+    },
+    "color": {
+      "border": "#E4E6EB",
+      "error": "#D32F2F",
+      "on_error": "#FFFFFF",
+      "on_primary": "#FFFFFF",
+      "on_secondary": "#FFFFFF",
+      "primary": "#0F5FA6",
+      "secondary": "#E8871E",
+      "surface": "#FFFFFF",
+      "surface_muted": "#F7F8FA",
+      "text_primary": "#16181D",
+      "text_secondary": "#626874"
+    },
+    "density": {
+      "default": "spacious"
+    },
+    "elevation": {
+      "card": 1,
+      "overlay": 4
+    },
+    "motion": {
+      "easing": "ease-out",
+      "fast_ms": 150,
+      "normal_ms": 250,
+      "slow_ms": 400
+    },
+    "radius": {
+      "card": 20,
+      "control": 12
+    },
+    "size": {
+      "control_height": 44,
+      "control_height_compact": 36,
+      "icon": 20
+    },
+    "spacing": {
+      "card": 16,
+      "control": 12,
+      "inline": 8,
+      "section": 40,
+      "tile": 12
+    },
+    "typography": {
+      "body": 15,
+      "display": 40,
+      "font_fallback": "Roboto",
+      "font_family": "Inter",
+      "heading_emphasis": "strong",
+      "headline": 32,
+      "label": 13,
+      "line_height_body": 1.5,
+      "title": 22,
+      "weight_emphasis": 700,
+      "weight_regular": 400
+    },
+    "version": 1
+  },
+  "version": 1
+}

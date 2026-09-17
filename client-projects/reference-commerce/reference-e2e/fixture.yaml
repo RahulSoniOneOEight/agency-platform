@@ -1,0 +1,472 @@
+version: 1
+client_id: reference-commerce
+fixture_version: 1
+seed: reference-commerce-v1
+synthetic: true
+coverage:
+  b2c: true
+  b2b: true
+categories:
+  - id: cat-001
+    name: Computing
+  - id: cat-002
+    name: Audio
+  - id: cat-003
+    name: Home Appliances
+  - id: cat-004
+    name: Accessories
+  - id: cat-005
+    name: Networking
+collections:
+  - id: col-001
+    name: Back to Work
+    category_ids:
+      - cat-001
+      - cat-004
+  - id: col-002
+    name: Home Essentials
+    category_ids:
+      - cat-003
+  - id: col-003
+    name: Audio Picks
+    category_ids:
+      - cat-002
+products:
+  - id: prd-001
+    sku: SKU-ELE-1000
+    name: Laptop Pro 14
+    category: cat-001
+    variant_ids:
+      - var-001
+      - var-002
+    retail_price: 1299.0
+    inventory: 24
+    b2b_quantity_breaks:
+      - min_quantity: 5
+        unit_price: 1234.05
+      - min_quantity: 20
+        unit_price: 1169.1
+  - id: prd-002
+    sku: SKU-ELE-1001
+    name: Wireless Mouse
+    category: cat-004
+    variant_ids:
+      - var-003
+    retail_price: 39.0
+    inventory: 180
+    b2b_quantity_breaks:
+      - min_quantity: 10
+        unit_price: 35.1
+  - id: prd-003
+    sku: SKU-ELE-1002
+    name: Mechanical Keyboard
+    category: cat-004
+    variant_ids:
+      - var-004
+      - var-005
+    retail_price: 129.0
+    inventory: 96
+    b2b_quantity_breaks:
+      - min_quantity: 5
+        unit_price: 116.1
+      - min_quantity: 25
+        unit_price: 109.65
+  - id: prd-004
+    sku: SKU-ELE-1003
+    name: 27-inch Monitor
+    category: cat-001
+    variant_ids:
+      - var-006
+    retail_price: 349.0
+    inventory: 40
+    b2b_quantity_breaks:
+      - min_quantity: 5
+        unit_price: 314.1
+  - id: prd-005
+    sku: SKU-ELE-1004
+    name: USB-C Hub
+    category: cat-004
+    variant_ids:
+      - var-007
+    retail_price: 79.0
+    inventory: 210
+    b2b_quantity_breaks:
+      - min_quantity: 10
+        unit_price: 71.1
+  - id: prd-006
+    sku: SKU-ELE-1005
+    name: Noise-Cancelling Headphones
+    category: cat-002
+    variant_ids:
+      - var-008
+      - var-009
+    retail_price: 279.0
+    inventory: 65
+    b2b_quantity_breaks:
+      - min_quantity: 5
+        unit_price: 251.1
+      - min_quantity: 20
+        unit_price: 237.15
+  - id: prd-007
+    sku: SKU-ELE-1006
+    name: Bluetooth Speaker
+    category: cat-002
+    variant_ids:
+      - var-010
+    retail_price: 89.0
+    inventory: 120
+    b2b_quantity_breaks:
+      - min_quantity: 10
+        unit_price: 80.1
+  - id: prd-008
+    sku: SKU-ELE-1007
+    name: 65W GaN Charger
+    category: cat-004
+    variant_ids:
+      - var-011
+    retail_price: 49.0
+    inventory: 300
+    b2b_quantity_breaks:
+      - min_quantity: 20
+        unit_price: 44.1
+  - id: prd-009
+    sku: SKU-ELE-1008
+    name: Air Purifier
+    category: cat-003
+    variant_ids:
+      - var-012
+    retail_price: 199.0
+    inventory: 34
+    b2b_quantity_breaks:
+      - min_quantity: 5
+        unit_price: 179.1
+  - id: prd-010
+    sku: SKU-ELE-1009
+    name: Espresso Machine
+    category: cat-003
+    variant_ids:
+      - var-013
+    retail_price: 449.0
+    inventory: 18
+    b2b_quantity_breaks:
+      - min_quantity: 3
+        unit_price: 404.1
+  - id: prd-011
+    sku: SKU-ELE-1010
+    name: Mesh Wi-Fi Router
+    category: cat-005
+    variant_ids:
+      - var-014
+      - var-015
+    retail_price: 159.0
+    inventory: 52
+    b2b_quantity_breaks:
+      - min_quantity: 5
+        unit_price: 143.1
+      - min_quantity: 15
+        unit_price: 135.15
+  - id: prd-012
+    sku: SKU-ELE-1011
+    name: 8-Port Network Switch
+    category: cat-005
+    variant_ids:
+      - var-016
+    retail_price: 69.0
+    inventory: 75
+    b2b_quantity_breaks:
+      - min_quantity: 10
+        unit_price: 62.1
+  - id: prd-013
+    sku: SKU-ELE-1012
+    name: Portable SSD 1TB
+    category: cat-001
+    variant_ids:
+      - var-017
+    retail_price: 119.0
+    inventory: 88
+    b2b_quantity_breaks:
+      - min_quantity: 10
+        unit_price: 107.1
+  - id: prd-014
+    sku: SKU-ELE-1013
+    name: Smart Thermostat
+    category: cat-003
+    variant_ids:
+      - var-018
+    retail_price: 179.0
+    inventory: 46
+    b2b_quantity_breaks:
+      - min_quantity: 5
+        unit_price: 161.1
+variants:
+  - id: var-001
+    product_id: prd-001
+    name: Laptop Pro 14 / 16GB / 512GB
+    sku: SKU-ELE-1000-A
+    attributes:
+      memory: 16GB
+      storage: 512GB
+  - id: var-002
+    product_id: prd-001
+    name: Laptop Pro 14 / 32GB / 1TB
+    sku: SKU-ELE-1000-B
+    attributes:
+      memory: 32GB
+      storage: 1TB
+  - id: var-003
+    product_id: prd-002
+    name: Wireless Mouse / Graphite
+    sku: SKU-ELE-1001-A
+    attributes:
+      color: Graphite
+  - id: var-004
+    product_id: prd-003
+    name: Mechanical Keyboard / ANSI / Brown
+    sku: SKU-ELE-1002-A
+    attributes:
+      layout: ANSI
+      switch: Brown
+  - id: var-005
+    product_id: prd-003
+    name: Mechanical Keyboard / ISO / Blue
+    sku: SKU-ELE-1002-B
+    attributes:
+      layout: ISO
+      switch: Blue
+  - id: var-006
+    product_id: prd-004
+    name: 27-inch Monitor / QHD
+    sku: SKU-ELE-1003-A
+    attributes:
+      resolution: QHD
+  - id: var-007
+    product_id: prd-005
+    name: USB-C Hub / 7-Port
+    sku: SKU-ELE-1004-A
+    attributes:
+      ports: 7
+  - id: var-008
+    product_id: prd-006
+    name: Noise-Cancelling Headphones / Midnight
+    sku: SKU-ELE-1005-A
+    attributes:
+      color: Midnight
+  - id: var-009
+    product_id: prd-006
+    name: Noise-Cancelling Headphones / Sand
+    sku: SKU-ELE-1005-B
+    attributes:
+      color: Sand
+  - id: var-010
+    product_id: prd-007
+    name: Bluetooth Speaker / Slate
+    sku: SKU-ELE-1006-A
+    attributes:
+      color: Slate
+  - id: var-011
+    product_id: prd-008
+    name: 65W GaN Charger / US
+    sku: SKU-ELE-1007-A
+    attributes:
+      plug: US
+  - id: var-012
+    product_id: prd-009
+    name: Air Purifier / Standard
+    sku: SKU-ELE-1008-A
+    attributes:
+      filter: HEPA
+  - id: var-013
+    product_id: prd-010
+    name: Espresso Machine / Stainless
+    sku: SKU-ELE-1009-A
+    attributes:
+      finish: Stainless
+  - id: var-014
+    product_id: prd-011
+    name: Mesh Wi-Fi Router / 2-Pack
+    sku: SKU-ELE-1010-A
+    attributes:
+      pack: 2
+  - id: var-015
+    product_id: prd-011
+    name: Mesh Wi-Fi Router / 3-Pack
+    sku: SKU-ELE-1010-B
+    attributes:
+      pack: 3
+  - id: var-016
+    product_id: prd-012
+    name: 8-Port Network Switch / Unmanaged
+    sku: SKU-ELE-1011-A
+    attributes:
+      managed: "false"
+  - id: var-017
+    product_id: prd-013
+    name: Portable SSD 1TB / USB-C
+    sku: SKU-ELE-1012-A
+    attributes:
+      interface: USB-C
+  - id: var-018
+    product_id: prd-014
+    name: Smart Thermostat / White
+    sku: SKU-ELE-1013-A
+    attributes:
+      color: White
+promotions:
+  - id: promo-001
+    name: Welcome 10
+    type: percent
+    value: 10
+  - id: promo-002
+    name: Trade Volume Rebate
+    type: tiered
+    value: 5
+  - id: promo-003
+    name: Free Shipping Over 500
+    type: shipping
+    value: 0
+accounts:
+  - id: acct-consumer-01
+    type: consumer
+    name: Dana Whitfield
+    email: dana.whitfield@example.invalid
+  - id: acct-consumer-02
+    type: consumer
+    name: Marco Reyes
+    email: marco.reyes@example.invalid
+  - id: acct-trade-01
+    type: trade
+    name: Northwind Electronics LLC
+    email: purchasing@northwind.example.invalid
+    credit_limit: 50000
+    available_credit: 32450
+  - id: acct-trade-02
+    type: trade
+    name: Blue Harbor Audio
+    email: buyers@blueharbor.example.invalid
+    credit_limit: 20000
+    available_credit: 8750
+  - id: acct-trade-03
+    type: trade
+    name: Cedar and Pine Home
+    email: procurement@cedarpine.example.invalid
+    credit_limit: 35000
+    available_credit: 35000
+quotations:
+  - id: quote-001
+    account_id: acct-trade-01
+    status: pending
+    lines:
+      - product_id: prd-001
+        quantity: 10
+        unit_price: 1234.05
+      - product_id: prd-006
+        quantity: 20
+        unit_price: 237.15
+  - id: quote-002
+    account_id: acct-trade-02
+    status: accepted
+    lines:
+      - product_id: prd-007
+        quantity: 15
+        unit_price: 80.1
+  - id: quote-003
+    account_id: acct-trade-03
+    status: rejected
+    lines:
+      - product_id: prd-009
+        quantity: 5
+        unit_price: 179.1
+rfqs:
+  - id: rfq-001
+    account_id: acct-trade-01
+    status: submitted
+    items:
+      - product_id: prd-004
+        quantity: 12
+        unit_price: 314.1
+  - id: rfq-002
+    account_id: acct-trade-02
+    status: quoted
+    items:
+      - product_id: prd-011
+        quantity: 8
+        unit_price: 143.1
+  - id: rfq-003
+    account_id: acct-trade-03
+    status: draft
+    items:
+      - product_id: prd-014
+        quantity: 6
+        unit_price: 161.1
+carts:
+  - id: cart-001
+    account_id: acct-consumer-01
+    lines:
+      - product_id: prd-003
+        quantity: 1
+        unit_price: 129.0
+  - id: cart-002
+    account_id: acct-trade-01
+    lines:
+      - product_id: prd-005
+        quantity: 20
+        unit_price: 71.1
+  - id: cart-003
+    account_id: acct-consumer-02
+    lines:
+      - product_id: prd-013
+        quantity: 2
+        unit_price: 119.0
+orders:
+  - id: order-001
+    account_id: acct-consumer-01
+    status: fulfilled
+    total: 168.0
+    lines:
+      - product_id: prd-002
+        quantity: 1
+        unit_price: 39.0
+      - product_id: prd-003
+        quantity: 1
+        unit_price: 129.0
+  - id: order-002
+    account_id: acct-trade-01
+    status: processing
+    total: 1422.0
+    lines:
+      - product_id: prd-005
+        quantity: 20
+        unit_price: 71.1
+  - id: order-003
+    account_id: acct-trade-02
+    status: pending
+    total: 801.0
+    lines:
+      - product_id: prd-007
+        quantity: 10
+        unit_price: 80.1
+validation_states:
+  - id: vs-001
+    target: cart-001
+    rule: minimum_order_value
+    severity: error
+    message: Cart total is below the consumer minimum order value.
+    valid: false
+  - id: vs-002
+    target: acct-trade-02
+    rule: credit_limit
+    severity: error
+    message: Requested quotation exceeds available trade credit.
+    valid: false
+  - id: vs-003
+    target: order-001
+    rule: address_complete
+    severity: info
+    message: Shipping address is complete and validated.
+    valid: true
+  - id: vs-004
+    target: rfq-003
+    rule: quantity_break
+    severity: warning
+    message: Requested quantity is below the first volume break.
+    valid: false

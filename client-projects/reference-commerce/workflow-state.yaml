@@ -1,0 +1,23 @@
+version: 2
+client_id: reference-commerce
+workflow: standard-agency
+current_stage: visual-qa
+status: in_progress
+run_id: null
+completed:
+  - client-intake
+  - resolve-intelligence
+  - generate-directions
+  - build-prototype
+skipped:
+  - stage: resource-research
+    reason: curated-reference-set-provided
+pending:
+  - visual-qa
+  - client-review
+  - productionize
+blocked: []
+stage_state: {}
+active_lease: null
+last_transition: null
+last_updated: "2026-09-18"

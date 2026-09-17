@@ -1,0 +1,78 @@
+version: 1
+candidates:
+  brand-logo:
+    - id: client-brand-logo
+      source: client
+      type: image
+      role: brand.logo
+      asset:
+        path: input/brand/brand-assets/logo.svg
+      provenance:
+        source: client
+        usage_status: client-supplied
+      scores:
+        direction_fit: 1.0
+        relevance: 1.0
+        composition: 0.9
+        brand_fit: 1.0
+        technical_quality: 0.9
+        provenance: 1.0
+        consistency: 1.0
+  home-hero:
+    - id: client-home-hero
+      source: client
+      type: image
+      role: home.hero
+      asset:
+        path: input/assets/banners/home-hero.jpg
+      provenance:
+        source: client
+        usage_status: client-supplied
+      scores:
+        direction_fit: 0.76
+        relevance: 0.80
+        composition: 0.72
+        brand_fit: 0.90
+        technical_quality: 0.78
+        provenance: 1.0
+        consistency: 0.84
+    - id: pexels-fixture-2001
+      source: pexels
+      type: image
+      role: home.hero
+      asset:
+        url: https://images.pexels.com/photos/fixture/reference-commerce-hero.jpg
+        width: 2400
+        height: 1350
+      provenance:
+        source: pexels
+        provider_id: fixture-2001
+        source_url: https://www.pexels.com/
+        usage_status: prototype-approved
+      scores:
+        direction_fit: 0.95
+        relevance: 0.93
+        composition: 0.94
+        brand_fit: 0.87
+        technical_quality: 0.94
+        provenance: 1.0
+        consistency: 0.89
+  cart-icon:
+    - id: iconoir-cart
+      source: agency
+      type: icon
+      role: icon.commerce.cart
+      asset:
+        provider: iconoir
+        name: cart
+      provenance:
+        source: agency
+        usage_status: approved
+      scores:
+        direction_fit: 1.0
+        relevance: 1.0
+        composition: 1.0
+        brand_fit: 0.95
+        technical_quality: 1.0
+        provenance: 1.0
+        consistency: 1.0

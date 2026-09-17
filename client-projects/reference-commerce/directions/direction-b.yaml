@@ -1,0 +1,39 @@
+id: b
+name: Premium Discovery
+archetype: premium-discovery
+strategy_family: premium-discovery
+thesis: Considered consumer purchases benefit from an editorial, spacious browsing experience that builds desire before price comparison.
+strategic_goal: increase considered-purchase conversion through premium discovery
+primary_personas: [consumer-shopper]
+primary_jobs: [discover-products, evaluate-quality]
+rationale: >-
+  High-consideration electronics reward editorial merchandising and generous
+  spacing; a home-led, spacious composition emphasises product storytelling over
+  dense comparison.
+information_architecture: [home, plp, pdp]
+navigation:
+  model: editorial
+primary_journey:
+  id: browse-to-pdp
+  steps: [home, plp, pdp]
+secondary_journeys:
+  - id: featured-to-pdp
+    steps: [home, pdp]
+discovery_model: curated-browse
+search:
+  prominence: medium
+merchandising:
+  emphasis: editorial-and-premium
+density: spacious
+transaction_model: considered-purchase
+patterns: [commerce.home, commerce.plp, commerce.pdp]
+components: [commerce.product-card]
+component_variants:
+  - component: commerce.product-card
+    variant: standard
+required_resources: []
+strengths: [strong brand storytelling, elevated product presentation]
+tradeoffs: [slower path to a specific known SKU]
+risks: [depends on strong product imagery]
+success_metrics: [pdp-engagement, add-to-cart-rate]
+score: 0.8

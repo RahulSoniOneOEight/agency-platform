@@ -1,0 +1,16 @@
+version: 1
+selections:
+  brand-logo:
+    primary: client-brand-logo
+    rationale:
+      - authoritative client-owned brand identity
+  home-hero:
+    primary: pexels-fixture-2001
+    fallback: client-home-hero
+    rationale:
+      - comparative research produced stronger composition and direction fit
+      - client asset retained as fallback
+  cart-icon:
+    primary: iconoir-cart
+    rationale:
+      - canonical agency semantic icon mapping
