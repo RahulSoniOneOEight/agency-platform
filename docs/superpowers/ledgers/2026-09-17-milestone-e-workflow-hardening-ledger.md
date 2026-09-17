@@ -128,6 +128,17 @@
 - **RE15 — Scope guard.** No F/G/H work: no production authorization, no release/deployment engine, no
   reference-client E2E beyond the E fixtures.
 
+## Final delivery
+
+- Branch: `milestone-e-workflow-hardening`
+- Final SHA: `b91632e8a4a2ad34f525b8895d9bd8f91f3131b9`
+- PR: **#22** — https://github.com/RahulSoniOneOEight/agency-platform/pull/22 (base `main`, state OPEN,
+  MERGEABLE, **not merged**)
+- CI: **green** — `flutter-checks` pass (3m18s), `validate-structure` pass (20s)
+- Lockfiles: `apps/prototype_app/pubspec.lock`, `apps/widgetbook/pubspec.lock`,
+  `packages/agency_flutter_ui/pubspec.lock` remain untracked and uncommitted; no lockfile-policy change.
+- Commits on the branch: 22 (from `ba28242`, the Milestone D merge).
+
 ## Cycle table
 
 | Cycle | Scope | Status | Commits |
