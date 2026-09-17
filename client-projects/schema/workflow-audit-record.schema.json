@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agency-platform/schema/workflow-audit-record.schema.json",
+  "title": "Workflow audit record",
+  "description": "One append-only workflow audit record. Records are written as compact JSONL lines under workflow/audit.jsonl and are never edited in place. An override requires a non-blank affected_gate.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "kind",
+    "actor",
+    "at",
+    "stage",
+    "run_id",
+    "summary",
+    "reason",
+    "details"
+  ],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "kind": { "enum": ["ruling", "deviation", "override", "recovery"] },
+    "actor": { "type": "string", "minLength": 1 },
+    "at": { "type": "string", "minLength": 1 },
+    "stage": { "type": ["string", "null"] },
+    "run_id": { "type": ["string", "null"] },
+    "summary": { "type": "string", "minLength": 1 },
+    "reason": { "type": "string", "minLength": 1 },
+    "details": { "type": "object", "additionalProperties": true }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "kind": { "const": "override" } },
+        "required": ["kind"]
+      },
+      "then": {
+        "properties": {
+          "details": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": ["affected_gate"],
+            "properties": {
+              "affected_gate": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
