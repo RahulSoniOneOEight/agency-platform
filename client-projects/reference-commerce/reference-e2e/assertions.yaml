@@ -187,3 +187,10 @@ assertions:
   description: reference-e2e/ is evidence only and contains no review, feedback, refinement,
     approval, or QA state records that duplicate canonical authorities.
   params: {}
+- id: artifact-e2e-evidence
+  scenario: normal-happy-path
+  kind: artifact_exists
+  description: The machine-readable review/approval/QA evidence report emitted by
+    the reference E2E journey exists under reference-e2e/evidence/.
+  params:
+    path: reference-e2e/evidence/review-approval-evidence.json

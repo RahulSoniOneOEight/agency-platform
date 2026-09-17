@@ -1,0 +1,249 @@
+{
+  "client_id": "reference-commerce",
+  "fixture_version": 1,
+  "scenario_id": "normal-happy-path",
+  "source_commit_sha": "0123456789abcdef0123456789abcdef01234567",
+  "selected_direction": "b",
+  "screen_overrides": {
+    "commerce.search": "a"
+  },
+  "section_overrides": {
+    "commerce.pdp": {
+      "pdp.price": "a"
+    }
+  },
+  "feedback": {
+    "blocking": [
+      {
+        "id": "feedback-blocking",
+        "scope": "section",
+        "status": "resolved",
+        "blocking": true,
+        "target": {
+          "screen": "commerce.pdp",
+          "section": "pdp.price"
+        },
+        "origin_qa_finding_id": null,
+        "history_types": [
+          "created",
+          "addressed",
+          "resolved"
+        ]
+      }
+    ],
+    "non_blocking": [
+      {
+        "id": "feedback-non-blocking",
+        "scope": "general",
+        "status": "open",
+        "blocking": false,
+        "target": {},
+        "origin_qa_finding_id": null,
+        "history_types": [
+          "created"
+        ]
+      }
+    ],
+    "visual_annotations": [
+      {
+        "id": "feedback-visual",
+        "status": "open",
+        "screenshot_ref": "sha256:4187fa0a2878b8298f57f293c933c880520b2014ff1279c00d029c566e16ce44",
+        "screen": "commerce.pdp",
+        "section": "pdp.price",
+        "effective_direction": "b"
+      }
+    ]
+  },
+  "refinement_batches": [
+    {
+      "id": "batch-001",
+      "status": "completed",
+      "feedback_ids": [
+        "feedback-blocking"
+      ],
+      "classification": "implementation_only"
+    }
+  ],
+  "review_rounds": 1,
+  "approval_versions": [
+    1
+  ],
+  "qa": {
+    "findings": [
+      {
+        "id": "qa-001",
+        "status": "promoted",
+        "severity": "major",
+        "category": "spacing",
+        "surface": "prototype",
+        "screen": "commerce.pdp",
+        "section": "pdp.price",
+        "rule_source": "design_contract",
+        "screenshot_ref": "sha256:4187fa0a2878b8298f57f293c933c880520b2014ff1279c00d029c566e16ce44",
+        "source_commit_sha": "0123456789abcdef0123456789abcdef01234567"
+      }
+    ],
+    "promotions": [
+      {
+        "finding_id": "qa-001",
+        "feedback_id": "feedback-qa-001",
+        "blocking": false
+      }
+    ]
+  },
+  "assertions": [
+    {
+      "id": "mix.selected_direction_b",
+      "passed": true
+    },
+    {
+      "id": "mix.screen_override_search_a",
+      "passed": true
+    },
+    {
+      "id": "mix.section_override_pdp_price_a",
+      "passed": true
+    },
+    {
+      "id": "mix.state_version_2",
+      "passed": true
+    },
+    {
+      "id": "mix.persisted_selected_direction_b",
+      "passed": true
+    },
+    {
+      "id": "mix.persisted_screen_override_search_a",
+      "passed": true
+    },
+    {
+      "id": "mix.persisted_section_override_pdp_price_a",
+      "passed": true
+    },
+    {
+      "id": "feedback.blocking_sets_needs_revision",
+      "passed": true
+    },
+    {
+      "id": "feedback.feedback-blocking_append_only_created_history",
+      "passed": true
+    },
+    {
+      "id": "feedback.feedback-non-blocking_append_only_created_history",
+      "passed": true
+    },
+    {
+      "id": "feedback.feedback-visual_append_only_created_history",
+      "passed": true
+    },
+    {
+      "id": "feedback.non_blocking_does_not_block",
+      "passed": true
+    },
+    {
+      "id": "feedback.blocking_unresolved_exactly_blocking",
+      "passed": true
+    },
+    {
+      "id": "refinement.blocking_addressed_not_resolved",
+      "passed": true
+    },
+    {
+      "id": "approval.ineligible_while_blocking_unresolved",
+      "passed": true
+    },
+    {
+      "id": "approval.blocked_attempt_created_no_snapshot",
+      "passed": true
+    },
+    {
+      "id": "refinement.blocking_resolved_by_reviewer",
+      "passed": true
+    },
+    {
+      "id": "qa.finding_detected",
+      "passed": true
+    },
+    {
+      "id": "qa.finding_blocking_null",
+      "passed": true
+    },
+    {
+      "id": "qa.finding_origin_feedback_absent",
+      "passed": true
+    },
+    {
+      "id": "qa.no_feedback_before_promotion",
+      "passed": true
+    },
+    {
+      "id": "qa.finding_triaged",
+      "passed": true
+    },
+    {
+      "id": "qa.promotion_origin_link",
+      "passed": true
+    },
+    {
+      "id": "qa.promotion_open",
+      "passed": true
+    },
+    {
+      "id": "qa.promotion_non_blocking",
+      "passed": true
+    },
+    {
+      "id": "qa.promotion_did_not_auto_resolve",
+      "passed": true
+    },
+    {
+      "id": "qa.promotion_idempotent",
+      "passed": true
+    },
+    {
+      "id": "qa.exactly_one_promoted_feedback",
+      "passed": true
+    },
+    {
+      "id": "round.closed_ready_for_final_review",
+      "passed": true
+    },
+    {
+      "id": "round.review_round_1",
+      "passed": true
+    },
+    {
+      "id": "approval.version_1",
+      "passed": true
+    },
+    {
+      "id": "approval.supersedes_null",
+      "passed": true
+    },
+    {
+      "id": "approval.review_round_matches",
+      "passed": true
+    },
+    {
+      "id": "approval.hash_sha256",
+      "passed": true
+    },
+    {
+      "id": "approval.carries_non_blocking_feedback",
+      "passed": true
+    },
+    {
+      "id": "approval.file_byte_identical",
+      "passed": true
+    },
+    {
+      "id": "runtime.bundle_bytes_unchanged",
+      "passed": true
+    },
+    {
+      "id": "runtime.snapshot_unchanged",
+      "passed": true
+    }
+  ]
+}
