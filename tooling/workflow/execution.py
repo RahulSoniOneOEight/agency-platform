@@ -56,7 +56,7 @@ class IllegalStageTransition(RuntimeError):
     """Raised when a checkpoint is not declared by the stage contract."""
 
 
-def _iso(now: datetime) -> str:
+def iso_timestamp(now: datetime) -> str:
     if now.tzinfo is None:
         now = now.replace(tzinfo=timezone.utc)
     return now.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -255,7 +255,42 @@ def _require_active_lease(state: dict, *, actor: str) -> WorkflowLease:
     return lease
 
 
-def _acquire_execution_lease(
+def reclaim_expired_lease(
+    client_dir: Path,
+    state: dict,
+    *,
+    actor: str,
+    run_id: str,
+    now: datetime,
+) -> tuple[dict, WorkflowLease | None]:
+    """Clear an expired lease and record a durable recovery audit event.
+
+    This is the only sanctioned takeover path for a lease the caller does not
+    own. A live or absent lease is returned unchanged, so callers can invoke it
+    unconditionally before acquiring.
+    """
+    existing = load_lease(state)
+    if existing is None or not is_expired(existing, now=now):
+        return state, None
+    recovered, expired = reconcile_expired_lease(state, now=now)
+    if expired is not None:
+        append_audit_record(
+            _audit_path(client_dir),
+            make_recovery_record(
+                actor=actor,
+                at=iso_timestamp(now),
+                summary=f"reclaimed expired lease {expired.lease_id}",
+                reason="lease expired before completion",
+                stage=state.get("current_stage"),
+                run_id=expired.run_id,
+                previous_state={"lease_id": expired.lease_id, "owner": expired.owner},
+                requested_state={"owner": actor, "run_id": run_id},
+            ),
+        )
+    return recovered, expired
+
+
+def acquire_execution_lease(
     client_dir: Path,
     state: dict,
     *,
@@ -264,31 +299,12 @@ def _acquire_execution_lease(
     now: datetime,
     ttl_seconds: int,
 ) -> tuple[dict, WorkflowLease]:
-    """Acquire the lease, deterministically recovering an expired one first.
-
-    Reclaiming an expired lease is the only takeover path, and it records a
-    durable recovery audit event so the reclaim is never silent.
-    """
-    existing = load_lease(state)
-    if existing is not None and is_expired(existing, now=now):
-        recovered_state, expired = reconcile_expired_lease(state, now=now)
-        if expired is not None:
-            append_audit_record(
-                _audit_path(client_dir),
-                make_recovery_record(
-                    actor=actor,
-                    at=_iso(now),
-                    summary=f"reclaimed expired lease {expired.lease_id}",
-                    reason="lease expired before completion",
-                    stage=state.get("current_stage"),
-                    run_id=expired.run_id,
-                    previous_state={"lease_id": expired.lease_id, "owner": expired.owner},
-                    requested_state={"owner": actor, "run_id": run_id},
-                ),
-            )
-        state = recovered_state
+    """Acquire the lease, deterministically recovering an expired one first."""
+    reclaimed, _ = reclaim_expired_lease(
+        client_dir, state, actor=actor, run_id=run_id, now=now
+    )
     return acquire_lease(
-        state, owner=actor, run_id=run_id, now=now, ttl_seconds=ttl_seconds
+        reclaimed, owner=actor, run_id=run_id, now=now, ttl_seconds=ttl_seconds
     )
 
 
@@ -339,7 +355,7 @@ def start_attempt(
 
     # The lease is acquired only for a genuinely new attempt, and always before
     # any evidence is written: a second owner is rejected here with no mutation.
-    leased_state, _ = _acquire_execution_lease(
+    leased_state, _ = acquire_execution_lease(
         client_dir,
         state,
         actor=actor,
@@ -348,7 +364,7 @@ def start_attempt(
         ttl_seconds=lease_ttl_seconds,
     )
 
-    started_at = _iso(now)
+    started_at = iso_timestamp(now)
     manifest = ExecutionManifest.start(
         run_id=resolved_run_id,
         client_id=client_id,
@@ -449,6 +465,66 @@ def _require_attempt_matches_state(
         )
 
 
+def completion_state_transition(
+    root: Path,
+    state: dict,
+    manifest: ExecutionManifest,
+    *,
+    at: str,
+    actor: str,
+    clear_lease: bool = True,
+) -> dict:
+    """Apply the canonical state transition implied by a completed manifest.
+
+    This is the single implementation of "a stage completed, advance the
+    pointer": :func:`complete_attempt` and the recovery reconciler both call it,
+    so a change can never make them diverge. ``clear_lease`` releases ownership
+    on the normal completion path; a reconciler that does not own the lease
+    passes ``False`` so it can never clear someone else's ownership.
+    """
+    contract = load_stage_contract(root, manifest.stage)
+    new_state = copy.deepcopy(state)
+
+    completed = list(new_state.get("completed", []))
+    if manifest.stage not in completed:
+        completed.append(manifest.stage)
+    new_state["completed"] = completed
+    new_state["pending"] = [
+        stage for stage in new_state.get("pending", []) if stage != manifest.stage
+    ]
+
+    stage_state = dict(new_state.get("stage_state") or {})
+    entry = dict(stage_state.get(manifest.stage) or {})
+    entry["attempt"] = manifest.attempt
+    entry["status"] = "complete"
+    entry["completed_at"] = at
+    entry["last_checkpoint"] = (
+        manifest.checkpoints[-1].name if manifest.checkpoints else None
+    )
+    entry["artifact_manifest_ref"] = manifest_relpath(manifest.run_id, manifest.attempt)
+    stage_state[manifest.stage] = entry
+    new_state["stage_state"] = stage_state
+
+    from_stage = state["current_stage"]
+    if contract.next_stages:
+        to_stage = contract.next_stages[0]
+        new_state["current_stage"] = to_stage
+        new_state["status"] = "in_progress"
+    else:
+        to_stage = manifest.stage
+        new_state["status"] = "complete"
+    new_state["last_transition"] = {
+        "from": from_stage,
+        "to": to_stage,
+        "at": at,
+        "actor": actor,
+    }
+    if clear_lease:
+        # Ownership is released only after the evidence is durable.
+        new_state["active_lease"] = None
+    return new_state
+
+
 def complete_attempt(
     root: Path,
     client_dir: Path,
@@ -486,39 +562,7 @@ def complete_attempt(
         manifest_path(client_dir, frozen.run_id, frozen.attempt), frozen
     )
 
-    new_state = copy.deepcopy(state)
-    completed = list(new_state.get("completed", []))
-    if manifest.stage not in completed:
-        completed.append(manifest.stage)
-    new_state["completed"] = completed
-    pending = list(new_state.get("pending", []))
-    new_state["pending"] = [stage for stage in pending if stage != manifest.stage]
-
-    stage_state = dict(new_state.get("stage_state") or {})
-    entry = dict(stage_state.get(manifest.stage) or {})
-    entry["attempt"] = frozen.attempt
-    entry["status"] = "complete"
-    entry["completed_at"] = at
-    entry["last_checkpoint"] = frozen.checkpoints[-1].name if frozen.checkpoints else None
-    entry["artifact_manifest_ref"] = manifest_relpath(frozen.run_id, frozen.attempt)
-    stage_state[manifest.stage] = entry
-    new_state["stage_state"] = stage_state
-
-    from_stage = state["current_stage"]
-    if contract.next_stages:
-        to_stage = contract.next_stages[0]
-        new_state["current_stage"] = to_stage
-        new_state["status"] = "in_progress"
-    else:
-        to_stage = manifest.stage
-        new_state["status"] = "complete"
-    new_state["last_transition"] = {
-        "from": from_stage,
-        "to": to_stage,
-        "at": at,
-        "actor": actor,
-    }
-    # Ownership is released only after the evidence is durable and the canonical
-    # transition is computed (RE5 ordering: evidence -> state pointer -> release).
-    new_state["active_lease"] = None
+    new_state = completion_state_transition(
+        root, state, frozen, at=at, actor=actor
+    )
     return new_state, frozen

@@ -72,13 +72,14 @@ decision, and routes the next legal stage. It writes nothing.
 ### Start (or idempotently reuse/resume)
 
 ```bash
-python -c "from pathlib import Path; from tooling.workflow.runner import start_stage; run = start_stage(Path('.'), Path('client-projects/abc-furniture'), actor='opencode:session', source_commit_sha='<40-hex-commit>'); print(run.status.current_stage, run.manifest.run_id, run.manifest.attempt, run.lease.lease_id)"
+python -c "from pathlib import Path; from tooling.workflow.runner import start_stage; run = start_stage(Path('.'), Path('client-projects/abc-furniture'), actor='opencode:session', source_commit_sha='<40-hex-commit>'); print(run.status.current_stage, run.manifest.run_id, run.manifest.attempt, run.lease.lease_id if run.lease else None)"
 ```
 
 `start_stage` refuses when the stage contract prerequisites are unmet, acquires the lease for a
 genuinely new attempt, and writes the create-only `attempt-N.yaml`. If the current inputs already
 match a completed attempt it **reuses** it; if the latest attempt is in-progress with a durable
-checkpoint it **resumes** it. In both reuse/resume cases it does not create a second attempt.
+checkpoint it **resumes** it. In both reuse/resume cases it does not create a second attempt and
+returns `lease=None`, so read `run.lease` defensively.
 
 ### Checkpoint (durable atomic step)
 
@@ -146,8 +147,12 @@ never re-runs a stage, and it is idempotent (nothing to reconcile means no write
   `WorkflowLeaseConflict` and no files change.
 - The lease is coordination only: it is never completion proof and never changes `current_stage`,
   `completed`, or `pending`.
-- Expiry is inclusive (`now >= expires_at`). An expired lease is reclaimed only through
-  `reconcile_expired_lease`, which records a durable `recovery` audit event first.
+- Expiry is inclusive (`now >= expires_at`). An expired lease is reclaimed only through the
+  execution/runner reclaim path (`reclaim_expired_lease` / `acquire_execution_lease`), which appends a
+  durable `recovery` audit record before ownership changes. `lease.reconcile_expired_lease` itself
+  only clears the mapping; the audit is written by its callers.
+- A foreign *live* lease is never cleared: `resume_stage` and `reconcile_state` raise
+  `RecoveryRequired`, and `complete_attempt`/`fail_attempt` raise `WorkflowLeaseOwnershipError`.
 - Completion and failure release the lease after evidence is durable.
 
 ## Idempotency, resume, and recovery

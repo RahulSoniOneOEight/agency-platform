@@ -6,9 +6,10 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from tooling.workflow.audit import load_audit_records
 from tooling.workflow.execution import StageCompletionGateFailed
 from tooling.workflow.initialize_client import initialize_client
-from tooling.workflow.lease import WorkflowLeaseConflict
+from tooling.workflow.lease import WorkflowLeaseConflict, acquire_lease
 from tooling.workflow.manifests import (
     ExecutionManifest,
     ValidatorEvidence,
@@ -17,6 +18,7 @@ from tooling.workflow.manifests import (
     write_manifest_create_only,
 )
 from tooling.workflow.runner import (
+    RecoveryRequired,
     checkpoint_stage,
     complete_stage,
     inspect_client,
@@ -194,6 +196,89 @@ class ResumeEndToEndTests(unittest.TestCase):
             self.assertEqual(frozen, (client / "workflow-state.yaml").read_bytes())
             self.assertEqual("resolve-intelligence", second.status.current_stage)
             self.assertEqual("none", second.status.recovery_action)
+
+    def test_reconcile_refuses_a_foreign_live_lease(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = _root(tmp)
+            client = _client(root)
+
+            completed = (
+                ExecutionManifest.start(
+                    run_id="wf-acme-20260917T120000Z-abc12345",
+                    client_id="acme",
+                    stage="client-intake",
+                    attempt=1,
+                    source_commit_sha=COMMIT,
+                    started_at=AT,
+                )
+                .with_checkpoint("intake-complete", at=AT)
+                .with_validators([_passed("client-input-contract")])
+                .complete(at=AT, required_validators=["client-input-contract"])
+            )
+            write_manifest_create_only(
+                manifest_path(client, completed.run_id, completed.attempt), completed
+            )
+            state = load_state(client / "workflow-state.yaml")
+            state["current_stage"] = "client-intake"
+            state["status"] = "in_progress"
+            state["stage_state"] = {
+                "client-intake": {"attempt": 1, "status": "in_progress"}
+            }
+            leased, _ = acquire_lease(
+                state, owner="opencode:session-a", run_id=None, now=NOW, ttl_seconds=1800
+            )
+            save_state(client / "workflow-state.yaml", leased)
+            before = (client / "workflow-state.yaml").read_bytes()
+
+            with self.assertRaises(RecoveryRequired):
+                reconcile_state(root, client, actor="opencode:session-b", now=NOW)
+
+            self.assertEqual(before, (client / "workflow-state.yaml").read_bytes())
+            self.assertEqual(
+                "opencode:session-a", load_state(client / "workflow-state.yaml")["active_lease"]["owner"]
+            )
+
+    def test_reconcile_reclaims_an_expired_lease_with_an_audit_record(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = _root(tmp)
+            client = _client(root)
+
+            completed = (
+                ExecutionManifest.start(
+                    run_id="wf-acme-20260917T120000Z-abc12345",
+                    client_id="acme",
+                    stage="client-intake",
+                    attempt=1,
+                    source_commit_sha=COMMIT,
+                    started_at=AT,
+                )
+                .with_checkpoint("intake-complete", at=AT)
+                .with_validators([_passed("client-input-contract")])
+                .complete(at=AT, required_validators=["client-input-contract"])
+            )
+            write_manifest_create_only(
+                manifest_path(client, completed.run_id, completed.attempt), completed
+            )
+            state = load_state(client / "workflow-state.yaml")
+            state["current_stage"] = "client-intake"
+            state["status"] = "in_progress"
+            state["stage_state"] = {
+                "client-intake": {"attempt": 1, "status": "in_progress"}
+            }
+            leased, _ = acquire_lease(
+                state, owner="opencode:session-a", run_id=None, now=NOW, ttl_seconds=60
+            )
+            save_state(client / "workflow-state.yaml", leased)
+
+            later = NOW + timedelta(minutes=5)
+            result = reconcile_state(root, client, actor="opencode:session-b", now=later)
+            self.assertEqual("resolve-intelligence", result.status.current_stage)
+            self.assertIsNone(
+                load_state(client / "workflow-state.yaml")["active_lease"]
+            )
+            records = load_audit_records(client / "workflow" / "audit.jsonl")
+            self.assertEqual(1, len(records))
+            self.assertEqual("recovery", records[0].kind)
 
     def test_scenario_d_changed_inputs_create_a_new_attempt(self):
         with tempfile.TemporaryDirectory() as tmp:

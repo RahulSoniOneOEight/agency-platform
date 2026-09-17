@@ -47,7 +47,7 @@ For any client, a fresh session must:
 7. run the validators declared by the stage contract;
 8. complete through the runner (`complete_stage`) only after every gate passes, or record failure with `fail_stage`;
 9. persist ruling/deviation/override records to `workflow/audit.jsonl` (overrides require a human actor);
-10. never edit `current_stage` by hand — only `tooling.workflow.runner` writes `workflow-state.yaml`.
+10. never edit `current_stage` by hand — only `tooling.workflow.runner` (and the one-time initializer) writes `workflow-state.yaml`.
 
 Every workflow file must contain `PURPOSE`, `READ`, `PROCESS`, `WRITE`, `VALIDATE`, `DO NOT`, and `NEXT`.
 

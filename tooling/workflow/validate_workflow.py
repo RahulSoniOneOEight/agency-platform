@@ -102,16 +102,19 @@ def _parse_timestamp(value: Any) -> datetime | None:
     return parsed.astimezone(timezone.utc)
 
 
-def _validate_state_schema(raw_state: Any, label: str) -> list[str]:
+def _validate_state_schema(
+    state: Any, label: str, *, normalized: bool = False
+) -> list[str]:
     try:
         schema = json.loads(_STATE_SCHEMA_PATH.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         return [f"{label}: cannot load workflow-state schema: {exc}"]
     validator = Draft202012Validator(schema)
     errors: list[str] = []
-    for error in validator.iter_errors(raw_state):
+    for error in validator.iter_errors(state):
         location = ".".join(str(part) for part in error.path) or "<root>"
-        errors.append(f"{label}: state schema: {location}: {error.message}")
+        prefix = "normalized state schema" if normalized else "state schema"
+        errors.append(f"{label}: {prefix}: {location}: {error.message}")
     return sorted(errors)
 
 
@@ -311,7 +314,12 @@ def validate_client(root: Path, client_dir: Path) -> list[str]:
     except Exception as exc:
         return [f"{client_dir}: cannot load workflow-state.yaml: {exc}"]
     errors.extend(_validate_state(state, str(client_dir), client_dir.name))
-    errors.extend(_validate_state_schema(raw_state, str(client_dir)))
+    # The schema describes the canonical v2 write format. A committed v1 state is
+    # still supported (RE1), so the strict raw check only applies to v2 files;
+    # the normalized state is schema-checked either way.
+    if isinstance(raw_state, dict) and raw_state.get("version") == 2:
+        errors.extend(_validate_state_schema(raw_state, str(client_dir)))
+    errors.extend(_validate_state_schema(state, str(client_dir), normalized=True))
     errors.extend(_validate_stage_state(client_dir, state))
     errors.extend(_validate_active_lease(client_dir, state))
     errors.extend(_validate_audit(client_dir))

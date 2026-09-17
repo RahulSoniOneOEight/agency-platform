@@ -173,6 +173,7 @@ REQUIRED_PATHS = (
     "tooling/validation/test_workflow_recovery.py",
     "tooling/validation/test_workflow_runner.py",
     "tooling/validation/test_workflow_resume_e2e.py",
+    "tooling/validation/test_workflow_authority_boundaries.py",
     "docs/superpowers/specs/2026-09-17-milestone-e-workflow-hardening-design.md",
     "docs/superpowers/plans/2026-09-17-milestone-e-workflow-hardening-implementation.md",
     "docs/superpowers/ledgers/2026-09-17-milestone-e-workflow-hardening-ledger.md",

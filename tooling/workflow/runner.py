@@ -29,10 +29,13 @@ from pathlib import Path
 from tooling.workflow.audit import append_audit_record, make_recovery_record
 from tooling.workflow.contracts import load_stage_contract
 from tooling.workflow.execution import (
-    _iso,
+    acquire_execution_lease,
     complete_attempt,
+    completion_state_transition,
     fail_attempt,
+    iso_timestamp,
     prior_manifests,
+    reclaim_expired_lease,
     record_checkpoint,
     start_attempt,
 )
@@ -278,7 +281,7 @@ def checkpoint_stage(
     )
     _require_lease_owner(state, actor=actor)
     contract = load_stage_contract(root, stage)
-    updated = record_checkpoint(manifest, checkpoint, at=_iso(moment), contract=contract)
+    updated = record_checkpoint(manifest, checkpoint, at=iso_timestamp(moment), contract=contract)
 
     # Evidence first: the checkpointed manifest is durable before the pointer.
     write_manifest_create_only(
@@ -316,7 +319,7 @@ def fail_stage(
         client_dir, run_id=run_id, stage=stage, status="in_progress"
     )
     new_state, failed = fail_attempt(
-        client_dir, state, manifest, reason=reason, at=_iso(moment), actor=actor
+        client_dir, state, manifest, reason=reason, at=iso_timestamp(moment), actor=actor
     )
     save_state_atomic(path, new_state)
     return _stage_run(root, client_dir, now=moment, manifest=failed)
@@ -348,7 +351,7 @@ def complete_stage(
         state,
         manifest,
         validator_results=validator_results,
-        at=_iso(moment),
+        at=iso_timestamp(moment),
         actor=actor,
     )
     save_state_atomic(path, new_state)
@@ -365,24 +368,14 @@ def _reclaim_expired_lease(
     now: datetime,
     ttl_seconds: int,
 ) -> tuple[dict, WorkflowLease]:
-    """Reclaim an expired lease, recording a durable recovery event first."""
-    recovered, expired = reconcile_expired_lease(state, now=now)
-    if expired is not None:
-        append_audit_record(
-            Path(client_dir) / AUDIT_RELPATH,
-            make_recovery_record(
-                actor=actor,
-                at=_iso(now),
-                summary=f"reclaimed expired lease {expired.lease_id}",
-                reason="lease expired before resume",
-                stage=state.get("current_stage"),
-                run_id=expired.run_id,
-                previous_state={"lease_id": expired.lease_id, "owner": expired.owner},
-                requested_state={"owner": actor, "run_id": run_id},
-            ),
-        )
-    return acquire_lease(
-        recovered, owner=actor, run_id=run_id, now=now, ttl_seconds=ttl_seconds
+    """Reclaim an expired lease through the shared, audited execution helper."""
+    return acquire_execution_lease(
+        client_dir,
+        state,
+        actor=actor,
+        run_id=run_id,
+        now=now,
+        ttl_seconds=ttl_seconds,
     )
 
 
@@ -473,65 +466,6 @@ def resume_stage(
     )
 
 
-def _completion_transition(
-    root: Path,
-    client_dir: Path,
-    state: dict,
-    manifest: ExecutionManifest,
-    *,
-    at: str,
-    actor: str,
-) -> dict:
-    """Apply exactly the canonical transition ``complete_attempt`` would.
-
-    Reconciliation may not re-run a stage: it only re-applies the state pointer
-    advance that a durable, already-frozen completed manifest implies. The
-    transition is byte-for-byte the same mutation as ``execution.complete_attempt``
-    (completed / pending / stage_state / current_stage / last_transition).
-    """
-    contract = load_stage_contract(root, manifest.stage)
-    new_state = dict(state)
-
-    completed = list(new_state.get("completed", []))
-    if manifest.stage not in completed:
-        completed.append(manifest.stage)
-    new_state["completed"] = completed
-    new_state["pending"] = [
-        stage for stage in new_state.get("pending", []) if stage != manifest.stage
-    ]
-
-    stage_state = dict(new_state.get("stage_state") or {})
-    entry = dict(stage_state.get(manifest.stage) or {})
-    entry["attempt"] = manifest.attempt
-    entry["status"] = "complete"
-    entry["completed_at"] = at
-    entry["last_checkpoint"] = (
-        manifest.checkpoints[-1].name if manifest.checkpoints else None
-    )
-    entry["artifact_manifest_ref"] = manifest_relpath(
-        manifest.run_id, manifest.attempt
-    )
-    stage_state[manifest.stage] = entry
-    new_state["stage_state"] = stage_state
-
-    from_stage = state["current_stage"]
-    if contract.next_stages:
-        to_stage = contract.next_stages[0]
-        new_state["current_stage"] = to_stage
-        new_state["status"] = "in_progress"
-    else:
-        to_stage = manifest.stage
-        new_state["status"] = "complete"
-    new_state["last_transition"] = {
-        "from": from_stage,
-        "to": to_stage,
-        "at": at,
-        "actor": actor,
-    }
-    new_state["active_lease"] = None
-    return new_state
-
-
 def reconcile_state(
     root: Path,
     client_dir: Path,
@@ -539,7 +473,13 @@ def reconcile_state(
     actor: str,
     now: datetime | None = None,
 ) -> StageRun:
-    """Advance a stale pointer for durable completed evidence, exactly once."""
+    """Advance a stale pointer for durable completed evidence, exactly once.
+
+    Reconciliation is a state-mutating operation, so it obeys the same lease
+    policy as every other mutation: a live lease owned by someone else blocks,
+    an expired lease is reclaimed through the audited recovery path, and the
+    reconciler never clears an ownership it does not hold.
+    """
     root = Path(root)
     client_dir = Path(client_dir)
     moment = _resolve_now(now)
@@ -565,9 +505,20 @@ def reconcile_state(
             "is required"
         )
 
-    at = manifest.completed_at or _iso(moment)
-    new_state = _completion_transition(
-        root, client_dir, state, manifest, at=at, actor=actor
+    lease = load_lease(state)
+    if lease is not None and lease.owner != actor and not is_expired(lease, now=moment):
+        raise RecoveryRequired(
+            f"lease {lease.lease_id} is held by {lease.owner!r}, not {actor!r}"
+        )
+    # An expired foreign lease is reclaimed through the shared audited path; a
+    # live lease owned by the actor (or no lease at all) passes through.
+    state, _ = reclaim_expired_lease(
+        client_dir, state, actor=actor, run_id=decision.run_id, now=moment
+    )
+
+    at = manifest.completed_at or iso_timestamp(moment)
+    new_state = completion_state_transition(
+        root, state, manifest, at=at, actor=actor, clear_lease=True
     )
     save_state_atomic(path, new_state)
     return _stage_run(root, client_dir, now=moment, manifest=manifest)
