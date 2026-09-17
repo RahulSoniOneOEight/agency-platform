@@ -1,0 +1,13 @@
+stage: client-intake
+version: 1
+requires:
+  stages: []
+  artifacts: []
+produces:
+  - derived/client-profile.yaml
+validators:
+  - client-input-contract
+checkpoints:
+  - intake-complete
+next:
+  - resolve-intelligence

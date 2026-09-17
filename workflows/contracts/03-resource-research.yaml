@@ -1,0 +1,14 @@
+stage: resource-research
+version: 1
+requires:
+  stages:
+    - resolve-intelligence
+  artifacts: []
+produces:
+  - resources/selection.yaml
+validators:
+  - resource-selection-contract
+checkpoints:
+  - resources-selected
+next:
+  - generate-directions
