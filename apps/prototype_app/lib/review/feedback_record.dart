@@ -336,12 +336,17 @@ final class FeedbackRecord {
     required List<FeedbackEvent> history,
     this.resolvedRound,
     this.visualAttachment,
+    this.originQaFindingId,
   }) : history = List<FeedbackEvent>.unmodifiable(history) {
     if (id.trim().isEmpty) {
       throw const FormatException('Feedback id is required');
     }
     if (text.trim().isEmpty) {
       throw const FormatException('Feedback text is required');
+    }
+    final origin = originQaFindingId;
+    if (origin != null && origin.trim().isEmpty) {
+      throw const FormatException('Feedback origin QA finding id must not be blank');
     }
     if (createdRound < 1) {
       throw const FormatException('Feedback created round must be positive');
@@ -392,6 +397,14 @@ final class FeedbackRecord {
   /// Provider-neutral visual evidence; only present for
   /// [FeedbackScope.visualAnnotation] records.
   final VisualAttachment? visualAttachment;
+
+  /// Immutable provenance linking this record back to the automated
+  /// `QAFinding` a reviewer promoted.
+  ///
+  /// This is provenance only: it never affects the C.4 lifecycle, blocking
+  /// classification, or approval semantics. `null` for feedback the reviewer
+  /// created directly.
+  final String? originQaFindingId;
 
   factory FeedbackRecord.fromJson(Map<String, dynamic> json) {
     final id = json['id'];
@@ -447,6 +460,11 @@ final class FeedbackRecord {
       visualAttachment =
           VisualAttachment.fromJson(rawAttachment.cast<String, dynamic>());
     }
+    final originQaFindingId = json['origin_qa_finding_id'];
+    if (originQaFindingId != null &&
+        (originQaFindingId is! String || originQaFindingId.trim().isEmpty)) {
+      throw const FormatException('Invalid feedback origin QA finding id');
+    }
     return FeedbackRecord(
       id: id,
       scope: feedbackScopeFromWire(scopeValue),
@@ -458,10 +476,11 @@ final class FeedbackRecord {
       history: history,
       resolvedRound: resolvedRound as int?,
       visualAttachment: visualAttachment,
+      originQaFindingId: originQaFindingId as String?,
     );
   }
 
-  /// Deterministic canonical serialization (all ten keys always present).
+  /// Deterministic canonical serialization (all eleven keys always present).
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -474,6 +493,7 @@ final class FeedbackRecord {
       'target': target.toJson(),
       'history': [for (final event in history) event.toJson()],
       'visual_attachment': visualAttachment?.toJson(),
+      'origin_qa_finding_id': originQaFindingId,
     };
   }
 
@@ -489,6 +509,7 @@ final class FeedbackRecord {
     List<FeedbackEvent>? history,
     Object? resolvedRound = _unset,
     Object? visualAttachment = _unset,
+    Object? originQaFindingId = _unset,
   }) {
     return FeedbackRecord(
       id: id ?? this.id,
@@ -505,6 +526,9 @@ final class FeedbackRecord {
       visualAttachment: identical(visualAttachment, _unset)
           ? this.visualAttachment
           : visualAttachment as VisualAttachment?,
+      originQaFindingId: identical(originQaFindingId, _unset)
+          ? this.originQaFindingId
+          : originQaFindingId as String?,
     );
   }
 
@@ -520,7 +544,8 @@ final class FeedbackRecord {
         other.createdRound != createdRound ||
         other.resolvedRound != resolvedRound ||
         other.target != target ||
-        other.visualAttachment != visualAttachment) {
+        other.visualAttachment != visualAttachment ||
+        other.originQaFindingId != originQaFindingId) {
       return false;
     }
     return _historyEquals(other.history, history);
@@ -538,6 +563,7 @@ final class FeedbackRecord {
         target,
         Object.hashAll(history),
         visualAttachment,
+        originQaFindingId,
       );
 }
 

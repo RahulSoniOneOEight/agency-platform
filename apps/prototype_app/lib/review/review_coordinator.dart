@@ -92,6 +92,7 @@ final class ReviewCoordinator {
     required FeedbackTarget target,
     bool blocking = true,
     VisualAttachment? visualAttachment,
+    String? originQaFindingId,
   }) async {
     _requireReviewer(actor, 'create feedback');
     final feedbackId = id.trim();
@@ -101,6 +102,10 @@ final class ReviewCoordinator {
     final feedbackText = text.trim();
     if (feedbackText.isEmpty) {
       throw const FormatException('Feedback text is required');
+    }
+    final origin = originQaFindingId?.trim();
+    if (origin != null && origin.isEmpty) {
+      throw const FormatException('Feedback origin QA finding id must not be blank');
     }
     if (!target.isValidForScope(scope)) {
       throw InvalidFeedbackTarget('target is not valid for $scope feedback');
@@ -153,6 +158,7 @@ final class ReviewCoordinator {
       createdRound: round,
       target: target,
       visualAttachment: visualAttachment,
+      originQaFindingId: origin,
       history: <FeedbackEvent>[
         FeedbackEvent(
           type: FeedbackEventType.created,

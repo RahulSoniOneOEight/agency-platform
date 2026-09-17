@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../fixtures/fixture_repository.dart';
+import '../qa/qa_coordinator.dart';
+import '../qa/review_qa_panel.dart';
 import '../runtime/prototype_runtime.dart';
 import 'review_actor.dart';
 import 'review_approval_panel.dart';
@@ -17,11 +19,15 @@ const double _wideBreakpoint = 900;
 
 /// Responsive Review Mode shell.
 ///
-/// It exposes the six review destinations (Overview, Directions, Screens,
-/// Selection, Comments, Approval) with a [NavigationRail] at wide widths and a
+/// It exposes the review destinations (Overview, Directions, Screens,
+/// Selection, Comments, Approval, and — when a QA coordinator is supplied — the
+/// automated QA triage destination) with a [NavigationRail] at wide widths and a
 /// [NavigationBar] at compact widths. The destination index is local UI state;
 /// all review decisions live in the injected [ReviewController], which is owned
 /// by the composition root, so switching destinations never loses review state.
+///
+/// QA triage is deliberately a separate destination backed by [QaCoordinator]:
+/// it never moves automated findings into `ReviewState`.
 class ReviewShell extends StatefulWidget {
   const ReviewShell({
     super.key,
@@ -29,6 +35,7 @@ class ReviewShell extends StatefulWidget {
     required this.controller,
     required this.coordinator,
     required this.actor,
+    this.qaCoordinator,
     this.onOpenPrototype,
   });
 
@@ -36,6 +43,10 @@ class ReviewShell extends StatefulWidget {
   final ReviewController controller;
   final ReviewCoordinator coordinator;
   final ReviewActor actor;
+
+  /// Optional automated-QA triage coordinator; when present a QA destination is
+  /// offered. Its absence leaves the C.1–C.7 destinations unchanged.
+  final QaCoordinator? qaCoordinator;
 
   /// Optional exit path back to normal prototype mode.
   final VoidCallback? onOpenPrototype;
@@ -45,7 +56,7 @@ class ReviewShell extends StatefulWidget {
 }
 
 class _ReviewShellState extends State<ReviewShell> {
-  static const List<_ReviewDestination> _destinations = [
+  static const List<_ReviewDestination> _coreDestinations = [
     _ReviewDestination('Overview', Icons.dashboard_outlined, Icons.dashboard),
     _ReviewDestination('Directions', Icons.explore_outlined, Icons.explore),
     _ReviewDestination('Screens', Icons.layers_outlined, Icons.layers),
@@ -55,9 +66,17 @@ class _ReviewShellState extends State<ReviewShell> {
     _ReviewDestination('Approval', Icons.verified_outlined, Icons.verified),
   ];
 
+  static const _ReviewDestination _qaDestination =
+      _ReviewDestination('QA', Icons.bug_report_outlined, Icons.bug_report);
+
   late final FixtureRepository _fixtures;
 
   int _destinationIndex = 0;
+
+  List<_ReviewDestination> get _destinations => [
+        ..._coreDestinations,
+        if (widget.qaCoordinator != null) _qaDestination,
+      ];
 
   @override
   void initState() {
@@ -67,6 +86,8 @@ class _ReviewShellState extends State<ReviewShell> {
 
   @override
   Widget build(BuildContext context) {
+    final destinations = _destinations;
+    final index = _destinationIndex.clamp(0, destinations.length - 1);
     return Scaffold(
       appBar: AppBar(
         title: Text('Review Mode · ${widget.runtime.clientId}'),
@@ -80,17 +101,17 @@ class _ReviewShellState extends State<ReviewShell> {
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {
-          final content = _buildDestination(_destinationIndex);
+          final content = _buildDestination(index);
           if (constraints.maxWidth >= _wideBreakpoint) {
             return Row(
               children: [
                 NavigationRail(
-                  selectedIndex: _destinationIndex,
+                  selectedIndex: index,
                   onDestinationSelected: (value) =>
                       setState(() => _destinationIndex = value),
                   labelType: NavigationRailLabelType.all,
                   destinations: [
-                    for (final destination in _destinations)
+                    for (final destination in destinations)
                       NavigationRailDestination(
                         icon: Icon(destination.icon),
                         selectedIcon: Icon(destination.selectedIcon),
@@ -107,11 +128,11 @@ class _ReviewShellState extends State<ReviewShell> {
             children: [
               Expanded(child: content),
               NavigationBar(
-                selectedIndex: _destinationIndex,
+                selectedIndex: index,
                 onDestinationSelected: (value) =>
                     setState(() => _destinationIndex = value),
                 destinations: [
-                  for (final destination in _destinations)
+                  for (final destination in destinations)
                     NavigationDestination(
                       icon: Icon(destination.icon),
                       selectedIcon: Icon(destination.selectedIcon),
@@ -127,6 +148,13 @@ class _ReviewShellState extends State<ReviewShell> {
   }
 
   Widget _buildDestination(int index) {
+    if (index == _coreDestinations.length && widget.qaCoordinator != null) {
+      return ReviewQaPanel(
+        runtime: widget.runtime,
+        coordinator: widget.qaCoordinator!,
+        actor: widget.actor,
+      );
+    }
     return switch (index) {
       0 =>
         ReviewOverview(runtime: widget.runtime, controller: widget.controller),

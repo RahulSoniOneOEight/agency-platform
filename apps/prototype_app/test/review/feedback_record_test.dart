@@ -487,10 +487,42 @@ void main() {
           'target',
           'history',
           'visual_attachment',
+          'origin_qa_finding_id',
         },
       );
       expect(json['resolved_round'], isNull);
       expect(json['visual_attachment'], isNull);
+      expect(json['origin_qa_finding_id'], isNull);
+    });
+
+    test('round-trips the originating QA finding provenance', () {
+      final original = FeedbackRecord(
+        id: 'feedback-qa-001',
+        scope: FeedbackScope.general,
+        text: 'Promoted from automated QA.',
+        status: FeedbackStatus.open,
+        blocking: false,
+        createdRound: 1,
+        target: const FeedbackTarget(),
+        originQaFindingId: 'qa-001',
+        history: [
+          FeedbackEvent(
+            type: FeedbackEventType.created,
+            actorId: 'reviewer-1',
+            at: DateTime.utc(2026, 9, 17, 10),
+            round: 1,
+          ),
+        ],
+      );
+      final json = original.toJson();
+      expect(json['origin_qa_finding_id'], 'qa-001');
+      expect(FeedbackRecord.fromJson(json), original);
+    });
+
+    test('rejects a blank originating QA finding id', () {
+      final json = record().toJson();
+      json['origin_qa_finding_id'] = '   ';
+      expect(() => FeedbackRecord.fromJson(json), throwsFormatException);
     });
 
     test('round-trips a visual annotation with evidence', () {
