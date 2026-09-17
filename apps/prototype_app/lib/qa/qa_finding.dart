@@ -435,14 +435,12 @@ void _validateHistory(List<QaFindingEvent> history) {
         }
         current = QaFindingStatus.promoted;
       case QaFindingEventType.dismissed:
-        if (current != QaFindingStatus.detected &&
-            current != QaFindingStatus.triaged) {
+        if (current != QaFindingStatus.triaged) {
           throw InvalidQaFinding('illegal QA history: dismissed from ${current.name}');
         }
         current = QaFindingStatus.dismissed;
       case QaFindingEventType.acceptedRisk:
-        if (current != QaFindingStatus.detected &&
-            current != QaFindingStatus.triaged) {
+        if (current != QaFindingStatus.triaged) {
           throw InvalidQaFinding(
             'illegal QA history: accepted_risk from ${current.name}',
           );
@@ -538,6 +536,9 @@ final class QaFinding {
     require('dedupe_key', dedupeKey);
     if (surface == QaSurface.prototype) {
       require('screen', screen);
+      if (story != null) {
+        throw const InvalidQaFinding('prototype findings must not carry a story');
+      }
     } else {
       require('story', story);
       if (screen != null) {
@@ -903,14 +904,13 @@ final class QaFinding {
     ]);
   }
 
-  /// Dismisses the finding as not actionable.
+  /// Dismisses the finding as not actionable. Requires prior triage.
   QaFinding dismiss({
     required String actorId,
     required DateTime at,
     required String reason,
   }) {
-    if (status != QaFindingStatus.detected &&
-        status != QaFindingStatus.triaged) {
+    if (status != QaFindingStatus.triaged) {
       throw InvalidQaTransition('cannot dismiss ${status.name} QA finding');
     }
     final text = reason.trim();
@@ -928,14 +928,13 @@ final class QaFinding {
     ]);
   }
 
-  /// Accepts the finding as a known, intentional risk.
+  /// Accepts the finding as a known, intentional risk. Requires prior triage.
   QaFinding acceptRisk({
     required String actorId,
     required DateTime at,
     required String reason,
   }) {
-    if (status != QaFindingStatus.detected &&
-        status != QaFindingStatus.triaged) {
+    if (status != QaFindingStatus.triaged) {
       throw InvalidQaTransition('cannot accept risk on ${status.name} QA finding');
     }
     final text = reason.trim();

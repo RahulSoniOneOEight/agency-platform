@@ -16,6 +16,7 @@ from tooling.visual_qa.qa_contracts import (
     normalize_region,
     validate_authority_bundle,
     validate_candidate,
+    validate_finding,
     validate_finding_against_schema,
 )
 from tooling.visual_qa.visual_provider import (
@@ -39,6 +40,7 @@ def candidate(**overrides: object) -> dict:
         "state": "default",
         "direction": "b",
         "section": "home.product-grid",
+        "screenshot_ref": "sha256:capture-1",
         "rule_source": "design_contract",
         "rule_ref": "spacing.card.gap",
         "confidence": 0.91,
@@ -56,6 +58,36 @@ class SchemaContractTests(unittest.TestCase):
         schema = load_qa_schema()
         template = json.loads(TEMPLATE_PATH.read_text(encoding="utf-8"))
         validate_finding_against_schema(template, schema)
+
+    def test_template_is_a_domain_valid_finding(self):
+        template = json.loads(TEMPLATE_PATH.read_text(encoding="utf-8"))
+        self.assertEqual(template, validate_finding(template))
+
+    def test_template_dedupe_key_is_reproducible(self):
+        template = json.loads(TEMPLATE_PATH.read_text(encoding="utf-8"))
+        self.assertEqual(
+            dedupe_key(template, client_id=template["client_id"]),
+            template["dedupe_key"],
+        )
+
+    def test_a_non_reproducible_dedupe_key_is_rejected(self):
+        template = json.loads(TEMPLATE_PATH.read_text(encoding="utf-8"))
+        template["dedupe_key"] = "qa-dedupe:v1|wrong"
+        with self.assertRaises(VisualQaSchemaInvalid):
+            validate_finding(template)
+
+    def test_promoted_finding_requires_a_feedback_id(self):
+        template = json.loads(TEMPLATE_PATH.read_text(encoding="utf-8"))
+        template["status"] = "promoted"
+        with self.assertRaises(VisualQaSchemaInvalid):
+            validate_finding(template)
+
+    def test_region_containment_is_enforced_beyond_the_schema(self):
+        template = json.loads(TEMPLATE_PATH.read_text(encoding="utf-8"))
+        template["region"] = {"x": 0.8, "y": 0, "width": 0.5, "height": 0.5}
+        validate_finding_against_schema(template)
+        with self.assertRaises(VisualQaSchemaInvalid):
+            validate_finding(template)
 
     def test_schema_required_keys_match_the_canonical_key_set(self):
         schema = load_qa_schema()
@@ -149,6 +181,55 @@ class CandidateValidationTests(unittest.TestCase):
             validate_candidate(candidate(confidence=1.5))
         with self.assertRaises(VisualQaSchemaInvalid):
             validate_candidate(candidate(confidence=-0.1))
+
+    def test_candidate_requires_a_screenshot_reference(self):
+        payload = candidate()
+        del payload["screenshot_ref"]
+        with self.assertRaises(VisualQaSchemaInvalid):
+            validate_candidate(payload)
+
+    def test_unknown_candidate_fields_are_rejected(self):
+        with self.assertRaises(VisualQaSchemaInvalid):
+            validate_candidate(candidate(notes="free-form narration"))
+
+    def test_normalized_candidate_is_consumable_by_the_dart_contract(self):
+        normalized = validate_candidate(candidate())
+        self.assertEqual(
+            {
+                "category",
+                "severity",
+                "summary",
+                "surface",
+                "screen",
+                "story",
+                "state",
+                "direction",
+                "mix_ref",
+                "section",
+                "region",
+                "screenshot_ref",
+                "rule_source",
+                "rule_ref",
+                "baseline_ref",
+                "confidence",
+                "evidence",
+            },
+            set(normalized.keys()),
+        )
+
+    def test_prototype_candidate_must_not_declare_a_story(self):
+        with self.assertRaises(VisualQaSchemaInvalid):
+            validate_candidate(candidate(story="AgencyButton.Primary"))
+
+    def test_widgetbook_candidate_must_not_declare_a_screen(self):
+        with self.assertRaises(VisualQaSchemaInvalid):
+            validate_candidate(
+                candidate(
+                    surface="widgetbook",
+                    screen="commerce.home",
+                    story="AgencyButton.Primary",
+                )
+            )
 
     def test_candidate_must_not_smuggle_review_authority(self):
         for forbidden in (
@@ -267,6 +348,19 @@ class AuthorityBundleTests(unittest.TestCase):
         with self.assertRaises(VisualQaSchemaInvalid):
             validate_authority_bundle(bundle)
 
+    def test_an_ordered_subset_is_accepted(self):
+        bundle = build_authority_bundle(
+            approved_experience={"ref": "x"}, design_contract={"ref": "y"}
+        )
+        bundle["layers"] = bundle["layers"][:2]
+        validate_authority_bundle(bundle)
+
+    def test_unknown_authority_source_is_rejected(self):
+        bundle = build_authority_bundle(approved_experience={"ref": "x"})
+        bundle["layers"][0]["source"] = "model_intuition"
+        with self.assertRaises(VisualQaSchemaInvalid):
+            validate_authority_bundle(bundle)
+
     def test_bundle_claiming_heuristics_override_is_rejected(self):
         bundle = build_authority_bundle(approved_experience={"ref": "x"})
         bundle["layers"][-1]["overrides_higher_authority"] = True
@@ -326,6 +420,7 @@ class ProviderTransportTests(unittest.TestCase):
             "print(json.dumps({'findings': ["
             "{'category':'spacing','severity':'minor','summary':'gap drift',"
             "'surface':'prototype','screen':'commerce.home','state':'default',"
+            "'screenshot_ref':'sha256:capture-1',"
             "'rule_source':'visual_heuristic','rule_ref':'heuristic.spacing'}]}))"
         )
         provider = CommandVisualQaProvider([sys.executable, "-c", script])
@@ -384,13 +479,13 @@ class FindingShapeContractTests(unittest.TestCase):
 
     def test_visual_qa_tooling_never_writes_feedback_records(self):
         for path in sorted((ROOT / "tooling" / "visual_qa").glob("*.py")):
-            source = path.read_text(encoding="utf-8").lower()
-            self.assertNotIn(
-                "feedbackrecord",
-                source.replace(" ", ""),
-                f"{path.name} references FeedbackRecord",
-            )
-            self.assertNotIn("feedback_record", source, f"{path.name} references feedback_record")
+            source = path.read_text(encoding="utf-8")
+            for needle in ("FeedbackRecord", "feedback_record", "createFeedback"):
+                self.assertNotIn(
+                    needle,
+                    source,
+                    f"{path.name} references {needle}",
+                )
 
 
 if __name__ == "__main__":

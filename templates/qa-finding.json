@@ -34,7 +34,7 @@
     }
   ],
   "confidence": 0.91,
-  "dedupe_key": "qa-dedupe:v1|prototype-demo|prototype|commerce.home|design_contract|spacing.card.gap|spacing|home.product-grid||",
+  "dedupe_key": "qa-dedupe:v1|prototype-demo|prototype|commerce.home|design_contract|spacing.card.gap|spacing|home.product-grid|0.1000,0.4200,0.8000,0.2400|",
   "feedback_id": null,
   "no_longer_reproducible": false,
   "recurrences": 0,

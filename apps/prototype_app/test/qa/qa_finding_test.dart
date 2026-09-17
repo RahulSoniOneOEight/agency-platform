@@ -161,6 +161,21 @@ void main() {
         throwsA(isA<InvalidQaTransition>()),
       );
     });
+
+    test('dismissal and accept-risk require prior triage', () {
+      expect(
+        () => sampleFinding().dismiss(actorId: reviewerId, at: at(1), reason: 'x'),
+        throwsA(isA<InvalidQaTransition>()),
+      );
+      expect(
+        () => sampleFinding().acceptRisk(
+          actorId: reviewerId,
+          at: at(1),
+          reason: 'x',
+        ),
+        throwsA(isA<InvalidQaTransition>()),
+      );
+    });
   });
 
   group('severity semantics', () {
@@ -297,9 +312,25 @@ void main() {
       );
       expect(
         () => sampleFinding(
+          surface: QaSurface.prototype,
+          screen: 'commerce.home',
+          story: 'AgencyButton.Primary',
+        ),
+        throwsA(isA<InvalidQaFinding>()),
+      );
+      expect(
+        () => sampleFinding(
           surface: QaSurface.widgetbook,
           screen: null,
           story: null,
+        ),
+        throwsA(isA<InvalidQaFinding>()),
+      );
+      expect(
+        () => sampleFinding(
+          surface: QaSurface.widgetbook,
+          screen: 'commerce.home',
+          story: 'AgencyButton.Primary',
         ),
         throwsA(isA<InvalidQaFinding>()),
       );

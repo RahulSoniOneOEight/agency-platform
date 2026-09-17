@@ -223,6 +223,28 @@ final class VisualQaCandidate {
     'merge_gate',
   };
 
+  /// The complete candidate vocabulary; unknown keys are rejected so a provider
+  /// cannot smuggle unstructured narration into the QA system of record.
+  static const Set<String> allowedKeys = {
+    'category',
+    'severity',
+    'summary',
+    'surface',
+    'screen',
+    'story',
+    'state',
+    'direction',
+    'mix_ref',
+    'section',
+    'region',
+    'screenshot_ref',
+    'rule_source',
+    'rule_ref',
+    'baseline_ref',
+    'confidence',
+    'evidence',
+  };
+
   factory VisualQaCandidate.fromJson(Map<String, dynamic> json) {
     final forbidden = forbiddenKeys.intersection(json.keys.toSet());
     if (forbidden.isNotEmpty) {
@@ -231,13 +253,19 @@ final class VisualQaCandidate {
         '${forbidden.toList()..sort()}',
       );
     }
+    final unknown = json.keys.toSet().difference(allowedKeys);
+    if (unknown.isNotEmpty) {
+      throw InvalidQaFinding(
+        'QA candidate has unknown fields: ${unknown.toList()..sort()}',
+      );
+    }
 
     String require(String key) {
       final value = json[key];
       if (value is! String || value.trim().isEmpty) {
         throw InvalidQaFinding('QA candidate missing $key');
       }
-      return value;
+      return value.trim();
     }
 
     String? optional(String key) {
@@ -246,7 +274,7 @@ final class VisualQaCandidate {
       if (value is! String || value.trim().isEmpty) {
         throw InvalidQaFinding('QA candidate $key must be a string');
       }
-      return value;
+      return value.trim();
     }
 
     final surface = qaSurfaceFromWire(require('surface'));
@@ -255,8 +283,18 @@ final class VisualQaCandidate {
     if (surface == QaSurface.prototype && screen == null) {
       throw const InvalidQaFinding('prototype QA candidate requires a screen');
     }
+    if (surface == QaSurface.prototype && story != null) {
+      throw const InvalidQaFinding(
+        'prototype QA candidate must not declare a story',
+      );
+    }
     if (surface == QaSurface.widgetbook && story == null) {
       throw const InvalidQaFinding('widgetbook QA candidate requires a story');
+    }
+    if (surface == QaSurface.widgetbook && screen != null) {
+      throw const InvalidQaFinding(
+        'widgetbook QA candidate must not declare a screen',
+      );
     }
 
     final confidence = json['confidence'];

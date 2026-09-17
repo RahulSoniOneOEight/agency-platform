@@ -49,7 +49,8 @@ def validate_client_visual_qa(client_dir: Path) -> list[str]:
 
     Checks the deterministic screenshot manifest (v1 or v2) and, when present,
     the legacy ``visual-findings.yaml`` compatibility artifact. v2 ``QAFinding``
-    records under ``prototype/qa/findings/`` are validated by the D.2 contracts.
+    records under ``prototype/qa/findings/`` are validated by the D.2 contracts
+    (``tooling.visual_qa.qa_contracts``).
     """
     errors: list[str] = []
     client_dir = Path(client_dir)

@@ -217,6 +217,44 @@ void main() {
       );
       expect(story.story, 'AgencyButton.Primary');
     });
+
+    test('unknown candidate fields are rejected', () {
+      final json = candidateJson()..['notes'] = 'free-form narration';
+      expect(
+        () => VisualQaCandidate.fromJson(json),
+        throwsA(isA<InvalidQaFinding>()),
+      );
+    });
+
+    test('candidate strings are trimmed at the boundary', () {
+      final candidate = VisualQaCandidate.fromJson(
+        candidateJson(category: '  spacing  ', ruleRef: ' spacing.card.gap '),
+      );
+      expect(candidate.category, 'spacing');
+      expect(candidate.ruleRef, 'spacing.card.gap');
+    });
+
+    test('prototype candidates must not declare a story', () {
+      expect(
+        () => VisualQaCandidate.fromJson(
+          candidateJson(story: 'AgencyButton.Primary'),
+        ),
+        throwsA(isA<InvalidQaFinding>()),
+      );
+    });
+
+    test('widgetbook candidates must not declare a screen', () {
+      expect(
+        () => VisualQaCandidate.fromJson(
+          candidateJson(
+            surface: 'widgetbook',
+            screen: 'commerce.home',
+            story: 'AgencyButton.Primary',
+          ),
+        ),
+        throwsA(isA<InvalidQaFinding>()),
+      );
+    });
   });
 
   group('candidate to finding mapping', () {
