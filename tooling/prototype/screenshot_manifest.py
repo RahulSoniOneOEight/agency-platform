@@ -18,6 +18,8 @@ import hashlib
 import json
 from urllib.parse import urlencode
 
+from tooling.visual_qa.errors import InvalidCaptureJob
+
 MANIFEST_VERSION = 2
 
 STANDARD_VIEWPORTS = [
@@ -34,16 +36,6 @@ ALLOWED_SURFACES = frozenset({"prototype", "widgetbook"})
 
 # The runtime contract supports direction IDs a, b, and optional c.
 ALLOWED_DIRECTIONS = frozenset({"a", "b", "c"})
-
-
-class InvalidCaptureJob(ValueError):
-    """A manifest or capture job that is structurally or semantically invalid."""
-
-    code = "invalid_capture_job"
-
-    def __init__(self, message: str) -> None:
-        super().__init__(message)
-        self.message = message
 
 
 def _require_mapping(value: object, label: str) -> dict:
