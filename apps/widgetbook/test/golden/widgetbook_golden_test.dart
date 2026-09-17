@@ -1,4 +1,6 @@
-﻿import 'package:agency_flutter_ui/agency_flutter_ui.dart';
+﻿import 'dart:io';
+
+import 'package:agency_flutter_ui/agency_flutter_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -10,8 +12,17 @@ import 'package:flutter_test/flutter_test.dart';
 /// comparison never rewrites a baseline.
 ///
 /// Coverage is intentionally selective: shared primitives and the product card
-/// (with its governed variants, density, stock, and wrapping states) â€” not every
+/// (with its governed variants, density, stock, and wrapping states) — not every
 /// possible permutation.
+///
+/// Baselines are byte-compared and rasterizer output differs slightly between
+/// platforms, so they are generated and compared on the canonical Linux CI
+/// runner. Elsewhere the group is skipped rather than producing a false failure;
+/// regenerate baselines only on Linux and only deliberately.
+final String? _goldenSkipReason = Platform.isLinux
+    ? null
+    : 'Governed golden baselines are generated and compared on the canonical '
+        'Linux CI runner.';
 
 const _sampleProduct = AgencyProduct(
   id: 'sku-108',
@@ -64,7 +75,7 @@ Future<void> _pumpGolden(
 }
 
 void main() {
-  group('AgencyButton goldens', () {
+  group('AgencyButton goldens', skip: _goldenSkipReason, () {
     testWidgets('primary', (tester) async {
       await _pumpGolden(
         tester,
@@ -96,7 +107,7 @@ void main() {
     });
   });
 
-  group('AgencySearchField goldens', () {
+  group('AgencySearchField goldens', skip: _goldenSkipReason, () {
     testWidgets('default', (tester) async {
       await _pumpGolden(
         tester,
@@ -113,7 +124,7 @@ void main() {
     });
   });
 
-  group('ProductCard goldens', () {
+  group('ProductCard goldens', skip: _goldenSkipReason, () {
     testWidgets('standard', (tester) async {
       await _pumpGolden(
         tester,

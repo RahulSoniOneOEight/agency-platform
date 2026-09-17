@@ -273,6 +273,13 @@
     `ubuntu-latest`. Flutter's test-font substitution makes text deterministic, but this must be
     confirmed by the first Linux CI run. If a platform delta appears, the baseline must be regenerated
     on Linux by a reviewer — never auto-updated.
+  - **Resolved (CI-verified):** the first Linux CI run did fail all 7 goldens (rasterizer delta,
+    e.g. 2.15% / 2707px on `product_card_long_name_b2b`). Baselines were regenerated on the canonical
+    Linux runner via a temporary, explicitly-labelled workflow that only uploaded them as an artifact
+    (no auto-commit); the Linux baselines were reviewed, committed (`10e2b84`), and the temporary
+    workflow deleted. The golden groups now skip off Linux with an explicit reason so non-Linux local
+    runs do not produce false failures. PR #21 CI is **green** (`flutter-checks` pass,
+    `validate-structure` pass).
   - Final counts after the fix commit: Python `unittest discover tooling/validation` = **455 tests OK**;
     `test/qa` = **129 tests**; `test/review` = **586 tests**; all validators and B.1D/B.1E freshness
     green.
