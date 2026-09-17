@@ -133,8 +133,8 @@
 | Cycle | Scope | Status | Commits |
 |-------|-------|--------|---------|
 | 1 | State machine + stage contracts + execution manifests | ACCEPTED | `02afbd9` `493b032` `99c9ee4` `146eba9` `a4d50a0` |
-| 2 | Idempotency + leases + retry/resume + audit/recovery | ACCEPTED | `a28d2b3` `c36c1d1` `b86b9b8` `1fc71bd` `…` |
-| 3 | OpenCode orchestration + CI hardening + E2E resumability | ACCEPTED | `a094d6b` `59d0507` `6397c73` |
+| 2 | Idempotency + leases + retry/resume + audit/recovery | ACCEPTED | `a28d2b3` `c36c1d1` `b86b9b8` `1fc71bd` `0196934` |
+| 3 | OpenCode orchestration + CI hardening + E2E resumability | ACCEPTED | `a094d6b` `59d0507` `6397c73` `560852c` `782df58` `8e532cd` |
 
 ## Progress log
 - 2026-09-17 — Preflight complete. Branch `milestone-e-workflow-hardening` at `21eb01f`; spec + plan
