@@ -206,6 +206,27 @@ class ValidatorContractTests(unittest.TestCase):
             "the optional refinement note file must never be a required path",
         )
 
+    def test_milestone_d_visual_qa_paths_are_required(self):
+        validator = self.load_validator()
+        for path in (
+            "tooling/visual_qa",
+            "tooling/visual_qa/capture_runner.py",
+            "tooling/visual_qa/qa_contracts.py",
+            "tooling/visual_qa/visual_provider.py",
+            "tooling/visual_qa/golden_compare.py",
+            "tooling/screenshots/capture_web.mjs",
+            "client-projects/schema/screenshot-manifest.schema.json",
+            "client-projects/schema/qa-finding.schema.json",
+            "templates/qa-finding.json",
+            "tooling/validation/test_visual_qa_capture.py",
+            "tooling/validation/test_visual_qa_contracts.py",
+            "apps/widgetbook/test/golden/widgetbook_golden_test.dart",
+            "docs/superpowers/specs/2026-09-17-milestone-d-automated-visual-qa-design.md",
+            "docs/superpowers/plans/2026-09-17-milestone-d-automated-visual-qa-implementation.md",
+            "docs/superpowers/ledgers/2026-09-17-milestone-d-automated-visual-qa-ledger.md",
+        ):
+            self.assertIn(path, validator.REQUIRED_PATHS)
+
     def test_main_reports_refinement_note_errors(self):
         validator = self.load_validator()
         with tempfile.TemporaryDirectory() as tmp:

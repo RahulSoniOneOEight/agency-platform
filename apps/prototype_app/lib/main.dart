@@ -4,6 +4,8 @@ import 'package:agency_flutter_ui/agency_flutter_ui.dart';
 import 'package:flutter/material.dart';
 
 import 'prototype_app.dart';
+import 'qa/memory_qa_finding_repository.dart';
+import 'qa/qa_coordinator.dart';
 import 'review/memory_approval_repository.dart';
 import 'review/memory_feedback_repository.dart';
 import 'review/memory_refinement_batch_repository.dart';
@@ -127,6 +129,28 @@ class _PrototypeBootstrapState extends State<PrototypeBootstrap> {
     return coordinator;
   }
 
+  /// Builds the automated-QA triage coordinator for [controller].
+  ///
+  /// QA findings are separate from `ReviewState`; the prototype composition root
+  /// uses an in-memory repository, and promotion still flows through the
+  /// validated [ReviewCoordinator] feedback seam.
+  QaCoordinator _qaCoordinatorFor(ReviewController controller) {
+    final existing = _qaCoordinator;
+    if (existing != null && identical(_qaController, controller)) {
+      return existing;
+    }
+    final coordinator = QaCoordinator(
+      findings: MemoryQaFindingRepository(),
+      review: _coordinatorFor(controller),
+    );
+    _qaController = controller;
+    _qaCoordinator = coordinator;
+    return coordinator;
+  }
+
+  ReviewController? _qaController;
+  QaCoordinator? _qaCoordinator;
+
   @override
   Widget build(BuildContext context) {
     final routeError = _routeError;
@@ -162,6 +186,7 @@ class _PrototypeBootstrapState extends State<PrototypeBootstrap> {
               controller: controller,
               coordinator: _coordinatorFor(controller),
               actor: kLocalReviewer,
+              qaCoordinator: _qaCoordinatorFor(controller),
               onOpenPrototype: () => setState(() => _showPrototype = true),
             ),
           );

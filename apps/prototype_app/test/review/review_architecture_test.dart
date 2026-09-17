@@ -6,6 +6,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prototype_app/fixtures/fixture_repository.dart';
 import 'package:prototype_app/prototype_app.dart';
+import 'package:prototype_app/qa/memory_qa_finding_repository.dart';
+import 'package:prototype_app/qa/qa_coordinator.dart';
+import 'package:prototype_app/qa/qa_finding.dart';
 import 'package:prototype_app/registry/prototype_registry.dart';
 import 'package:prototype_app/review/memory_approval_repository.dart';
 import 'package:prototype_app/review/memory_feedback_repository.dart';
@@ -451,6 +454,139 @@ void main() {
       expect(find.text('Overall direction: Not selected'), findsOneWidget);
       expect(find.text('Overall direction: a'), findsNothing);
       expect(find.text('Overall direction: A'), findsNothing);
+    });
+  });
+
+  // 9. Automated QA stays a separate authority (Milestone D).
+  group('automated QA boundary', () {
+    test('ReviewState carries no QA finding collection', () {
+      final runtime = _threeDirectionRuntime();
+      final controller = ReviewController(
+        clientId: runtime.clientId,
+        repository: MemoryReviewRepository(),
+        runtime: runtime,
+      );
+
+      final json = controller.state.toJson();
+      expect(json.keys.toSet(), {
+        'version',
+        'client_id',
+        'review_round',
+        'status',
+        'selected_direction',
+        'screen_selections',
+        'comments',
+        'feedback_ids',
+      });
+      for (final key in json.keys) {
+        expect(key.contains('qa'), isFalse, reason: 'QA state leaked into $key');
+      }
+    });
+
+    testWidgets('the QA destination appears only when a QA coordinator is supplied',
+        (tester) async {
+      final runtime = _threeDirectionRuntime();
+      final controller = ReviewController(
+        clientId: runtime.clientId,
+        repository: MemoryReviewRepository(),
+        runtime: runtime,
+      );
+      final coordinator = ReviewCoordinator(
+        controller: controller,
+        feedbackRepository: MemoryFeedbackRepository(),
+        approvalRepository: MemoryApprovalRepository(),
+        refinementBatchRepository: MemoryRefinementBatchRepository(),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ReviewShell(
+            runtime: runtime,
+            controller: controller,
+            coordinator: coordinator,
+            actor: _reviewer,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('QA'), findsNothing);
+
+      final qaCoordinator = QaCoordinator(
+        findings: MemoryQaFindingRepository(),
+        review: coordinator,
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ReviewShell(
+            runtime: runtime,
+            controller: controller,
+            coordinator: coordinator,
+            actor: _reviewer,
+            qaCoordinator: qaCoordinator,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('QA'), findsWidgets);
+    });
+
+    testWidgets('promotion leaves runtime data byte-identical', (tester) async {
+      final bundle = canonicalBundle(
+        directionIds: const ['a', 'b'],
+        patterns: const {
+          'a': ['commerce.home'],
+          'b': ['commerce.home'],
+        },
+      );
+      final runtime = PrototypeRuntime.fromMap(bundle);
+      final controller = ReviewController(
+        clientId: runtime.clientId,
+        repository: MemoryReviewRepository(),
+        runtime: runtime,
+      );
+      final coordinator = ReviewCoordinator(
+        controller: controller,
+        feedbackRepository: MemoryFeedbackRepository(),
+        approvalRepository: MemoryApprovalRepository(),
+        refinementBatchRepository: MemoryRefinementBatchRepository(),
+      );
+      final qa = QaCoordinator(
+        findings: MemoryQaFindingRepository(),
+        review: coordinator,
+      );
+      final bundleJsonBefore = json.encode(bundle);
+      final directionsBefore = Map.of(runtime.directions);
+      final themesBefore = Map.of(runtime.directionThemes);
+
+      await qa.recordFinding(
+        QaFinding.detected(
+          id: 'qa-001',
+          clientId: 'prototype-demo',
+          severity: QaSeverity.major,
+          category: 'spacing',
+          surface: QaSurface.prototype,
+          screen: 'commerce.home',
+          state: 'default',
+          direction: 'a',
+          section: 'home.product-grid',
+          screenshotRef: 'sha256:capture-1',
+          sourceCommitSha: 'abc123',
+          ruleSource: QaRuleSource.designContract,
+          ruleRef: 'spacing.card.gap',
+          summary: 'spacing drift',
+          actorId: 'visual-qa',
+          at: DateTime.utc(2026, 9, 17, 10),
+        ),
+      );
+      await qa.triageFinding(findingId: 'qa-001', actor: _reviewer);
+      await qa.promoteFinding(findingId: 'qa-001', actor: _reviewer);
+
+      expect(json.encode(bundle), bundleJsonBefore);
+      expect(runtime.directions.keys.toSet(), directionsBefore.keys.toSet());
+      expect(runtime.directionThemes.keys.toSet(), themesBefore.keys.toSet());
+      expect(identical(runtime.theme, runtime.theme), isTrue);
+      expect(await coordinator.listApprovals(), isEmpty);
+      expect(await coordinator.allBatches(), isEmpty);
     });
   });
 }

@@ -1,3 +1,12 @@
+# LEGACY compatibility artifact (Milestone B / C).
+#
+# New automated QA findings are canonical QAFinding JSON records under
+# client-projects/<client>/prototype/qa/findings/<finding-id>.json, validated
+# against client-projects/schema/qa-finding.schema.json (see templates/qa-finding.json).
+#
+# This YAML shape is retained only for the workflow runtime
+# (tooling/workflow/validate_workflow.py) and existing clients. It is still
+# validated by tooling/prototype/validate_visual_qa.py.
 version: 1
 client_id: example-client
 findings:

@@ -20,6 +20,26 @@ const _sampleSecondProduct = AgencyProduct(
   price: AgencyPrice(current: 1799),
 );
 
+/// A deliberately long product name used to protect text-wrapping behavior.
+const _longNameProduct = AgencyProduct(
+  id: 'sku-110',
+  name: 'Industrial-Grade Three-Phase Variable Frequency Drive with Brake Chopper',
+  sku: 'VFD-3PH-BRK',
+  stock: 3,
+  rating: 4.2,
+  price: AgencyPrice(current: 184999, compareAt: 199999),
+);
+
+/// An out-of-stock B2B product used to protect the governed stock state.
+const _outOfStockProduct = AgencyProduct(
+  id: 'sku-111',
+  name: 'Replacement Filter Cartridge',
+  sku: 'FLT-REPL-01',
+  stock: 0,
+  rating: 4.0,
+  price: AgencyPrice(current: 2499),
+);
+
 Widget buildAgencyWidgetbook() {
   return Widgetbook.material(
     directories: [
@@ -41,6 +61,13 @@ Widget buildAgencyWidgetbook() {
                   onPressed: () {},
                 ),
               ),
+              WidgetbookUseCase(
+                name: 'Disabled',
+                builder: (_) => const AgencyButton(
+                  label: 'Continue',
+                  onPressed: null,
+                ),
+              ),
             ],
           ),
           WidgetbookComponent(
@@ -51,6 +78,16 @@ Widget buildAgencyWidgetbook() {
                 builder: (_) => const SizedBox(
                   width: 360,
                   child: AgencySearchField(hintText: 'Search products or SKU'),
+                ),
+              ),
+              WidgetbookUseCase(
+                name: 'Filled',
+                builder: (_) => SizedBox(
+                  width: 360,
+                  child: AgencySearchField(
+                    hintText: 'Search products or SKU',
+                    controller: TextEditingController(text: 'USB-C hub'),
+                  ),
                 ),
               ),
             ],
@@ -89,6 +126,26 @@ Widget buildAgencyWidgetbook() {
                     product: _sampleProduct,
                     variant: ProductCardVariant.compact,
                     density: AgencyDensity.dense,
+                  ),
+                ),
+              ),
+              WidgetbookUseCase(
+                name: 'Out of stock (B2B)',
+                builder: (_) => const SizedBox(
+                  width: 260,
+                  child: ProductCard(
+                    product: _outOfStockProduct,
+                    variant: ProductCardVariant.b2b,
+                  ),
+                ),
+              ),
+              WidgetbookUseCase(
+                name: 'Long name (wrapping)',
+                builder: (_) => const SizedBox(
+                  width: 260,
+                  child: ProductCard(
+                    product: _longNameProduct,
+                    variant: ProductCardVariant.b2b,
                   ),
                 ),
               ),

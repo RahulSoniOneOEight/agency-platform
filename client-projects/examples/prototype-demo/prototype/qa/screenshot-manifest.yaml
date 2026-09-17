@@ -1,9 +1,6 @@
-version: 1
+version: 2
 client_id: prototype-demo
-directions:
-- a
-- b
-- c
+fixture_version: prototype-demo-v1
 viewports:
 - name: mobile-small
   width: 360
@@ -20,10 +17,459 @@ viewports:
 - name: desktop
   width: 1440
   height: 900
-routes:
-- direction: a
-  path: /?client=prototype-demo&direction=a
-- direction: b
-  path: /?client=prototype-demo&direction=b
-- direction: c
-  path: /?client=prototype-demo&direction=c
+jobs:
+- surface: prototype
+  screen: commerce.search
+  state: default
+  direction: a
+  viewport:
+    name: mobile-small
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.search
+  state: default
+  direction: a
+  viewport:
+    name: mobile-medium
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.search
+  state: default
+  direction: a
+  viewport:
+    name: mobile-large
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.search
+  state: default
+  direction: a
+  viewport:
+    name: tablet
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.search
+  state: default
+  direction: a
+  viewport:
+    name: desktop
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.plp
+  state: default
+  direction: a
+  viewport:
+    name: mobile-small
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.plp
+  state: default
+  direction: a
+  viewport:
+    name: mobile-medium
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.plp
+  state: default
+  direction: a
+  viewport:
+    name: mobile-large
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.plp
+  state: default
+  direction: a
+  viewport:
+    name: tablet
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.plp
+  state: default
+  direction: a
+  viewport:
+    name: desktop
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.pdp
+  state: default
+  direction: a
+  viewport:
+    name: mobile-small
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.pdp
+  state: default
+  direction: a
+  viewport:
+    name: mobile-medium
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.pdp
+  state: default
+  direction: a
+  viewport:
+    name: mobile-large
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.pdp
+  state: default
+  direction: a
+  viewport:
+    name: tablet
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.pdp
+  state: default
+  direction: a
+  viewport:
+    name: desktop
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.cart
+  state: default
+  direction: a
+  viewport:
+    name: mobile-small
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.cart
+  state: default
+  direction: a
+  viewport:
+    name: mobile-medium
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.cart
+  state: default
+  direction: a
+  viewport:
+    name: mobile-large
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.cart
+  state: default
+  direction: a
+  viewport:
+    name: tablet
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.cart
+  state: default
+  direction: a
+  viewport:
+    name: desktop
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.rfq
+  state: default
+  direction: a
+  viewport:
+    name: mobile-small
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.rfq
+  state: default
+  direction: a
+  viewport:
+    name: mobile-medium
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.rfq
+  state: default
+  direction: a
+  viewport:
+    name: mobile-large
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.rfq
+  state: default
+  direction: a
+  viewport:
+    name: tablet
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.rfq
+  state: default
+  direction: a
+  viewport:
+    name: desktop
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.trade-dashboard
+  state: default
+  direction: b
+  viewport:
+    name: mobile-small
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.trade-dashboard
+  state: default
+  direction: b
+  viewport:
+    name: mobile-medium
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.trade-dashboard
+  state: default
+  direction: b
+  viewport:
+    name: mobile-large
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.trade-dashboard
+  state: default
+  direction: b
+  viewport:
+    name: tablet
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.trade-dashboard
+  state: default
+  direction: b
+  viewport:
+    name: desktop
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.reorder
+  state: default
+  direction: b
+  viewport:
+    name: mobile-small
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.reorder
+  state: default
+  direction: b
+  viewport:
+    name: mobile-medium
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.reorder
+  state: default
+  direction: b
+  viewport:
+    name: mobile-large
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.reorder
+  state: default
+  direction: b
+  viewport:
+    name: tablet
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.reorder
+  state: default
+  direction: b
+  viewport:
+    name: desktop
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.cart
+  state: default
+  direction: b
+  viewport:
+    name: mobile-small
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.cart
+  state: default
+  direction: b
+  viewport:
+    name: mobile-medium
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.cart
+  state: default
+  direction: b
+  viewport:
+    name: mobile-large
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.cart
+  state: default
+  direction: b
+  viewport:
+    name: tablet
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.cart
+  state: default
+  direction: b
+  viewport:
+    name: desktop
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.home
+  state: default
+  direction: c
+  viewport:
+    name: mobile-small
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.home
+  state: default
+  direction: c
+  viewport:
+    name: mobile-medium
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.home
+  state: default
+  direction: c
+  viewport:
+    name: mobile-large
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.home
+  state: default
+  direction: c
+  viewport:
+    name: tablet
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.home
+  state: default
+  direction: c
+  viewport:
+    name: desktop
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.plp
+  state: default
+  direction: c
+  viewport:
+    name: mobile-small
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.plp
+  state: default
+  direction: c
+  viewport:
+    name: mobile-medium
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.plp
+  state: default
+  direction: c
+  viewport:
+    name: mobile-large
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.plp
+  state: default
+  direction: c
+  viewport:
+    name: tablet
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.plp
+  state: default
+  direction: c
+  viewport:
+    name: desktop
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.pdp
+  state: default
+  direction: c
+  viewport:
+    name: mobile-small
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.pdp
+  state: default
+  direction: c
+  viewport:
+    name: mobile-medium
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.pdp
+  state: default
+  direction: c
+  viewport:
+    name: mobile-large
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.pdp
+  state: default
+  direction: c
+  viewport:
+    name: tablet
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.pdp
+  state: default
+  direction: c
+  viewport:
+    name: desktop
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.rfq
+  state: default
+  direction: c
+  viewport:
+    name: mobile-small
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.rfq
+  state: default
+  direction: c
+  viewport:
+    name: mobile-medium
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.rfq
+  state: default
+  direction: c
+  viewport:
+    name: mobile-large
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.rfq
+  state: default
+  direction: c
+  viewport:
+    name: tablet
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.rfq
+  state: default
+  direction: c
+  viewport:
+    name: desktop
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.trade-dashboard
+  state: default
+  direction: c
+  viewport:
+    name: mobile-small
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.trade-dashboard
+  state: default
+  direction: c
+  viewport:
+    name: mobile-medium
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.trade-dashboard
+  state: default
+  direction: c
+  viewport:
+    name: mobile-large
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.trade-dashboard
+  state: default
+  direction: c
+  viewport:
+    name: tablet
+  device_scale_factor: 1
+- surface: prototype
+  screen: commerce.trade-dashboard
+  state: default
+  direction: c
+  viewport:
+    name: desktop
+  device_scale_factor: 1

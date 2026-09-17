@@ -93,6 +93,7 @@ def compose_prototype(root: Path, client_dir: Path) -> Path:
         stale.unlink()
 
     directions: dict[str, str] = {}
+    screens_by_direction: dict[str, list[str]] = {}
     seen_ids: set[str] = set()
     for direction_key, path in discovered:
         direction = _load_yaml(path)
@@ -113,6 +114,9 @@ def compose_prototype(root: Path, client_dir: Path) -> Path:
             encoding="utf-8",
         )
         directions[direction_key] = f"prototype/runtime/direction-{direction_key}.json"
+        screens_by_direction[direction_key] = [
+            str(pattern) for pattern in (runtime_direction.get("patterns") or [])
+        ]
 
     fixture_path = fixtures_dir / "demo.yaml"
     fixture_path.write_text(
@@ -141,7 +145,15 @@ def compose_prototype(root: Path, client_dir: Path) -> Path:
 
     screenshot_path = qa_dir / "screenshot-manifest.yaml"
     screenshot_path.write_text(
-        yaml.safe_dump(build_screenshot_manifest(client_id, available_ids), sort_keys=False),
+        yaml.safe_dump(
+            build_screenshot_manifest(
+                client_id,
+                available_ids,
+                screens_by_direction,
+                fixture_version=f"{client_id}-v1",
+            ),
+            sort_keys=False,
+        ),
         encoding="utf-8",
     )
 

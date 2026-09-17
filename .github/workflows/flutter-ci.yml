@@ -49,6 +49,19 @@ jobs:
             )
           done < <(find packages apps starters client-projects -name pubspec.yaml -print)
 
+      - name: Governed visual golden regression
+        if: steps.detect.outputs.has_packages == 'true'
+        shell: bash
+        run: |
+          # Deterministic golden regression gate. A mismatch fails CI and never
+          # rewrites a baseline (baselines change only via a deliberate
+          # `flutter test --update-goldens` run reviewed and committed by a human).
+          if [ -d apps/widgetbook/test/golden ]; then
+            cd apps/widgetbook
+            flutter pub get
+            flutter test test/golden
+          fi
+
       - name: Build prototype app for web
         if: steps.detect.outputs.has_packages == 'true'
         shell: bash

@@ -1,0 +1,151 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agency-platform/schema/qa-finding.schema.json",
+  "title": "Automated QA finding (v1)",
+  "description": "A QAFinding is the sole automated visual-QA finding authority. It is produced by deterministic golden comparison or a provider-neutral Visual AI review and may only become human-review state through explicit reviewer promotion into a FeedbackRecord. Severity is QA impact only and never implies C.4 blocking.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "client_id",
+    "status",
+    "severity",
+    "category",
+    "surface",
+    "screen",
+    "story",
+    "state",
+    "direction",
+    "mix_ref",
+    "section",
+    "region",
+    "screenshot_ref",
+    "source_commit_sha",
+    "rule_source",
+    "rule_ref",
+    "baseline_ref",
+    "summary",
+    "evidence",
+    "confidence",
+    "dedupe_key",
+    "feedback_id",
+    "no_longer_reproducible",
+    "recurrences",
+    "history"
+  ],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "client_id": { "type": "string", "minLength": 1 },
+    "status": {
+      "type": "string",
+      "enum": ["detected", "triaged", "promoted", "dismissed", "accepted_risk"]
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["info", "minor", "major", "blocker"],
+      "description": "QA impact only; never a C.4 blocking classification."
+    },
+    "category": { "type": "string", "minLength": 1 },
+    "surface": { "type": "string", "enum": ["prototype", "widgetbook"] },
+    "screen": { "type": ["string", "null"] },
+    "story": { "type": ["string", "null"] },
+    "state": { "type": "string", "minLength": 1 },
+    "direction": { "type": ["string", "null"] },
+    "mix_ref": { "type": ["string", "null"] },
+    "section": { "type": ["string", "null"] },
+    "region": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/definitions/region" }
+      ]
+    },
+    "screenshot_ref": { "type": "string", "minLength": 1 },
+    "source_commit_sha": { "type": "string", "minLength": 1 },
+    "rule_source": {
+      "type": "string",
+      "enum": [
+        "approved_experience",
+        "design_contract",
+        "accepted_baseline",
+        "linked_reference",
+        "visual_heuristic"
+      ],
+      "description": "Descending authority: approved experience > design contract > accepted baseline > linked reference > general heuristics."
+    },
+    "rule_ref": { "type": "string", "minLength": 1 },
+    "baseline_ref": { "type": ["string", "null"] },
+    "summary": { "type": "string", "minLength": 1 },
+    "evidence": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/evidence" }
+    },
+    "confidence": {
+      "oneOf": [
+        { "type": "null" },
+        { "type": "number", "minimum": 0, "maximum": 1 }
+      ]
+    },
+    "dedupe_key": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Stable identity derived from client/surface/screen-or-story/rule/category/section-or-region/baseline; excludes severity, confidence, evidence, and source commit."
+    },
+    "feedback_id": { "type": ["string", "null"] },
+    "no_longer_reproducible": { "type": "boolean" },
+    "recurrences": { "type": "integer", "minimum": 0 },
+    "history": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/event" }
+    }
+  },
+  "definitions": {
+    "region": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "width", "height"],
+      "properties": {
+        "x": { "type": "number", "minimum": 0, "maximum": 1 },
+        "y": { "type": "number", "minimum": 0, "maximum": 1 },
+        "width": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+        "height": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "region": { "$ref": "#/definitions/region" },
+        "ref": { "type": "string", "minLength": 1 },
+        "note": { "type": "string", "minLength": 1 }
+      }
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event", "actor_id", "at"],
+      "properties": {
+        "event": {
+          "type": "string",
+          "enum": [
+            "detected",
+            "triaged",
+            "promoted",
+            "dismissed",
+            "accepted_risk",
+            "recurrence",
+            "evidence_linked",
+            "no_longer_reproducible"
+          ]
+        },
+        "actor_id": { "type": "string", "minLength": 1 },
+        "at": { "type": "string", "format": "date-time" },
+        "reason": { "type": "string", "minLength": 1 },
+        "feedback_id": { "type": "string", "minLength": 1 },
+        "run_id": { "type": "string", "minLength": 1 },
+        "evidence_ref": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}
