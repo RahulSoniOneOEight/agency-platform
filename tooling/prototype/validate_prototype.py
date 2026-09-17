@@ -6,6 +6,7 @@ from pathlib import Path
 import yaml
 
 from .project_direction import validate_runtime_direction
+from .screenshot_manifest import InvalidCaptureJob, manifest_directions
 
 REQUIRED_PATHS = (
     "tooling/prototype/__init__.py",
@@ -103,13 +104,16 @@ def _validate_manifest_inner(manifest_path: Path) -> list[str]:
         screenshot = yaml.safe_load(screenshot_path.read_text(encoding="utf-8"))
     except yaml.YAMLError as exc:
         return errors + [f"{label}: invalid screenshot manifest yaml: {exc}"]
-    screenshot_dirs = screenshot.get("directions") if isinstance(screenshot, dict) else None
-    if (
-        not isinstance(screenshot_dirs, list)
-        or any(not isinstance(d, str) for d in screenshot_dirs)
-        or set(screenshot_dirs) != set(keys)
-    ):
-        errors.append(f"{label}: screenshot manifest directions must equal {keys!r}")
+    screenshot_dirs: set[str] | None = None
+    try:
+        screenshot_dirs = manifest_directions(screenshot)
+    except InvalidCaptureJob as exc:
+        errors.append(f"{label}: invalid screenshot manifest: {exc}")
+    else:
+        if screenshot_dirs != set(keys):
+            errors.append(
+                f"{label}: screenshot manifest directions must equal {keys!r}"
+            )
 
     return errors
 

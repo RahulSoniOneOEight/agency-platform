@@ -173,10 +173,17 @@ class PrototypePlatformTests(unittest.TestCase):
             self.assertTrue(data["products"] or data["services"])
 
     def test_screenshot_manifest_has_standard_viewports(self):
-        manifest = build_screenshot_manifest("acme", ["a", "b", "c"])
+        manifest = build_screenshot_manifest(
+            "acme",
+            ["a", "b", "c"],
+            {"a": ["commerce.home"], "b": ["commerce.search"], "c": ["commerce.pdp"]},
+        )
         sizes = {(v["width"], v["height"]) for v in manifest["viewports"]}
         self.assertEqual({(360, 800), (390, 844), (430, 932), (768, 1024), (1440, 900)}, sizes)
-        self.assertEqual(["a", "b", "c"], manifest["directions"])
+        self.assertEqual(2, manifest["version"])
+        self.assertEqual(
+            {"a", "b", "c"}, {job["direction"] for job in manifest["jobs"]}
+        )
 
     def test_visual_findings_contract(self):
         valid = {
@@ -345,17 +352,35 @@ class PrototypePlatformTests(unittest.TestCase):
             errors = validate_prototype_platform(root)
             self.assertTrue(any("direction b" in error or "must be a string" in error for error in errors))
 
-    def test_validation_reports_unhashable_screenshot_directions(self):
+    def test_validation_reports_invalid_screenshot_jobs(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             client = _write_client(root, ["a", "b"])
             compose_prototype(root, client)
             screenshot_path = client / "prototype" / "qa" / "screenshot-manifest.yaml"
             screenshot = yaml.safe_load(screenshot_path.read_text(encoding="utf-8"))
-            screenshot["directions"] = [{"direction": "a"}]
+            screenshot["jobs"][0]["direction"] = "z"
             screenshot_path.write_text(yaml.safe_dump(screenshot, sort_keys=False), encoding="utf-8")
             errors = validate_prototype_platform(root)
-            self.assertTrue(any("screenshot manifest directions" in error for error in errors))
+            self.assertTrue(
+                any("invalid screenshot manifest" in error for error in errors), errors
+            )
+
+    def test_validation_reports_screenshot_direction_mismatch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            client = _write_client(root, ["a", "b"])
+            compose_prototype(root, client)
+            screenshot_path = client / "prototype" / "qa" / "screenshot-manifest.yaml"
+            screenshot = yaml.safe_load(screenshot_path.read_text(encoding="utf-8"))
+            screenshot["jobs"] = [
+                job for job in screenshot["jobs"] if job.get("direction") == "a"
+            ]
+            screenshot_path.write_text(yaml.safe_dump(screenshot, sort_keys=False), encoding="utf-8")
+            errors = validate_prototype_platform(root)
+            self.assertTrue(
+                any("screenshot manifest directions" in error for error in errors), errors
+            )
 
 
 if __name__ == "__main__":
