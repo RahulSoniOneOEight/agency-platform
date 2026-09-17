@@ -156,6 +156,29 @@ committed Dart review records cannot be byte-reproduced. Determinism must be ass
 | F.3 | Change boundaries + resume + reports/CI (Tasks 8–10) | PENDING | — |
 
 ## Progress log
+
+- 2026-09-18 — **Cycle F.2 implemented** (a84fed\). The real C/D authorities are exercised on the
+  reference client in a temp workspace (RF4/RF9): Compare/Select/Mix (overall \\, screen
+  \commerce.search → a\, governed section \commerce.pdp/pdp.price → a\), one blocking + one
+  non-blocking + one visual-annotation FeedbackRecord, RefinementBatch draft→confirmed→ready→
+  started→validated→completed with the blocking item moving open→addressed (never auto-resolved),
+  explicit reviewer resolve + round close, ApprovalSnapshot v1 (version 1, supersedes null, sha256
+  review-state hash, carries the non-blocking feedback, byte-identical on disk), and the D visual-QA
+  path (FixtureVisualQaProvider → QAFinding detected/triaged → one explicit idempotent promotion to
+  FeedbackRecord(originQaFindingId), blocking false, no auto-resolve, plus a dismiss path that creates
+  no feedback).
+  - Delivered: \pps/prototype_app/test/reference_client/{reference_client_review_approval_test.dart,
+    reference_client_qa_test.dart}\; \	ooling/reference_client/evidence.py\;
+    \client-projects/schema/reference-client-report.schema.json\;
+    \	ooling/validation/test_reference_client_evidence.py\; committed machine evidence
+    \client-projects/reference-commerce/reference-e2e/evidence/review-approval-evidence.json    (canonical JSON, 39 passing assertions, no subjective score).
+  - Tests: \	est_reference_client_*\ 38 (16 fixture + 12 scenario + 10 evidence) → repo suite
+    **733 tests OK**; \lutter test test/reference_client\ 11, \lutter test test/review\ 586,
+    \lutter test test/qa\ 129, \lutter test\ 789, \lutter analyze\ clean; all validators and both
+    \--check\ freshness commands pass.
+  - Evidence emission is opt-in: the Dart test writes into the repo only when
+    \REFERENCE_EVIDENCE_PATH\ is set, so CI never mutates committed authority.
+
 - 2026-09-18 — Preflight complete. Branch `milestone-f-reference-client` at `a40ccf7`, based on the
   merged E tip `4a9a532`. Spec + plan read in full. Preflight scan found two decisive constraints
   (C1 runtime direction ids, C2 non-`examples` validator coverage) plus C3 (five governed sections)
