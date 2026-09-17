@@ -152,11 +152,10 @@ committed Dart review records cannot be byte-reproduced. Determinism must be ass
 | Cycle | Scope | Status | Commits |
 |-------|-------|--------|---------|
 | F.1 | Reference client foundation (Tasks 1–4) | ACCEPTED | `1c1a23b` `514e120` `…` |
-| F.2 | Review → Approval v1 → Visual QA (Tasks 5–7) | PENDING | — |
+| F.2 | Review → Approval v1 → Visual QA (Tasks 5–7) | PENDING-REVIEW | `2a84fed` |
 | F.3 | Change boundaries + resume + reports/CI (Tasks 8–10) | PENDING | — |
 
 ## Progress log
-
 - 2026-09-18 — Preflight complete. Branch `milestone-f-reference-client` at `a40ccf7`, based on the
   merged E tip `4a9a532`. Spec + plan read in full. Preflight scan found two decisive constraints
   (C1 runtime direction ids, C2 non-`examples` validator coverage) plus C3 (five governed sections)
