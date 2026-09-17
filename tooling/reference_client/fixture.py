@@ -217,22 +217,42 @@ def _reference_errors(fixture: dict[str, Any]) -> list[str]:
 
     validation_states = fixture.get("validation_states")
     if isinstance(validation_states, list):
+        all_ids: set[Any] = set()
+        for name in (
+            "categories",
+            "collections",
+            "products",
+            "variants",
+            "accounts",
+            "quotations",
+            "rfqs",
+            "carts",
+            "orders",
+            "promotions",
+        ):
+            all_ids |= ids(name)
+        kind_ids = {
+            "product": product_ids,
+            "variant": variant_ids,
+            "account": account_ids,
+            "category": category_ids,
+        }
         for index, entry in enumerate(validation_states):
             if not isinstance(entry, dict):
                 continue
             target = entry.get("target")
-            if not isinstance(target, str) or ":" not in target:
+            if not isinstance(target, str) or not target:
                 continue
-            kind, _, ref = target.partition(":")
-            known = {
-                "product": product_ids,
-                "variant": variant_ids,
-                "account": account_ids,
-                "category": category_ids,
-            }.get(kind)
-            if known is not None and ref not in known:
+            if ":" in target:
+                kind, _, ref = target.partition(":")
+                known = kind_ids.get(kind)
+                if known is not None and ref not in known:
+                    errors.append(
+                        f"validation_states.{index}.target: unknown {kind} {ref!r}"
+                    )
+            elif target not in all_ids:
                 errors.append(
-                    f"validation_states.{index}.target: unknown {kind} {ref!r}"
+                    f"validation_states.{index}.target: unknown entity {target!r}"
                 )
 
     return errors

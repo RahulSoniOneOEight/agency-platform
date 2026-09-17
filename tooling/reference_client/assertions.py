@@ -443,11 +443,15 @@ def validate_assertions(root: Path, client_dir: Path) -> list[str]:
     errors: list[str] = []
 
     version = document.get("version")
-    if version is not None and version not in SUPPORTED_ASSERTION_VERSIONS:
+    if version is None:
+        errors.append(f"{path}: assertions require a version")
+    elif version not in SUPPORTED_ASSERTION_VERSIONS:
         errors.append(f"{path}: unsupported assertions version {version!r}")
 
     client_id = document.get("client_id")
-    if client_id is not None and client_id != client_dir.name:
+    if client_id is None:
+        errors.append(f"{path}: assertions require a client_id")
+    elif client_id != client_dir.name:
         errors.append(
             f"{path}: client_id {client_id!r} does not match client directory "
             f"{client_dir.name!r}"

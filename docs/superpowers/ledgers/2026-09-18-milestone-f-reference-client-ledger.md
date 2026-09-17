@@ -198,6 +198,13 @@ committed Dart review records cannot be byte-reproduced. Determinism must be ass
     to demonstrate a rejection (RF15 records that provenance follows the canonical schema);
     `validate_repo`/CI wiring of the reference-client validator is F.3 Task 10 scope; the runtime
     fixture pack and the E2E fixture intentionally differ (RF14); `artifact_exists` assertions are
-    existence-only.
+    existence-only; **direction `b` render coverage is limited to `commerce.pdp`** because
+    `commerce.home`/`commerce.plp` hit the pre-existing shared `ProductCard`/`mainAxisExtent` overflow
+    — direction `b` is still proven distinct by its bundle metadata, theme, and immutability
+    assertions.
   - Post-fix counts: `test_reference_client_fixture` 16, `test_reference_client_scenario` 12,
-    `flutter test test/reference_client` 8.
+    `flutter test test/reference_client` 8, `flutter test` 786.
+  - **Scoped re-review: ACCEPT-WITH-MINORS — major M1 closed, 0 blockers / 0 majors met; F.2 may
+    proceed.** Residual partials closed in the same pass: `validation_states.target` now validates bare
+    entity ids as well as `kind:ref` targets, and `validate_assertions` now requires `version` and
+    `client_id` to be present.
