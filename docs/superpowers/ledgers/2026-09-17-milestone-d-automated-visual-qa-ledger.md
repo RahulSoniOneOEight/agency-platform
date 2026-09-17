@@ -126,8 +126,8 @@
 
 | Cycle | Scope | Status | Commits |
 |-------|-------|--------|---------|
-| 1 | D.1 deterministic screenshot automation (Tasks 1–3) | PENDING | — |
-| 2 | D.2 Visual AI QA + `QAFinding` (Tasks 4–6) | PENDING | — |
+| 1 | D.1 deterministic screenshot automation (Tasks 1–3) | ACCEPTED | `7ba1df2` `32d7f59` `08e9b4f` `5bd89c8` |
+| 2 | D.2 Visual AI QA + `QAFinding` (Tasks 4–6) | ACCEPTED | `b6315f3` `a2574f9` `d4559eb` `0285a41` |
 | 3 | D.3 golden/Widgetbook + D.4 orchestration + CI (Tasks 7–11) | PENDING | — |
 
 ## Progress log
@@ -135,3 +135,60 @@
 - 2026-09-17 — Preflight complete. Branch `milestone-d-visual-qa` at `9f613dc`; spec + plan present;
   C.4–C.7 baseline green (Python 283 OK, review 581 passing). RD1–RD12 recorded. Untracked
   `pubspec.lock` files intentionally uncommitted.
+- 2026-09-17 — **Cycle 1 (D.1) implemented and ACCEPTED.** Commits: `7ba1df2` manifest v2 + schema +
+  demo manifest; `32d7f59` error-type unification + regenerated demo manifest; `08e9b4f` hardened
+  browser adapter (dependency-free local-Chromium fallback, `--force-device-scale-factor=` fix,
+  private `.capture-tmp` staging) and atomic temp publication; `5bd89c8` review fixes.
+  - Delivered: `MANIFEST_VERSION=2`, `normalize_manifest`, `build_capture_jobs`, `manifest_directions`;
+    `tooling/visual_qa/{errors,capture_models,capture_runner}.py`; transport-only
+    `tooling/screenshots/capture_web.mjs`; compat CLI `tooling/prototype/capture_screenshots.py`
+    (`--help`, `--dry-run`, typed exit codes); `client-projects/schema/screenshot-manifest.schema.json`;
+    `validate_prototype.py` v1+v2 aware; `validate_visual_qa.py` now has a real `__main__` gate.
+  - Tests: `tooling/validation/test_visual_qa_capture.py` = **94 tests**; repo Python suite =
+    **378 tests OK**; `validate_repo.py` (98 paths) + `validate_prototype` + `validate_knowledge` +
+    `validate_workflow` all pass.
+  - **Live smoke capture (real browser):** served `apps/prototype_app/build/web` on :8099 and captured
+    `prototype-demo` `commerce.home` direction `c` at 390×844 → 45,682-byte PNG (visually verified:
+    a fully settled Procurement RFQ screen) plus sidecar with matching
+    `capture_id=sha256:4187fa0a…` and `source_commit_sha=9f613dc`.
+  - Independent review (`git diff 774bd55...HEAD`): **0 blockers, 1 major, 9 minors**; all 11 required
+    checks PASS. Major M1 (PNG published before sidecar → orphan risk) fixed in `5bd89c8` (stage both,
+    roll back the PNG if the sidecar publish fails). Also fixed: non-PNG output now rejected; scale
+    factor `1` vs `1.0` numeric canonicalization; viewport `name` is part of identity (no silent
+    filename collision); `state` sanitized in filenames; `validate_visual_qa` no-op gate fixed;
+    `__all__`/docstring overclaims removed. Accepted minors recorded below.
+  - **Accepted minors (tracked, non-gating):** the browser adapter always reports
+    `deterministic: true` (nondeterminism is only reachable through fake backends);
+    `artifact.path` stores the bare filename (portable, not absolute).
+- 2026-09-17 — **Cycle 1 re-verification:** `py -3.12 -m unittest discover tooling/validation` =
+  378 OK; `validate_repo.py` exit 0; `validate_prototype` exit 0.
+- 2026-09-17 — **Cycle 2 (D.2) implemented and ACCEPTED.** Commits: `b6315f3` QAFinding domain +
+  memory/file repositories + schema + template; `a2574f9` provider-neutral Visual QA contract
+  (Python `qa_contracts.py`/`visual_provider.py`, Dart `visual_qa_provider.dart`); `d4559eb`
+  review fixes; `0285a41` residual-minor fixes.
+  - Delivered: `QaFinding` (26-key canonical JSON, append-only history, derived fields that cannot
+    drift), `QaFindingStatus`/`QaSeverity`/`QaSurface`/`QaRuleSource` (authority-ranked),
+    `QaRegion`/`QaEvidence`/`QaFindingEvent`, typed `QaDomainError` hierarchy,
+    `QaFindingRepository` + memory/file adapters under `prototype/qa/findings/`,
+    `client-projects/schema/qa-finding.schema.json`, `templates/qa-finding.json`,
+    `VisualQaProvider` seam + `FixtureVisualQaProvider` (offline), `VisualQaAuthorityBundle`
+    (non-invertible), `VisualQaCandidate` (strict, forbidden-key and unknown-key rejection).
+  - Tests: `test/qa` = **75 tests**; `tooling/validation/test_visual_qa_contracts.py` = **57 tests**;
+    repo Python suite = **435 tests OK**; `flutter test test/review` = **581 green**;
+    `flutter analyze` clean; `validate_repo` + `validate_prototype` + `validate_visual_qa` +
+    `validate_workflow` pass.
+  - Independent review: **REJECT** initially — 0 blockers, 2 majors (M1 template `dedupe_key` not
+    reproducible and undetected by the Python gate; M2 Python candidate normalization dropped
+    `screenshot_ref` which Dart requires) + 9 minors, several cross-language. All fixed in
+    `d4559eb` (domain-level `validate_finding` that recomputes the dedupe key, enforces region
+    containment and promotion consistency; `screenshot_ref` in the candidate contract; ordered
+    authority subsets; unknown-key rejection; symmetric surface identity; trimming at the provider
+    boundary; spec-exact triage-before-disposition) and `0285a41` (finding-surface identity in
+    `validate_finding`; canonical trimming inside `computeQaDedupeKey`; v2 findings wired into
+    `validate_client_visual_qa`).
+  - Focused re-review: **ACCEPT-WITH-MINORS**; majors M1 and M2 explicitly closed; no new blockers.
+    Residual accepted minors: none outstanding (all four re-review minors were fixed in `0285a41`).
+  - **Ruling RD13 — domain validation is a Python gate, not only a schema.** JSON Schema cannot
+    express dedupe reproducibility, region containment, or promotion consistency, so
+    `validate_finding` composes schema + domain checks and is invoked by
+    `validate_client_visual_qa` over `prototype/qa/findings/*.json`.

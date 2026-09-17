@@ -7,7 +7,22 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tooling.visual_qa.errors import VisualQaSchemaInvalid
+from tooling.visual_qa.errors import (
+    InvalidBaselineIndex,
+    UnauthorizedBaselineUpdate,
+    VisualQaSchemaInvalid,
+)
+from tooling.visual_qa.golden_compare import (
+    BASELINE_INDEX_VERSION,
+    GATING_RESULTS,
+    GoldenBaseline,
+    authorize_baseline_update,
+    baseline_id,
+    compare_to_baseline,
+    find_baseline,
+    load_baseline_index,
+    validate_baseline_index,
+)
 from tooling.visual_qa.qa_contracts import (
     AUTHORITY_ORDER,
     build_authority_bundle,
@@ -560,6 +575,145 @@ class ClientFindingValidationTests(unittest.TestCase):
         template["story"] = "AgencyButton.Primary"
         with self.assertRaises(VisualQaSchemaInvalid):
             validate_finding(template)
+
+
+def capture_job(**overrides: object) -> dict:
+    job = {
+        "client_id": "prototype-demo",
+        "surface": "prototype",
+        "screen": "commerce.home",
+        "story": None,
+        "state": "default",
+        "direction": "b",
+        "mix_ref": None,
+        "viewport": {"name": "mobile-medium", "width": 390, "height": 844},
+        "fixture_version": "demo-v1",
+        "source_commit_sha": "abc123",
+        "capture_id": "sha256:capture-1",
+        "content_hash": "sha256:" + "a" * 64,
+        "path": "commerce-home.png",
+    }
+    job.update(overrides)
+    return job
+
+
+class GoldenBaselineTests(unittest.TestCase):
+    def baseline(self, job: dict | None = None, **overrides: object) -> GoldenBaseline:
+        return GoldenBaseline.from_capture_job(
+            job or capture_job(),
+            content_hash=overrides.pop("content_hash", "sha256:" + "a" * 64),
+            path=overrides.pop("path", "goldens/commerce-home.png"),
+            accepted_by=overrides.pop("accepted_by", "reviewer-1"),
+            accepted_at=overrides.pop("accepted_at", "2026-09-17T10:00:00+00:00"),
+        )
+
+    def test_baseline_id_is_stable_and_identity_rich(self):
+        self.assertEqual(baseline_id(capture_job()), baseline_id(capture_job()))
+        self.assertNotEqual(
+            baseline_id(capture_job()), baseline_id(capture_job(state="loading"))
+        )
+        self.assertNotEqual(
+            baseline_id(capture_job()),
+            baseline_id(capture_job(direction="c")),
+        )
+        self.assertNotEqual(
+            baseline_id(capture_job()),
+            baseline_id(
+                capture_job(viewport={"width": 1440, "height": 900})
+            ),
+        )
+        self.assertNotEqual(
+            baseline_id(capture_job()),
+            baseline_id(capture_job(fixture_version="demo-v2")),
+        )
+
+    def test_baseline_records_capture_identity_and_provenance(self):
+        baseline = self.baseline()
+        self.assertEqual("prototype-demo", baseline.client_id)
+        self.assertEqual("commerce.home", baseline.screen)
+        self.assertEqual(390, baseline.viewport["width"])
+        self.assertEqual("demo-v1", baseline.fixture_version)
+        self.assertEqual("abc123", baseline.source_commit_sha)
+        self.assertEqual("reviewer-1", baseline.accepted_by)
+        self.assertEqual(baseline.to_json(), GoldenBaseline.from_json(baseline.to_json()).to_json())
+
+    def test_matching_capture_is_a_match(self):
+        baseline = self.baseline()
+        comparison = compare_to_baseline(
+            baseline, capture_job(), compared_at="2026-09-17T11:00:00+00:00"
+        )
+        self.assertEqual("match", comparison.result)
+        self.assertFalse(comparison.is_gating_failure)
+
+    def test_mismatching_capture_produces_diff_metadata(self):
+        baseline = self.baseline()
+        comparison = compare_to_baseline(
+            baseline,
+            capture_job(content_hash="sha256:" + "b" * 64),
+            compared_at="2026-09-17T11:00:00+00:00",
+        )
+        self.assertEqual("mismatch", comparison.result)
+        self.assertTrue(comparison.is_gating_failure)
+        self.assertTrue(comparison.diff_ref)
+        self.assertEqual(baseline.content_hash, comparison.baseline_content_hash)
+
+    def test_comparison_never_rewrites_the_baseline(self):
+        baseline = self.baseline()
+        before = baseline.to_json()
+        compare_to_baseline(
+            baseline,
+            capture_job(content_hash="sha256:" + "c" * 64),
+            compared_at="2026-09-17T11:00:00+00:00",
+        )
+        self.assertEqual(before, baseline.to_json())
+
+    def test_missing_baseline_is_reported(self):
+        comparison = compare_to_baseline(
+            None, capture_job(), compared_at="2026-09-17T11:00:00+00:00"
+        )
+        self.assertEqual("missing_baseline", comparison.result)
+        self.assertTrue(comparison.is_gating_failure)
+
+    def test_gating_results_are_deterministic(self):
+        self.assertEqual(("mismatch", "missing_baseline"), GATING_RESULTS)
+
+    def test_baseline_index_round_trips(self):
+        index = {
+            "version": BASELINE_INDEX_VERSION,
+            "baselines": [self.baseline().to_json()],
+        }
+        self.assertEqual(index, validate_baseline_index(index))
+        self.assertIsNotNone(find_baseline(index, capture_job()))
+        self.assertIsNone(find_baseline(index, capture_job(state="loading")))
+
+    def test_duplicate_baseline_ids_are_rejected(self):
+        entry = self.baseline().to_json()
+        with self.assertRaises(InvalidBaselineIndex):
+            validate_baseline_index(
+                {"version": BASELINE_INDEX_VERSION, "baselines": [entry, entry]}
+            )
+
+    def test_unknown_surface_is_rejected(self):
+        payload = self.baseline().to_json()
+        payload["surface"] = "print"
+        with self.assertRaises(InvalidBaselineIndex):
+            GoldenBaseline.from_json(payload)
+
+    def test_baseline_updates_require_a_reviewer(self):
+        authorize_baseline_update({"id": "reviewer-1", "role": "reviewer"})
+        for actor in (
+            {"id": "opencode", "role": "agent"},
+            {"id": "approver-1", "role": "approver"},
+            {"id": "", "role": "reviewer"},
+            {"role": "reviewer"},
+        ):
+            with self.assertRaises(UnauthorizedBaselineUpdate):
+                authorize_baseline_update(actor)
+
+    def test_missing_index_file_yields_an_empty_index(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            index = load_baseline_index(Path(tmp) / "baseline-index.yaml")
+        self.assertEqual([], index["baselines"])
 
 
 if __name__ == "__main__":

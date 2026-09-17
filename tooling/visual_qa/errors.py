@@ -58,6 +58,18 @@ class GoldenMismatch(VisualQaError):
     code = "golden_mismatch"
 
 
+class UnauthorizedBaselineUpdate(VisualQaError):
+    """A baseline create/update was attempted without reviewer authority."""
+
+    code = "unauthorized_baseline_update"
+
+
+class InvalidBaselineIndex(VisualQaError):
+    """A governed baseline index is malformed or ambiguous."""
+
+    code = "invalid_baseline_index"
+
+
 class InvalidQaFinding(VisualQaError):
     """A QA finding candidate failed schema or domain validation."""
 
