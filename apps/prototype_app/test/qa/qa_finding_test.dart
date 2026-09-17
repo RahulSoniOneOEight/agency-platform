@@ -347,6 +347,14 @@ void main() {
       final restored = QaFinding.fromJson(finding.toJson());
       expect(restored.dedupeKey, finding.dedupeKey);
     });
+
+    test('dedupe key matches the python contract formula', () {
+      expect(
+        sampleFinding().dedupeKey,
+        'qa-dedupe:v1|prototype-demo|prototype|commerce.home|'
+        'design_contract|spacing.card.gap|spacing|home.product-grid||',
+      );
+    });
   });
 
   group('recurrence and no-longer-reproducible', () {
