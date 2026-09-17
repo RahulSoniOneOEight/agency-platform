@@ -309,13 +309,35 @@ def build_capture_jobs(
     manifest: object,
     base_url: str = "http://localhost:8080",
     source_commit_sha: str = "",
+    screens_by_direction: dict[str, list[str]] | None = None,
 ) -> list[dict]:
-    """Expand a v1/v2 manifest into deterministic, identity-rich capture jobs."""
+    """Expand a v1/v2 manifest into deterministic, identity-rich capture jobs.
+
+    v1 manifests are read-compatible for planning/validation, but a v1 job has no
+    governed screen. Passing ``screens_by_direction`` upgrades those legacy jobs
+    into capturable v2 jobs; without it a screen-less prototype job is rejected
+    with a typed error rather than producing an artifact that cannot be
+    reproduced.
+    """
     if not isinstance(source_commit_sha, str):
         raise InvalidCaptureJob("source_commit_sha must be a string")
     normalized = normalize_manifest(manifest)
     jobs: list[dict] = []
     for job in normalized["jobs"]:
+        if (
+            job["surface"] == "prototype"
+            and job["screen"] is None
+            and screens_by_direction
+        ):
+            screens = screens_by_direction.get(job["direction"] or "")
+            if screens:
+                job = {**job, "screen": screens[0]}
+        if job["surface"] == "prototype" and job["screen"] is None:
+            raise InvalidCaptureJob(
+                "legacy screenshot manifests are read-only: upgrade to a v2 "
+                "manifest with explicit screens (or pass screens_by_direction) "
+                "before capturing"
+            )
         capture_id = capture_identity(job, source_commit_sha)
         jobs.append(
             {

@@ -651,6 +651,37 @@ final class QaFinding {
   /// How many times the issue was rediscovered after a successful recheck.
   final int recurrences;
 
+  /// The complete canonical key set; unknown keys are rejected on decode so a
+  /// malformed artifact cannot smuggle in unstructured data.
+  static const Set<String> canonicalKeys = {
+    'id',
+    'client_id',
+    'status',
+    'severity',
+    'category',
+    'surface',
+    'screen',
+    'story',
+    'state',
+    'direction',
+    'mix_ref',
+    'section',
+    'region',
+    'screenshot_ref',
+    'source_commit_sha',
+    'rule_source',
+    'rule_ref',
+    'baseline_ref',
+    'summary',
+    'evidence',
+    'confidence',
+    'dedupe_key',
+    'feedback_id',
+    'no_longer_reproducible',
+    'recurrences',
+    'history',
+  };
+
   /// Always `null`: QA severity never carries a C.4 blocking classification.
   ///
   /// Blocking is owned by the reviewer and lives on the promoted
@@ -743,6 +774,13 @@ final class QaFinding {
   }
 
   factory QaFinding.fromJson(Map<String, dynamic> json) {
+    final unknown = json.keys.toSet().difference(canonicalKeys);
+    if (unknown.isNotEmpty) {
+      throw InvalidQaFinding(
+        'QA finding has unknown fields: ${unknown.toList()..sort()}',
+      );
+    }
+
     String require(String key) {
       final value = json[key];
       if (value is! String || value.trim().isEmpty) {

@@ -117,10 +117,26 @@
   `authority_bundle` (approved/current experience → design contract/tokens → accepted baseline →
   linked reference → general heuristics). A lower layer can never be represented as overriding a
   higher one. Findings record `rule_source`, `rule_ref`, and baseline/reference identity.
-- **RD12 — `QaCoordinator` never replaces `ReviewCoordinator`.** `QaCoordinator` orchestrates
+  - **RD12 — `QaCoordinator` never replaces `ReviewCoordinator`.** `QaCoordinator` orchestrates
   capture/golden/AI/dedupe/promotion/recheck only; it delegates all feedback lifecycle to
   `ReviewCoordinator` and never mutates `ReviewState`, approval snapshots, refinement batches, or
   runtime bundles. `ReviewState` gains no QA collection.
+
+## Rulings added during execution
+
+- **RD13 — domain validation is a Python gate, not only a schema** (see progress log).
+- **RD14 — promotion does not synthesize a `VisualAttachment`** (see progress log).
+- **RD15 — goldens use Flutter's built-in comparator only** (see progress log).
+- **RD16 — `QAFinding` promotion defaults to non-blocking.** `promoteFinding(blocking: false)` is the
+  default so QA severity can never implicitly gate C.4 review; the reviewer opts in explicitly, and
+  `setBlocking` remains available afterwards. Verified by the end-to-end test (review status stays
+  `in_review` after a non-blocking promotion).
+- **RD17 — generated goldens are committed; generated captures are not.** `.gitignore` excludes
+  `build/visual-qa/` and `client-projects/**/prototype/screenshots/*.png`, while
+  `apps/widgetbook/test/golden/goldens/*.png` remains tracked as governed baselines.
+- **RD18 — model routing.** Orchestrator implemented the code; three fresh independent `general`
+  reviewers performed the Cycle 1, Cycle 2, and Cycle 2 re-review gates, and a final whole-branch
+  reviewer closes the milestone. No other subagent types were available.
 
 ## Cycle table
 
@@ -128,7 +144,7 @@
 |-------|-------|--------|---------|
 | 1 | D.1 deterministic screenshot automation (Tasks 1–3) | ACCEPTED | `7ba1df2` `32d7f59` `08e9b4f` `5bd89c8` |
 | 2 | D.2 Visual AI QA + `QAFinding` (Tasks 4–6) | ACCEPTED | `b6315f3` `a2574f9` `d4559eb` `0285a41` |
-| 3 | D.3 golden/Widgetbook + D.4 orchestration + CI (Tasks 7–11) | PENDING | — |
+| 3 | D.3 golden/Widgetbook + D.4 orchestration + CI (Tasks 7–11) | ACCEPTED | `d945f15` `ae08bcd` `7dc9b5a` `dda502a` `d1c2fe4` `a9c4e6b`… |
 
 ## Progress log
 
@@ -192,3 +208,71 @@
     express dedupe reproducibility, region containment, or promotion consistency, so
     `validate_finding` composes schema + domain checks and is invoked by
     `validate_client_visual_qa` over `prototype/qa/findings/*.json`.
+- 2026-09-17 — **Cycle 3 (D.3 + D.4) implemented.** Commits: `d945f15` Widgetbook coverage + governed
+  goldens + Python golden-baseline authority; `ae08bcd` `QaCoordinator` + reviewer promotion +
+  `originQaFindingId` + QA triage UI + architecture guards; `7dc9b5a` targeted re-check + `QaRun`
+  records + repositories; `dda502a` docs/workflow/validators/CI canonicalization; `d1c2fe4` D.1–D.4
+  end-to-end regression.
+  - Delivered: `tooling/visual_qa/golden_compare.py` (baseline identity, baseline index, pure
+    comparison that never rewrites, reviewer-only update authorization, deterministic gating policy);
+    `apps/widgetbook` high-value states (disabled button, filled search field, out-of-stock and
+    long-name product cards) + **7 committed goldens**; `FeedbackRecord.originQaFindingId`
+    (11th canonical key); `ReviewCoordinator.createFeedback(originQaFindingId:)`; `QaCoordinator`
+    (dedupe-aware intake, QA triage, explicit/idempotent promotion with in-flight guard and orphan
+    reconciliation, targeted re-check); `QaRun`/`QaCheckResult`/`QaCaptureJob` + `affectedCaptureJobs`
+    + memory/file run repositories; `ReviewQaPanel` + a QA destination in `ReviewShell` (optional, so
+    C.1–C.7 shells are unchanged) wired into `main.dart`; `qa_architecture_test.dart`; extended
+    `review_architecture_test.dart`; canonical `VISUAL_QA.md`, `workflows/06-visual-qa.md`, CI steps,
+    and 115 required validator paths.
+  - **Ruling RD14 — promotion does not synthesize a `VisualAttachment`.** `QaFinding` carries a
+    `screenshot_ref` and a normalized `region` but no viewport dimensions, and `VisualAttachment`
+    requires a governed screen plus viewport. Promotion therefore maps governed screen/section to
+    `section`/`screen` scope, a bare direction to `decision`, and everything else (e.g. Widgetbook
+    stories) to `general`; visual evidence stays on the `QAFinding` and is linked by
+    `originQaFindingId`. C.4 target validation is unchanged and still authoritative.
+  - **Ruling RD15 — goldens use Flutter's built-in comparator only.** No `golden_toolkit`/`alchemist`
+    dependency, so `pubspec.lock` policy is untouched. Baseline updates require a deliberate
+    `flutter test --update-goldens` run by a human/reviewer.
+  - Verification: `apps/prototype_app` `flutter test test/qa` = **127 tests**; `test/review` =
+    **586 tests**; full `flutter test` = **776 tests**; `flutter analyze` clean; `flutter build web`
+    succeeded. `packages/agency_flutter_ui` 42 tests + clean. `apps/widgetbook` 8 tests (7 goldens)
+    + clean. Python `unittest discover tooling/validation` = **448 tests OK**;
+    `validate_repo.py` (115 paths), `validate_knowledge`, `validate_workflow`,
+    `validate_prototype`, `validate_visual_qa` all pass; B.1D bindings and B.1E resolved themes
+    `--check` fresh.
+- 2026-09-17 — **Final whole-branch review** (`git diff 774bd55...HEAD`, strongest available model):
+  **ACCEPT-WITH-MINORS — 0 blockers / 0 majors; target met.** All 27 required checks PASS with
+  file:line evidence; all command results matched the ledger exactly. Adversarial probes confirmed:
+  Visual AI cannot reach `FeedbackRecord` without reviewer action; `blocker` severity cannot become
+  C.4 blocking; no golden/baseline writer exists; `lib/qa` cannot mutate review/approval/batch/runtime
+  state; `ReviewState` gained no QA state; CI needs no AI secret and golden failures gate; generated
+  captures ignored, governed goldens tracked, lockfiles untouched.
+  - **Minors fixed after the review (`a9c4e6b`-range):**
+    - m1 — `validate_finding` now mirrors the Dart lifecycle walk (history legality, status↔history,
+      promoted↔event `feedback_id`, no-longer-reproducible derivation, recurrence count), closing the
+      Python-side enforcement gap.
+    - m2 — `build_capture_jobs` now raises a typed `InvalidCaptureJob` for screen-less legacy (v1)
+      jobs instead of emitting an uncapturable artifact, and accepts `screens_by_direction` to upgrade
+      them into v2 jobs.
+    - m3 — Dart `QaFinding.fromJson` rejects unknown keys (`QaFinding.canonicalKeys`), matching the
+      schema and Python.
+  - **Accepted minors (recorded, non-gating):**
+    - m4 — a few typed errors in the spec's catalogue (`GoldenMismatch`, `DuplicateFindingPromotion`,
+      Python `QaEvidenceMissing`) are declared but not raised on any current path; `compare_to_baseline`
+      returns a result instead of throwing, which is the intended pure API.
+    - m5/m6 — the committed Widgetbook goldens are the governed baselines but carry no separate
+      baseline-index metadata, and prototype-side golden comparison (`golden_compare.py`) is exercised
+      by tests rather than a browser-capture CI job (browser capture is intentionally out of CI scope
+      per the spec's automation boundary).
+    - m7 — findings are not structurally required to carry a non-empty `evidence` list (a
+      `screenshot_ref` is mandatory and the schema forbids invented fields); tightening this would
+      break legitimate low-evidence candidates, so it is deferred to a policy decision.
+    - m9 — the browser adapter always self-reports `deterministic: true`, and a non-unit device scale
+      factor would be rejected by the viewport-dimension check (canonical jobs use DSF 1).
+  - **Unverifiable risk (flagged):** the 7 Flutter goldens were generated on Windows; CI runs
+    `ubuntu-latest`. Flutter's test-font substitution makes text deterministic, but this must be
+    confirmed by the first Linux CI run. If a platform delta appears, the baseline must be regenerated
+    on Linux by a reviewer — never auto-updated.
+  - Final counts after the fix commit: Python `unittest discover tooling/validation` = **455 tests OK**;
+    `test/qa` = **129 tests**; `test/review` = **586 tests**; all validators and B.1D/B.1E freshness
+    green.

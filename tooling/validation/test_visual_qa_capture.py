@@ -406,12 +406,29 @@ class LegacyManifestCompatibilityTests(unittest.TestCase):
         }
 
     def test_v1_manifest_still_normalizes(self):
-        jobs = build_capture_jobs(self.legacy_manifest(), BASE_URL, COMMIT)
-        self.assertEqual(4, len(jobs))
-        self.assertEqual({"a", "b"}, {job["direction"] for job in jobs})
+        normalized = normalize_manifest(self.legacy_manifest())
+        self.assertEqual(4, len(normalized["jobs"]))
+        self.assertEqual({"a", "b"}, {job["direction"] for job in normalized["jobs"]})
         self.assertEqual(
             {(390, 844), (1440, 900)},
-            {(job["viewport"]["width"], job["viewport"]["height"]) for job in jobs},
+            {(job["viewport"]["width"], job["viewport"]["height"]) for job in normalized["jobs"]},
+        )
+
+    def test_v1_capture_requires_explicit_screens(self):
+        with self.assertRaises(InvalidCaptureJob):
+            build_capture_jobs(self.legacy_manifest(), BASE_URL, COMMIT)
+
+    def test_v1_capture_upgrades_when_screens_are_supplied(self):
+        jobs = build_capture_jobs(
+            self.legacy_manifest(),
+            BASE_URL,
+            COMMIT,
+            screens_by_direction={"a": ["commerce.home"], "b": ["commerce.plp"]},
+        )
+        self.assertEqual(4, len(jobs))
+        self.assertEqual(
+            {("a", "commerce.home"), ("b", "commerce.plp")},
+            {(job["direction"], job["screen"]) for job in jobs},
         )
 
     def test_v1_normalization_produces_v2_jobs(self):
@@ -424,10 +441,20 @@ class LegacyManifestCompatibilityTests(unittest.TestCase):
             self.assertEqual(1, job["device_scale_factor"])
 
     def test_v1_capture_id_is_stable(self):
-        first = build_capture_jobs(self.legacy_manifest(), BASE_URL, COMMIT)
-        second = build_capture_jobs(self.legacy_manifest(), BASE_URL, COMMIT)
+        jobs = build_capture_jobs(
+            self.legacy_manifest(),
+            BASE_URL,
+            COMMIT,
+            screens_by_direction={"a": ["commerce.home"], "b": ["commerce.plp"]},
+        )
+        again = build_capture_jobs(
+            self.legacy_manifest(),
+            BASE_URL,
+            COMMIT,
+            screens_by_direction={"a": ["commerce.home"], "b": ["commerce.plp"]},
+        )
         self.assertEqual(
-            [job["capture_id"] for job in first], [job["capture_id"] for job in second]
+            [job["capture_id"] for job in jobs], [job["capture_id"] for job in again]
         )
 
     def test_v1_invalid_direction_is_rejected(self):

@@ -97,6 +97,41 @@ class SchemaContractTests(unittest.TestCase):
         with self.assertRaises(VisualQaSchemaInvalid):
             validate_finding(template)
 
+    def test_illegal_history_walk_is_rejected(self):
+        template = json.loads(TEMPLATE_PATH.read_text(encoding="utf-8"))
+        template["history"] = [
+            {"event": "detected", "actor_id": "visual-qa", "at": "2026-09-17T10:00:00.000Z"},
+            {"event": "dismissed", "actor_id": "reviewer-1", "at": "2026-09-17T10:01:00.000Z", "reason": "x"},
+        ]
+        template["status"] = "dismissed"
+        with self.assertRaises(VisualQaSchemaInvalid):
+            validate_finding(template)
+
+    def test_status_must_match_the_history(self):
+        template = json.loads(TEMPLATE_PATH.read_text(encoding="utf-8"))
+        template["status"] = "triaged"
+        with self.assertRaises(VisualQaSchemaInvalid):
+            validate_finding(template)
+
+    def test_promoted_status_requires_a_matching_promoted_event(self):
+        template = json.loads(TEMPLATE_PATH.read_text(encoding="utf-8"))
+        template["status"] = "promoted"
+        template["feedback_id"] = "feedback-qa-001"
+        with self.assertRaises(VisualQaSchemaInvalid):
+            validate_finding(template)
+
+    def test_no_longer_reproducible_must_match_the_history(self):
+        template = json.loads(TEMPLATE_PATH.read_text(encoding="utf-8"))
+        template["no_longer_reproducible"] = True
+        with self.assertRaises(VisualQaSchemaInvalid):
+            validate_finding(template)
+
+    def test_recurrence_count_must_match_the_history(self):
+        template = json.loads(TEMPLATE_PATH.read_text(encoding="utf-8"))
+        template["recurrences"] = 3
+        with self.assertRaises(VisualQaSchemaInvalid):
+            validate_finding(template)
+
     def test_region_containment_is_enforced_beyond_the_schema(self):
         template = json.loads(TEMPLATE_PATH.read_text(encoding="utf-8"))
         template["region"] = {"x": 0.8, "y": 0, "width": 0.5, "height": 0.5}

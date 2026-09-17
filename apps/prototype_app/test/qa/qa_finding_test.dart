@@ -554,5 +554,14 @@ void main() {
       ];
       expect(() => QaFinding.fromJson(json), throwsA(isA<InvalidQaFinding>()));
     });
+
+    test('unknown payload keys are rejected', () {
+      final json = sampleFinding().toJson()..['notes'] = 'free-form';
+      expect(() => QaFinding.fromJson(json), throwsA(isA<InvalidQaFinding>()));
+    });
+
+    test('the canonical key set matches the emitted payload', () {
+      expect(sampleFinding().toJson().keys.toSet(), QaFinding.canonicalKeys);
+    });
   });
 }

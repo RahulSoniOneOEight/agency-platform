@@ -171,12 +171,88 @@ def validate_finding(finding: object, schema: dict | None = None) -> dict:
             "only promoted QA findings may reference a feedback record"
         )
     history = finding.get("history")
-    if isinstance(history, list) and history:
-        if history[0].get("event") != "detected":
-            raise VisualQaSchemaInvalid(
-                "QA finding history must start with the detected event"
-            )
+    if not isinstance(history, list) or not history:
+        raise VisualQaSchemaInvalid("QA finding history is required")
+    _validate_finding_history(history, status=status, feedback_id=feedback_id)
+    derived_no_longer = _derive_no_longer_reproducible(history)
+    if derived_no_longer != finding.get("no_longer_reproducible"):
+        raise VisualQaSchemaInvalid(
+            "QA finding no_longer_reproducible does not match its history"
+        )
+    derived_recurrences = sum(
+        1 for event in history if event.get("event") == "recurrence"
+    )
+    if derived_recurrences != finding.get("recurrences"):
+        raise VisualQaSchemaInvalid(
+            "QA finding recurrence count does not match its history"
+        )
     return finding
+
+
+_STATUS_AFTER_EVENT = {
+    "detected": "detected",
+    "triaged": "triaged",
+    "promoted": "promoted",
+    "dismissed": "dismissed",
+    "accepted_risk": "accepted_risk",
+}
+
+_LEGAL_PREDECESSORS = {
+    "triaged": ("detected",),
+    "promoted": ("triaged",),
+    "dismissed": ("triaged",),
+    "accepted_risk": ("triaged",),
+}
+
+
+def _validate_finding_history(
+    history: list, *, status: object, feedback_id: object
+) -> None:
+    """Mirror the Dart append-only lifecycle walk."""
+    if history[0].get("event") != "detected":
+        raise VisualQaSchemaInvalid(
+            "QA finding history must start with the detected event"
+        )
+    current = "detected"
+    for index, event in enumerate(history):
+        if not isinstance(event, dict):
+            raise VisualQaSchemaInvalid("QA finding history event must be a mapping")
+        name = event.get("event")
+        if name == "detected":
+            if index != 0:
+                raise VisualQaSchemaInvalid(
+                    "QA finding history must not repeat the detected event"
+                )
+            continue
+        if name in _LEGAL_PREDECESSORS:
+            if current not in _LEGAL_PREDECESSORS[name]:
+                raise VisualQaSchemaInvalid(
+                    f"illegal QA history: {name} from {current}"
+                )
+            current = _STATUS_AFTER_EVENT[name]
+        elif name not in ("recurrence", "evidence_linked", "no_longer_reproducible"):
+            raise VisualQaSchemaInvalid(f"unknown QA finding event: {name!r}")
+    if status != current:
+        raise VisualQaSchemaInvalid("QA finding status does not match its history")
+    if status == "promoted":
+        promoted_events = [
+            event for event in history if event.get("event") == "promoted"
+        ]
+        if not promoted_events or promoted_events[-1].get("feedback_id") != feedback_id:
+            raise VisualQaSchemaInvalid(
+                "promoted QA finding must match its promoted event"
+            )
+
+
+def _derive_no_longer_reproducible(history: list) -> bool:
+    flag = False
+    for event in history:
+        name = event.get("event")
+        if name == "no_longer_reproducible":
+            flag = True
+        elif name == "recurrence":
+            flag = False
+    return flag
 
 
 def _require_non_empty_string(value: object, label: str) -> str:
