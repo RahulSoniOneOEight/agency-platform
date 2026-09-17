@@ -1,0 +1,16 @@
+stage: generate-directions
+version: 1
+requires:
+  stages:
+    - resolve-intelligence
+  artifacts: []
+produces:
+  - directions/direction-a.yaml
+  - directions/direction-b.yaml
+  - directions/comparison.yaml
+validators:
+  - direction-contract
+checkpoints:
+  - directions-complete
+next:
+  - build-prototype

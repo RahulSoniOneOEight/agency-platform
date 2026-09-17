@@ -43,3 +43,6 @@ Generate the best 2–3 client-specific product strategies from the client conte
 
 ## NEXT
 `05-build-prototype.md`
+
+## RUNTIME
+Execute through `tooling.workflow.runner`; the machine-readable contract is `workflows/contracts/04-generate-directions.yaml`.

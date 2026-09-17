@@ -1,0 +1,13 @@
+stage: productionize
+version: 1
+requires:
+  stages:
+    - client-review
+  artifacts:
+    - approved-experience.yaml
+produces: []
+validators:
+  - productionize-contract
+checkpoints:
+  - release-ready
+next: []

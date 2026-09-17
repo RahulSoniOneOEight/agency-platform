@@ -1,0 +1,15 @@
+stage: resolve-intelligence
+version: 1
+requires:
+  stages:
+    - client-intake
+  artifacts:
+    - derived/client-profile.yaml
+produces:
+  - resolved-intelligence.yaml
+validators:
+  - resolved-intelligence-contract
+checkpoints:
+  - intelligence-resolved
+next:
+  - resource-research

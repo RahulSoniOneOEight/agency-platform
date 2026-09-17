@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agency-platform/schema/workflow-stage-contract.schema.json",
+  "title": "Workflow stage contract",
+  "description": "Machine-readable stage metadata. Declares only ids, paths, and names that already exist in the repository; business instructions remain in workflows/*.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "stage",
+    "version",
+    "requires",
+    "produces",
+    "validators",
+    "checkpoints",
+    "next"
+  ],
+  "properties": {
+    "stage": { "$ref": "#/$defs/stage" },
+    "version": { "const": 1 },
+    "requires": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stages", "artifacts"],
+      "properties": {
+        "stages": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/stage" }
+        },
+        "artifacts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/path" }
+        }
+      }
+    },
+    "produces": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/path" }
+    },
+    "validators": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/identifier" }
+    },
+    "checkpoints": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/identifier" }
+    },
+    "next": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/stage" }
+    }
+  },
+  "$defs": {
+    "stage": {
+      "enum": [
+        "client-intake",
+        "resolve-intelligence",
+        "resource-research",
+        "generate-directions",
+        "build-prototype",
+        "visual-qa",
+        "client-review",
+        "productionize"
+      ]
+    },
+    "path": { "type": "string", "minLength": 1 },
+    "identifier": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" }
+  }
+}

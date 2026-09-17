@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agency-platform/schema/workflow-state.schema.json",
+  "title": "Workflow execution state (v2)",
+  "description": "Canonical v2 workflow-state record. v1 state remains readable through normalization; this schema describes the canonical write format.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "client_id",
+    "workflow",
+    "current_stage",
+    "status",
+    "run_id",
+    "completed",
+    "skipped",
+    "pending",
+    "blocked",
+    "stage_state",
+    "active_lease",
+    "last_transition",
+    "last_updated"
+  ],
+  "properties": {
+    "version": { "const": 2 },
+    "client_id": { "type": "string", "minLength": 1 },
+    "workflow": { "type": "string", "minLength": 1 },
+    "current_stage": {
+      "enum": [
+        "client-intake",
+        "resolve-intelligence",
+        "resource-research",
+        "generate-directions",
+        "build-prototype",
+        "visual-qa",
+        "client-review",
+        "productionize"
+      ]
+    },
+    "status": {
+      "enum": ["not_started", "in_progress", "blocked", "complete"]
+    },
+    "run_id": { "type": ["string", "null"] },
+    "completed": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/stage" }
+    },
+    "skipped": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/skippedStage" }
+    },
+    "pending": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/stage" }
+    },
+    "blocked": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/stage" }
+    },
+    "stage_state": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/stageName" },
+      "additionalProperties": { "$ref": "#/$defs/stageAttempt" }
+    },
+    "active_lease": {
+      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/lease" }]
+    },
+    "last_transition": {
+      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/transition" }]
+    },
+    "last_updated": { "type": "string", "minLength": 1 }
+  },
+  "$defs": {
+    "stageName": {
+      "enum": [
+        "client-intake",
+        "resolve-intelligence",
+        "resource-research",
+        "generate-directions",
+        "build-prototype",
+        "visual-qa",
+        "client-review",
+        "productionize"
+      ]
+    },
+    "stage": { "$ref": "#/$defs/stageName" },
+    "skippedStage": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["stage", "reason"],
+      "properties": {
+        "stage": { "$ref": "#/$defs/stageName" },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    },
+    "stageAttempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "attempt": { "type": "integer", "minimum": 1 },
+        "status": {
+          "enum": ["not_started", "in_progress", "blocked", "failed", "complete"]
+        },
+        "started_at": { "type": "string", "minLength": 1 },
+        "completed_at": { "type": "string", "minLength": 1 },
+        "failed_at": { "type": "string", "minLength": 1 },
+        "last_checkpoint": { "type": ["string", "null"] },
+        "artifact_manifest_ref": { "type": ["string", "null"] }
+      }
+    },
+    "lease": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lease_id", "owner", "run_id", "acquired_at", "expires_at"],
+      "properties": {
+        "lease_id": { "type": "string", "minLength": 1 },
+        "owner": { "type": "string", "minLength": 1 },
+        "run_id": { "type": ["string", "null"] },
+        "acquired_at": { "type": "string", "minLength": 1 },
+        "expires_at": { "type": "string", "minLength": 1 }
+      }
+    },
+    "transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "to", "at", "actor"],
+      "properties": {
+        "from": { "type": ["string", "null"] },
+        "to": { "$ref": "#/$defs/stageName" },
+        "at": { "type": "string", "minLength": 1 },
+        "actor": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

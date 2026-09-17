@@ -1,16 +1,48 @@
 from __future__ import annotations
 
+import copy
+import json
 import shutil
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
 
+from tooling.workflow.audit import load_audit_records
 from tooling.workflow.client_input import validate_client_input
+from tooling.workflow.contracts import load_stage_contract
+from tooling.workflow.execution import (
+    IllegalStageTransition,
+    StageCompletionGateFailed,
+    StagePrerequisiteFailed,
+    StageValidationFailed,
+    complete_attempt,
+    fail_attempt,
+    record_checkpoint,
+    release_after_completion,
+    start_attempt,
+)
 from tooling.workflow.initialize_client import initialize_client
+from tooling.workflow.lease import (
+    WorkflowLeaseConflict,
+    WorkflowLeaseOwnershipError,
+    acquire_lease,
+    load_lease,
+)
+from tooling.workflow.manifests import (
+    ExecutionManifest,
+    ValidatorEvidence,
+    artifacts_for_paths,
+    load_manifest,
+    manifest_path,
+    manifest_relpath,
+    write_manifest_create_only,
+)
 from tooling.workflow.router import next_stage
-from tooling.workflow.state import initial_state, save_state
+from tooling.workflow.runner import reconcile_state
+from tooling.workflow.state import initial_state, load_state, save_state
 from tooling.workflow.validate_workflow import validate_client, validate_runtime, validate_workflow_file
 
 
@@ -338,6 +370,1078 @@ class WorkflowRuntimeTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[2]
         errors = validate_runtime(root)
         self.assertEqual([], errors)
+
+
+class WorkflowExecutionTests(unittest.TestCase):
+    COMMIT = "0" * 40
+    AT = "2026-09-17T00:00:00Z"
+
+    def _root(self, tmp: str) -> Path:
+        root = Path(tmp)
+        (root / "client-projects").mkdir(parents=True, exist_ok=True)
+        shutil.copytree(ROOT / "workflows" / "contracts", root / "workflows" / "contracts")
+        return root
+
+    def _client(self, root: Path) -> Path:
+        client = root / "client-projects" / "acme"
+        client.mkdir(parents=True, exist_ok=True)
+        return client
+
+    def _passed(self, name: str) -> ValidatorEvidence:
+        return ValidatorEvidence(name=name, status="passed", at=self.AT)
+
+    def test_start_attempt_refuses_when_prerequisites_unmet(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            state = initial_state("acme")
+            with self.assertRaises(StagePrerequisiteFailed):
+                start_attempt(
+                    root,
+                    client,
+                    state,
+                    actor="tester",
+                    source_commit_sha=self.COMMIT,
+                    stage="resolve-intelligence",
+                )
+
+    def test_start_attempt_refuses_when_prerequisite_artifact_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            state = initial_state("acme")
+            state["completed"] = ["client-intake"]
+            with self.assertRaises(StagePrerequisiteFailed):
+                start_attempt(
+                    root,
+                    client,
+                    state,
+                    actor="tester",
+                    source_commit_sha=self.COMMIT,
+                    stage="resolve-intelligence",
+                )
+
+    def test_start_attempt_writes_manifest_and_advances_run(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            state = initial_state("acme")
+            new_state, manifest = start_attempt(
+                root, client, state, actor="tester", source_commit_sha=self.COMMIT
+            )
+            self.assertEqual("client-intake", manifest.stage)
+            self.assertEqual("in_progress", manifest.status)
+            self.assertTrue(manifest_path(client, manifest.run_id, manifest.attempt).exists())
+            self.assertEqual(manifest.run_id, new_state["run_id"])
+            self.assertEqual("in_progress", new_state["status"])
+            self.assertEqual(1, new_state["stage_state"]["client-intake"]["attempt"])
+            self.assertIsNone(state["run_id"])
+            self.assertEqual({}, state["stage_state"])
+
+    def test_failed_attempt_leaves_pointer_collections_unchanged(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            state = initial_state("acme")
+            new_state, manifest = start_attempt(
+                root, client, state, actor="tester", source_commit_sha=self.COMMIT
+            )
+            failed_state, failed_manifest = fail_attempt(
+                client, new_state, manifest, reason="boom", at=self.AT, actor="tester"
+            )
+            self.assertEqual(state["current_stage"], failed_state["current_stage"])
+            self.assertEqual(state["completed"], failed_state["completed"])
+            self.assertEqual(state["pending"], failed_state["pending"])
+            self.assertEqual("failed", failed_manifest.status)
+            self.assertEqual("failed", failed_state["stage_state"]["client-intake"]["status"])
+            self.assertEqual(self.AT, failed_state["stage_state"]["client-intake"]["failed_at"])
+
+    def test_complete_attempt_missing_produced_artifact_raises(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            state = initial_state("acme")
+            new_state, manifest = start_attempt(
+                root, client, state, actor="tester", source_commit_sha=self.COMMIT
+            )
+            with self.assertRaises(StageValidationFailed):
+                complete_attempt(
+                    root,
+                    client,
+                    new_state,
+                    manifest,
+                    validator_results=[self._passed("client-input-contract")],
+                    at=self.AT,
+                    actor="tester",
+                )
+
+    def test_complete_attempt_failed_validator_raises(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            (client / "derived").mkdir(parents=True, exist_ok=True)
+            (client / "derived" / "client-profile.yaml").write_text("id: acme\n", encoding="utf-8")
+            state = initial_state("acme")
+            new_state, manifest = start_attempt(
+                root, client, state, actor="tester", source_commit_sha=self.COMMIT
+            )
+            with self.assertRaises(StageCompletionGateFailed):
+                complete_attempt(
+                    root,
+                    client,
+                    new_state,
+                    manifest,
+                    validator_results=[
+                        ValidatorEvidence(name="client-input-contract", status="failed", at=self.AT)
+                    ],
+                    at=self.AT,
+                    actor="tester",
+                )
+
+    def test_successful_complete_attempt_writes_manifest_before_state(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            (client / "derived").mkdir(parents=True, exist_ok=True)
+            (client / "derived" / "client-profile.yaml").write_text("id: acme\n", encoding="utf-8")
+            state = initial_state("acme")
+            new_state, manifest = start_attempt(
+                root, client, state, actor="tester", source_commit_sha=self.COMMIT
+            )
+            final_state, frozen = complete_attempt(
+                root,
+                client,
+                new_state,
+                manifest,
+                validator_results=[self._passed("client-input-contract")],
+                at=self.AT,
+                actor="tester",
+            )
+
+            path = manifest_path(client, frozen.run_id, frozen.attempt)
+            self.assertTrue(path.exists())
+            self.assertEqual("completed", load_manifest(path).status)
+            self.assertEqual("resolve-intelligence", final_state["current_stage"])
+            self.assertIn("client-intake", final_state["completed"])
+            self.assertNotIn("client-intake", final_state["pending"])
+            self.assertEqual(
+                {"from": "client-intake", "to": "resolve-intelligence", "at": self.AT, "actor": "tester"},
+                final_state["last_transition"],
+            )
+            self.assertEqual(
+                "complete", final_state["stage_state"]["client-intake"]["status"]
+            )
+
+    def test_record_checkpoint_rejects_undeclared_checkpoint(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            contract = load_stage_contract(root, "client-intake")
+            state = initial_state("acme")
+            _, manifest = start_attempt(
+                root, client, state, actor="tester", source_commit_sha=self.COMMIT
+            )
+            with self.assertRaises(IllegalStageTransition):
+                record_checkpoint(manifest, "bogus-checkpoint", at=self.AT, contract=contract)
+            updated = record_checkpoint(
+                manifest, "intake-complete", at=self.AT, contract=contract
+            )
+            self.assertEqual("intake-complete", updated.checkpoints[-1].name)
+
+    def test_complete_attempt_rejects_a_non_current_stage_manifest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            (client / "derived").mkdir(parents=True, exist_ok=True)
+            (client / "derived" / "client-profile.yaml").write_text(
+                "id: acme\n", encoding="utf-8"
+            )
+            state = initial_state("acme")
+            new_state, manifest = start_attempt(
+                root, client, state, actor="tester", source_commit_sha=self.COMMIT
+            )
+            foreign = ExecutionManifest(
+                run_id=manifest.run_id,
+                client_id=manifest.client_id,
+                stage="generate-directions",
+                attempt=1,
+                source_commit_sha=self.COMMIT,
+                started_at=self.AT,
+            )
+            with self.assertRaises(IllegalStageTransition):
+                complete_attempt(
+                    root,
+                    client,
+                    new_state,
+                    foreign,
+                    validator_results=[self._passed("direction-contract")],
+                    at=self.AT,
+                    actor="tester",
+                )
+            self.assertEqual("client-intake", new_state["current_stage"])
+
+    def test_complete_attempt_rejects_a_stale_run_manifest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            (client / "derived").mkdir(parents=True, exist_ok=True)
+            (client / "derived" / "client-profile.yaml").write_text(
+                "id: acme\n", encoding="utf-8"
+            )
+            state = initial_state("acme")
+            new_state, manifest = start_attempt(
+                root, client, state, actor="tester", source_commit_sha=self.COMMIT
+            )
+            stale = ExecutionManifest(
+                run_id="wf-acme-other",
+                client_id=manifest.client_id,
+                stage=manifest.stage,
+                attempt=1,
+                source_commit_sha=self.COMMIT,
+                started_at=self.AT,
+            )
+            with self.assertRaises(IllegalStageTransition):
+                complete_attempt(
+                    root,
+                    client,
+                    new_state,
+                    stale,
+                    validator_results=[self._passed("client-input-contract")],
+                    at=self.AT,
+                    actor="tester",
+                )
+
+    def test_complete_attempt_rejects_a_cross_client_manifest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            (client / "derived").mkdir(parents=True, exist_ok=True)
+            (client / "derived" / "client-profile.yaml").write_text(
+                "id: acme\n", encoding="utf-8"
+            )
+            state = initial_state("acme")
+            new_state, manifest = start_attempt(
+                root, client, state, actor="tester", source_commit_sha=self.COMMIT
+            )
+            foreign = ExecutionManifest(
+                run_id=manifest.run_id,
+                client_id="other-client",
+                stage=manifest.stage,
+                attempt=1,
+                source_commit_sha=self.COMMIT,
+                started_at=self.AT,
+            )
+            with self.assertRaises(IllegalStageTransition):
+                complete_attempt(
+                    root,
+                    client,
+                    new_state,
+                    foreign,
+                    validator_results=[self._passed("client-input-contract")],
+                    at=self.AT,
+                    actor="tester",
+                )
+
+    def test_fail_attempt_rejects_a_non_current_stage_manifest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            state = initial_state("acme")
+            new_state, manifest = start_attempt(
+                root, client, state, actor="tester", source_commit_sha=self.COMMIT
+            )
+            foreign = ExecutionManifest(
+                run_id=manifest.run_id,
+                client_id=manifest.client_id,
+                stage="generate-directions",
+                attempt=1,
+                source_commit_sha=self.COMMIT,
+                started_at=self.AT,
+            )
+            with self.assertRaises(IllegalStageTransition):
+                fail_attempt(client, new_state, foreign, reason="boom", at=self.AT, actor="tester")
+
+    def test_fail_attempt_rejects_a_stale_run_manifest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            state = initial_state("acme")
+            new_state, manifest = start_attempt(
+                root, client, state, actor="tester", source_commit_sha=self.COMMIT
+            )
+            stale = ExecutionManifest(
+                run_id="wf-acme-other",
+                client_id=manifest.client_id,
+                stage=manifest.stage,
+                attempt=1,
+                source_commit_sha=self.COMMIT,
+                started_at=self.AT,
+            )
+            with self.assertRaises(IllegalStageTransition):
+                fail_attempt(client, new_state, stale, reason="boom", at=self.AT, actor="tester")
+
+    def test_complete_attempt_rejects_a_manifest_when_no_run_is_active(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            (client / "derived").mkdir(parents=True, exist_ok=True)
+            (client / "derived" / "client-profile.yaml").write_text(
+                "id: acme\n", encoding="utf-8"
+            )
+            state = initial_state("acme")
+            unlinked = ExecutionManifest(
+                run_id="wf-acme-unlinked",
+                client_id="acme",
+                stage="client-intake",
+                attempt=1,
+                source_commit_sha=self.COMMIT,
+                started_at=self.AT,
+            )
+            with self.assertRaises(IllegalStageTransition):
+                complete_attempt(
+                    root,
+                    client,
+                    state,
+                    unlinked,
+                    validator_results=[self._passed("client-input-contract")],
+                    at=self.AT,
+                    actor="tester",
+                )
+
+    def test_fail_attempt_requires_the_owning_lease(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            state = initial_state("acme")
+            started_state, manifest = start_attempt(
+                root, client, state, actor="tester", source_commit_sha=self.COMMIT
+            )
+            with self.assertRaises(WorkflowLeaseOwnershipError):
+                fail_attempt(
+                    client,
+                    started_state,
+                    manifest,
+                    reason="boom",
+                    at=self.AT,
+                    actor="someone-else",
+                )
+            self.assertEqual("in_progress", started_state["stage_state"]["client-intake"]["status"])
+
+    def test_start_attempt_acquires_the_lease_and_releases_on_completion(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            (client / "derived").mkdir(parents=True, exist_ok=True)
+            (client / "derived" / "client-profile.yaml").write_text(
+                "id: acme\n", encoding="utf-8"
+            )
+            state = initial_state("acme")
+            started_state, manifest = start_attempt(
+                root, client, state, actor="tester", source_commit_sha=self.COMMIT
+            )
+            self.assertIsNotNone(started_state["active_lease"])
+            self.assertEqual("tester", started_state["active_lease"]["owner"])
+
+            final_state, _ = complete_attempt(
+                root,
+                client,
+                started_state,
+                manifest,
+                validator_results=[self._passed("client-input-contract")],
+                at=self.AT,
+                actor="tester",
+            )
+            self.assertIsNone(final_state["active_lease"])
+
+    def test_second_owner_cannot_start_while_a_live_lease_is_held(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            state = initial_state("acme")
+            leased_state, _ = start_attempt(
+                root, client, state, actor="opencode:session-a", source_commit_sha=self.COMMIT
+            )
+            before = json.dumps(leased_state, sort_keys=True)
+            manifests_before = sorted(
+                path.name
+                for path in (client / "workflow" / "executions").rglob("attempt-*.yaml")
+            )
+            with self.assertRaises(WorkflowLeaseConflict):
+                start_attempt(
+                    root,
+                    client,
+                    leased_state,
+                    actor="opencode:session-b",
+                    source_commit_sha=self.COMMIT,
+                )
+            self.assertEqual(before, json.dumps(leased_state, sort_keys=True))
+            self.assertEqual(
+                manifests_before,
+                sorted(
+                    path.name
+                    for path in (client / "workflow" / "executions").rglob("attempt-*.yaml")
+                ),
+            )
+
+    def test_complete_attempt_requires_the_owning_lease(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            (client / "derived").mkdir(parents=True, exist_ok=True)
+            (client / "derived" / "client-profile.yaml").write_text(
+                "id: acme\n", encoding="utf-8"
+            )
+            state = initial_state("acme")
+            started_state, manifest = start_attempt(
+                root, client, state, actor="tester", source_commit_sha=self.COMMIT
+            )
+            with self.assertRaises(WorkflowLeaseOwnershipError):
+                complete_attempt(
+                    root,
+                    client,
+                    started_state,
+                    manifest,
+                    validator_results=[self._passed("client-input-contract")],
+                    at=self.AT,
+                    actor="someone-else",
+                )
+            released = dict(started_state)
+            released["active_lease"] = None
+            with self.assertRaises(WorkflowLeaseOwnershipError):
+                complete_attempt(
+                    root,
+                    client,
+                    released,
+                    manifest,
+                    validator_results=[self._passed("client-input-contract")],
+                    at=self.AT,
+                    actor="tester",
+                )
+
+    def test_expired_lease_is_reclaimed_with_an_audit_record(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            state = initial_state("acme")
+            leased_state, _ = start_attempt(
+                root,
+                client,
+                state,
+                actor="opencode:session-a",
+                source_commit_sha=self.COMMIT,
+                now=datetime(2026, 9, 17, 12, 0, tzinfo=timezone.utc),
+                lease_ttl_seconds=60,
+            )
+            expired_lease_id = leased_state["active_lease"]["lease_id"]
+            reclaimed_state, _ = start_attempt(
+                root,
+                client,
+                leased_state,
+                actor="opencode:session-b",
+                source_commit_sha=self.COMMIT,
+                now=datetime(2026, 9, 17, 12, 5, tzinfo=timezone.utc),
+            )
+            self.assertEqual(
+                "opencode:session-b", reclaimed_state["active_lease"]["owner"]
+            )
+            records = load_audit_records(client / "workflow" / "audit.jsonl")
+            self.assertEqual(1, len(records))
+            self.assertEqual("recovery", records[0].kind)
+            self.assertEqual(
+                expired_lease_id, records[0].details["previous_state"]["lease_id"]
+            )
+
+    def test_v1_state_remains_valid_under_the_hardened_validator(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            (client / "derived").mkdir(parents=True, exist_ok=True)
+            (client / "derived" / "client-profile.yaml").write_text(
+                "id: acme\n", encoding="utf-8"
+            )
+            (client / "workflow-state.yaml").write_text(
+                yaml.safe_dump(
+                    {
+                        "version": 1,
+                        "client_id": "acme",
+                        "current_stage": "client-intake",
+                        "status": "not_started",
+                        "completed": [],
+                        "skipped": [],
+                        "pending": ["client-intake"],
+                        "blocked": [],
+                        "last_updated": "2026-09-17",
+                    },
+                    sort_keys=False,
+                ),
+                encoding="utf-8",
+            )
+            errors = validate_client(root, client)
+            self.assertEqual([], errors)
+
+    def test_unknown_top_level_state_key_is_reported(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            (client / "derived").mkdir(parents=True, exist_ok=True)
+            (client / "derived" / "client-profile.yaml").write_text(
+                "id: acme\n", encoding="utf-8"
+            )
+            state = initial_state("acme")
+            state["unexpected"] = True
+            save_state(client / "workflow-state.yaml", state)
+            raw = yaml.safe_load(
+                (client / "workflow-state.yaml").read_text(encoding="utf-8")
+            )
+            raw["unexpected"] = True
+            (client / "workflow-state.yaml").write_text(
+                yaml.safe_dump(raw, sort_keys=False), encoding="utf-8"
+            )
+            errors = validate_client(root, client)
+            self.assertTrue(any("state schema" in error for error in errors), errors)
+
+    def test_real_repository_workflow_validation_is_clean(self):
+        errors = validate_runtime(Path(__file__).resolve().parents[2])
+        self.assertEqual([], errors)
+
+    def test_validate_client_reports_lease_expiring_before_acquisition(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            (client / "derived").mkdir(parents=True, exist_ok=True)
+            (client / "derived" / "client-profile.yaml").write_text(
+                "id: acme\n", encoding="utf-8"
+            )
+            state = initial_state("acme")
+            state["active_lease"] = {
+                "lease_id": "lease-1",
+                "owner": "opencode:session-a",
+                "run_id": None,
+                "acquired_at": "2026-09-17T12:00:00Z",
+                "expires_at": "2026-09-17T11:00:00Z",
+            }
+            save_state(client / "workflow-state.yaml", state)
+            errors = validate_client(root, client)
+            self.assertTrue(any("expires_at" in error for error in errors), errors)
+
+    def test_validate_client_reports_pointer_ahead_of_prerequisites(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            (client / "derived").mkdir(parents=True, exist_ok=True)
+            (client / "derived" / "client-profile.yaml").write_text(
+                "id: acme\n", encoding="utf-8"
+            )
+            state = initial_state("acme")
+            state["current_stage"] = "build-prototype"
+            state["status"] = "in_progress"
+            state["completed"] = ["client-intake"]
+            save_state(client / "workflow-state.yaml", state)
+            errors = validate_client(root, client)
+            self.assertTrue(
+                any("prerequisites not completed" in error for error in errors), errors
+            )
+
+    def test_validate_client_reports_a_manifest_ref_with_the_wrong_stage(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            (client / "derived").mkdir(parents=True, exist_ok=True)
+            (client / "derived" / "client-profile.yaml").write_text(
+                "id: acme\n", encoding="utf-8"
+            )
+            state = initial_state("acme")
+            new_state, manifest = start_attempt(
+                root, client, state, actor="tester", source_commit_sha=self.COMMIT
+            )
+            final_state, frozen = complete_attempt(
+                root,
+                client,
+                new_state,
+                manifest,
+                validator_results=[self._passed("client-input-contract")],
+                at=self.AT,
+                actor="tester",
+            )
+            save_state(client / "workflow-state.yaml", final_state)
+            path = manifest_path(client, frozen.run_id, frozen.attempt)
+            tampered = yaml.safe_load(path.read_text(encoding="utf-8"))
+            tampered["stage"] = "resolve-intelligence"
+            path.write_text(yaml.safe_dump(tampered, sort_keys=False), encoding="utf-8")
+            errors = validate_client(root, client)
+            self.assertTrue(
+                any("manifest of stage" in error for error in errors), errors
+            )
+
+    def test_validate_client_reports_a_malformed_manifest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            (client / "derived").mkdir(parents=True, exist_ok=True)
+            (client / "derived" / "client-profile.yaml").write_text(
+                "id: acme\n", encoding="utf-8"
+            )
+            state = initial_state("acme")
+            new_state, manifest = start_attempt(
+                root, client, state, actor="tester", source_commit_sha=self.COMMIT
+            )
+            save_state(client / "workflow-state.yaml", new_state)
+            path = manifest_path(client, manifest.run_id, manifest.attempt)
+            path.write_text("status: archived\n", encoding="utf-8")
+            errors = validate_client(root, client)
+            self.assertTrue(any("manifest" in error for error in errors), errors)
+
+    def test_validate_client_reports_a_malformed_audit_line(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            (client / "derived").mkdir(parents=True, exist_ok=True)
+            (client / "derived" / "client-profile.yaml").write_text(
+                "id: acme\n", encoding="utf-8"
+            )
+            save_state(client / "workflow-state.yaml", initial_state("acme"))
+            audit = client / "workflow" / "audit.jsonl"
+            audit.parent.mkdir(parents=True, exist_ok=True)
+            audit.write_text("not-json\n", encoding="utf-8")
+            errors = validate_client(root, client)
+            self.assertTrue(any("audit" in error for error in errors), errors)
+
+    def test_completed_manifest_records_produced_artifacts_as_outputs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            (client / "derived").mkdir(parents=True, exist_ok=True)
+            profile = client / "derived" / "client-profile.yaml"
+            profile.write_text("id: acme\n", encoding="utf-8")
+            state = initial_state("acme")
+            new_state, manifest = start_attempt(
+                root, client, state, actor="tester", source_commit_sha=self.COMMIT
+            )
+            _, frozen = complete_attempt(
+                root,
+                client,
+                new_state,
+                manifest,
+                validator_results=[self._passed("client-input-contract")],
+                at=self.AT,
+                actor="tester",
+            )
+            self.assertEqual(
+                ["derived/client-profile.yaml"],
+                [ref.path for ref in frozen.outputs],
+            )
+            self.assertTrue(frozen.outputs[0].sha256)
+
+    def test_validate_client_rejects_a_completed_manifest_without_validators(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            (client / "derived").mkdir(parents=True, exist_ok=True)
+            (client / "derived" / "client-profile.yaml").write_text(
+                "id: acme\n", encoding="utf-8"
+            )
+            forged = ExecutionManifest(
+                run_id="wf-acme-20260917T120000Z-abc12345",
+                client_id="acme",
+                stage="client-intake",
+                attempt=1,
+                source_commit_sha=self.COMMIT,
+                started_at=self.AT,
+                status="completed",
+                completed_at=self.AT,
+            )
+            write_manifest_create_only(
+                manifest_path(client, forged.run_id, forged.attempt), forged
+            )
+            state = initial_state("acme")
+            state["stage_state"] = {
+                "client-intake": {
+                    "attempt": 1,
+                    "status": "complete",
+                    "artifact_manifest_ref": manifest_relpath(
+                        forged.run_id, forged.attempt
+                    ),
+                }
+            }
+            save_state(client / "workflow-state.yaml", state)
+            errors = validate_client(root, client)
+            self.assertTrue(
+                any("without a passed" in error for error in errors), errors
+            )
+
+    def test_reconcile_refuses_a_completed_manifest_without_validators(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            (client / "derived").mkdir(parents=True, exist_ok=True)
+            (client / "derived" / "client-profile.yaml").write_text(
+                "id: acme\n", encoding="utf-8"
+            )
+            forged = ExecutionManifest(
+                run_id="wf-acme-20260917T120000Z-abc12345",
+                client_id="acme",
+                stage="client-intake",
+                attempt=1,
+                source_commit_sha=self.COMMIT,
+                started_at=self.AT,
+                status="completed",
+                completed_at=self.AT,
+            )
+            write_manifest_create_only(
+                manifest_path(client, forged.run_id, forged.attempt), forged
+            )
+            state = initial_state("acme")
+            state["status"] = "in_progress"
+            state["stage_state"] = {
+                "client-intake": {"attempt": 1, "status": "in_progress"}
+            }
+            save_state(client / "workflow-state.yaml", state)
+
+            with self.assertRaises(StageCompletionGateFailed):
+                reconcile_state(root, client, actor="tester", now=datetime(2026, 9, 17, 12, tzinfo=timezone.utc))
+            reloaded = load_state(client / "workflow-state.yaml")
+            self.assertEqual("client-intake", reloaded["current_stage"])
+
+    def test_validate_client_rejects_nested_domain_state_in_stage_state(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            (client / "derived").mkdir(parents=True, exist_ok=True)
+            (client / "derived" / "client-profile.yaml").write_text(
+                "id: acme\n", encoding="utf-8"
+            )
+            state = initial_state("acme")
+            state["stage_state"] = {
+                "client-intake": {"status": "in_progress", "qa_findings": ["qa-1"]}
+            }
+            save_state(client / "workflow-state.yaml", state)
+            errors = validate_client(root, client)
+            self.assertTrue(
+                any("stage_state" in error for error in errors), errors
+            )
+
+    def test_validate_client_rejects_a_broken_manifest_reference(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            (client / "derived").mkdir(parents=True, exist_ok=True)
+            (client / "derived" / "client-profile.yaml").write_text(
+                "id: acme\n", encoding="utf-8"
+            )
+            state = initial_state("acme")
+            new_state, manifest = start_attempt(
+                root, client, state, actor="tester", source_commit_sha=self.COMMIT
+            )
+            final_state, frozen = complete_attempt(
+                root,
+                client,
+                new_state,
+                manifest,
+                validator_results=[self._passed("client-input-contract")],
+                at=self.AT,
+                actor="tester",
+            )
+            final_state["stage_state"]["client-intake"]["artifact_manifest_ref"] = (
+                "workflow/executions/missing/attempt-1.yaml"
+            )
+            save_state(client / "workflow-state.yaml", final_state)
+            errors = validate_client(root, client)
+            self.assertTrue(
+                any("references missing execution manifest" in error for error in errors),
+                errors,
+            )
+            self.assertTrue(frozen.status == "completed")
+
+    def test_validate_client_rejects_a_corrupted_frozen_manifest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            (client / "derived").mkdir(parents=True, exist_ok=True)
+            (client / "derived" / "client-profile.yaml").write_text(
+                "id: acme\n", encoding="utf-8"
+            )
+            state = initial_state("acme")
+            new_state, manifest = start_attempt(
+                root, client, state, actor="tester", source_commit_sha=self.COMMIT
+            )
+            final_state, frozen = complete_attempt(
+                root,
+                client,
+                new_state,
+                manifest,
+                validator_results=[self._passed("client-input-contract")],
+                at=self.AT,
+                actor="tester",
+            )
+            save_state(client / "workflow-state.yaml", final_state)
+            path = manifest_path(client, frozen.run_id, frozen.attempt)
+            path.write_text("{ not: valid: yaml", encoding="utf-8")
+            errors = validate_client(root, client)
+            self.assertTrue(any("manifest" in error for error in errors), errors)
+
+    def test_validate_client_rejects_stage_state_complete_without_manifest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            (client / "derived").mkdir(parents=True, exist_ok=True)
+            (client / "derived" / "client-profile.yaml").write_text(
+                "id: acme\n", encoding="utf-8"
+            )
+            state = initial_state("acme")
+            state["completed"] = ["client-intake"]
+            state["stage_state"] = {"client-intake": {"status": "complete"}}
+            save_state(client / "workflow-state.yaml", state)
+            errors = validate_client(root, client)
+            self.assertTrue(
+                any("no completed execution manifest" in error for error in errors), errors
+            )
+
+
+class WorkflowIdempotencyRuntimeTests(unittest.TestCase):
+    """Cycle 2: failure evidence, idempotent reruns, and lease ownership."""
+
+    COMMIT = "0" * 40
+    AT = "2026-09-17T00:00:00Z"
+    NOW = datetime(2026, 9, 17, 12, 0, tzinfo=timezone.utc)
+
+    def _root(self, tmp: str) -> Path:
+        root = Path(tmp)
+        (root / "client-projects").mkdir(parents=True, exist_ok=True)
+        shutil.copytree(ROOT / "workflows" / "contracts", root / "workflows" / "contracts")
+        return root
+
+    def _client(self, root: Path) -> Path:
+        client = root / "client-projects" / "acme"
+        client.mkdir(parents=True, exist_ok=True)
+        return client
+
+    def _passed(self, name: str) -> ValidatorEvidence:
+        return ValidatorEvidence(name=name, status="passed", at=self.AT)
+
+    def test_fail_attempt_persists_failed_manifest_on_disk(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            state = initial_state("acme")
+            new_state, manifest = start_attempt(
+                root, client, state, actor="tester", source_commit_sha=self.COMMIT
+            )
+            _, failed = fail_attempt(
+                client, new_state, manifest, reason="boom", at=self.AT, actor="tester"
+            )
+            on_disk = load_manifest(manifest_path(client, failed.run_id, failed.attempt))
+            self.assertEqual("failed", on_disk.status)
+            self.assertEqual("boom", on_disk.failure_reason)
+            self.assertEqual(self.AT, on_disk.completed_at)
+
+    def test_reuse_rerun_does_not_duplicate_completed_manifest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            (client / "derived").mkdir(parents=True, exist_ok=True)
+            (client / "derived" / "client-profile.yaml").write_text(
+                "id: acme\n", encoding="utf-8"
+            )
+            refs = artifacts_for_paths(client, ["derived/client-profile.yaml"])
+            state = initial_state("acme")
+            new_state, manifest = start_attempt(
+                root,
+                client,
+                state,
+                actor="tester",
+                source_commit_sha=self.COMMIT,
+                inputs=refs,
+            )
+            final_state, frozen = complete_attempt(
+                root,
+                client,
+                new_state,
+                manifest,
+                validator_results=[self._passed("client-input-contract")],
+                at=self.AT,
+                actor="tester",
+            )
+
+            reused_state, reused = start_attempt(
+                root,
+                client,
+                final_state,
+                actor="tester",
+                source_commit_sha=self.COMMIT,
+                stage="client-intake",
+                inputs=refs,
+            )
+
+            self.assertEqual(frozen.run_id, reused.run_id)
+            self.assertEqual(frozen.attempt, reused.attempt)
+            self.assertEqual("completed", reused.status)
+            self.assertEqual(final_state, reused_state)
+            manifests = sorted(
+                (client / "workflow" / "executions").glob("*/attempt-*.yaml")
+            )
+            self.assertEqual(1, len(manifests))
+
+    def test_lease_blocks_second_owner_and_state_is_not_mutated(self):
+        state = initial_state("acme")
+        leased_state, lease = acquire_lease(
+            state, owner="opencode:session-a", run_id=None, now=self.NOW
+        )
+        before = copy.deepcopy(leased_state)
+        with self.assertRaises(WorkflowLeaseConflict):
+            acquire_lease(
+                leased_state, owner="opencode:session-b", run_id=None, now=self.NOW
+            )
+        self.assertEqual(before, leased_state)
+        self.assertEqual(lease, load_lease(leased_state))
+        self.assertIsNone(state["active_lease"])
+
+    def test_release_after_completion_clears_the_lease(self):
+        state = initial_state("acme")
+        leased_state, lease = acquire_lease(
+            state, owner="opencode:session-a", run_id=None, now=self.NOW
+        )
+        released = release_after_completion(leased_state, lease)
+        self.assertIsNone(released["active_lease"])
+        self.assertEqual(lease.to_dict(), leased_state["active_lease"])
+
+
+class WorkflowValidatorHardeningTests(unittest.TestCase):
+    """Cycle 3 slice 3b: hardened, strictly read-only repository validation."""
+
+    COMMIT = "0" * 40
+    AT = "2026-09-17T00:00:00Z"
+
+    def _root(self, tmp: str) -> Path:
+        root = Path(tmp)
+        (root / "client-projects").mkdir(parents=True, exist_ok=True)
+        shutil.copytree(ROOT / "workflows" / "contracts", root / "workflows" / "contracts")
+        return root
+
+    def _client(self, root: Path) -> Path:
+        client = root / "client-projects" / "acme"
+        client.mkdir(parents=True, exist_ok=True)
+        return client
+
+    def _write_raw_state(self, client: Path, state: dict) -> None:
+        (client / "workflow-state.yaml").write_text(
+            yaml.safe_dump(state, sort_keys=False), encoding="utf-8"
+        )
+
+    def test_validate_client_reports_unknown_top_level_key(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            state = initial_state("acme")
+            state["unexpected_key"] = True
+            self._write_raw_state(client, state)
+
+            errors = validate_client(root, client)
+
+        self.assertTrue(any("unexpected_key" in error for error in errors), errors)
+
+    def test_validate_client_reports_lease_expiring_before_acquisition(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            state = initial_state("acme")
+            state["status"] = "in_progress"
+            state["active_lease"] = {
+                "lease_id": "lease-abc",
+                "owner": "opencode:test",
+                "run_id": "wf-acme-1",
+                "acquired_at": "2026-09-17T12:00:00Z",
+                "expires_at": "2026-09-17T11:00:00Z",
+            }
+            self._write_raw_state(client, state)
+
+            errors = validate_client(root, client)
+
+        self.assertTrue(
+            any("expires_at" in error and "acquired_at" in error for error in errors),
+            errors,
+        )
+
+    def test_validate_client_reports_manifest_ref_with_wrong_stage(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            manifest = (
+                ExecutionManifest.start(
+                    run_id="wf-acme-1",
+                    client_id="acme",
+                    stage="resolve-intelligence",
+                    attempt=1,
+                    source_commit_sha=self.COMMIT,
+                    started_at=self.AT,
+                )
+                .with_validators(
+                    [ValidatorEvidence(name="resolved-intelligence-contract", status="passed", at=self.AT)]
+                )
+                .complete(at=self.AT, required_validators=["resolved-intelligence-contract"])
+            )
+            path = manifest_path(client, "wf-acme-1", 1)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(yaml.safe_dump(manifest.to_dict(), sort_keys=False), encoding="utf-8")
+
+            state = initial_state("acme")
+            state["current_stage"] = "resolve-intelligence"
+            state["status"] = "in_progress"
+            state["completed"] = ["client-intake"]
+            state["stage_state"] = {
+                "client-intake": {
+                    "attempt": 1,
+                    "status": "complete",
+                    "artifact_manifest_ref": "workflow/executions/wf-acme-1/attempt-1.yaml",
+                }
+            }
+            save_state(client / "workflow-state.yaml", state)
+
+            errors = validate_client(root, client)
+
+        self.assertTrue(any("references manifest of stage" in error for error in errors), errors)
+
+    def test_validate_client_reports_malformed_manifest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            path = client / "workflow" / "executions" / "wf-acme-1" / "attempt-1.yaml"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("run_id: wf-acme-1\nstage: client-intake\n", encoding="utf-8")
+            self._write_raw_state(client, initial_state("acme"))
+
+            errors = validate_client(root, client)
+
+        self.assertTrue(any("manifest" in error for error in errors), errors)
+
+    def test_validate_client_reports_malformed_audit_line(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            audit = client / "workflow" / "audit.jsonl"
+            audit.parent.mkdir(parents=True, exist_ok=True)
+            audit.write_text("{ not valid json\n", encoding="utf-8")
+            self._write_raw_state(client, initial_state("acme"))
+
+            errors = validate_client(root, client)
+
+        self.assertTrue(any("audit.jsonl" in error for error in errors), errors)
+
+    def test_validate_client_reports_pointer_ahead_of_prerequisites(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            state = initial_state("acme")
+            state["current_stage"] = "build-prototype"
+            state["status"] = "in_progress"
+            state["completed"] = ["client-intake"]
+            save_state(client / "workflow-state.yaml", state)
+
+            errors = validate_client(root, client)
+
+        self.assertTrue(any("prerequisites not completed" in error for error in errors), errors)
+
+    def test_real_repository_workflow_validation_is_clean(self):
+        self.assertEqual([], validate_runtime(ROOT))
 
 
 if __name__ == "__main__":

@@ -1,0 +1,14 @@
+stage: client-review
+version: 1
+requires:
+  stages:
+    - visual-qa
+  artifacts: []
+produces:
+  - approved-experience.yaml
+validators:
+  - approved-experience-contract
+checkpoints:
+  - review-complete
+next:
+  - productionize

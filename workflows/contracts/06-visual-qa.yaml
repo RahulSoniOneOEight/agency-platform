@@ -1,0 +1,17 @@
+stage: visual-qa
+version: 1
+requires:
+  stages:
+    - build-prototype
+  artifacts:
+    - prototype/prototype-manifest.yaml
+produces:
+  - prototype/qa/screenshot-manifest.yaml
+validators:
+  - visual-qa-contract
+checkpoints:
+  - capture-complete
+  - findings-complete
+  - validation-complete
+next:
+  - client-review

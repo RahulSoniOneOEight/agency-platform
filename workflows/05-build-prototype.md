@@ -48,3 +48,6 @@ Turn validated Experience Directions into a runnable A/B/C prototype using the s
 
 ## NEXT
 `06-visual-qa.md`
+
+## RUNTIME
+Execute through `tooling.workflow.runner`; the machine-readable contract is `workflows/contracts/05-build-prototype.yaml`.

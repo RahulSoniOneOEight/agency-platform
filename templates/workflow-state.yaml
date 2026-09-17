@@ -1,7 +1,9 @@
-version: 1
+version: 2
 client_id: example-client
+workflow: standard-agency
 current_stage: client-intake
 status: not_started
+run_id: null
 completed: []
 skipped: []
 pending:
@@ -14,4 +16,7 @@ pending:
   - client-review
   - productionize
 blocked: []
-last_updated: 2026-09-14
+stage_state: {}
+active_lease: null
+last_transition: null
+last_updated: "2026-09-17"

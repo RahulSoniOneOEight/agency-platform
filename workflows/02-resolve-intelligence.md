@@ -34,3 +34,6 @@ All referenced presets, components, patterns, journeys, and resource requirement
 
 ## NEXT
 `03-resource-research.md`
+
+## RUNTIME
+Execute through `tooling.workflow.runner`; the machine-readable contract is `workflows/contracts/02-resolve-intelligence.yaml`.

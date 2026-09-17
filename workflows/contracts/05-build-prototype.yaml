@@ -1,0 +1,15 @@
+stage: build-prototype
+version: 1
+requires:
+  stages:
+    - generate-directions
+  artifacts: []
+produces:
+  - prototype/prototype-manifest.yaml
+  - prototype/fixtures/demo.yaml
+validators:
+  - prototype-platform-contract
+checkpoints:
+  - prototype-composed
+next:
+  - visual-qa

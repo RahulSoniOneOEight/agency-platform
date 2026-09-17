@@ -28,3 +28,6 @@ Productionization cannot begin until `approved-experience.yaml` exists and valid
 
 ## NEXT
 Release / reusable-learning promotion workflow defined by later delivery milestones.
+
+## RUNTIME
+Execute through `tooling.workflow.runner`; the machine-readable contract is `workflows/contracts/08-productionize.yaml`.
