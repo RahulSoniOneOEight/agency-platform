@@ -11,10 +11,12 @@ from tooling.workflow.execution import StageCompletionGateFailed
 from tooling.workflow.initialize_client import initialize_client
 from tooling.workflow.lease import WorkflowLeaseConflict, acquire_lease
 from tooling.workflow.manifests import (
+    ArtifactRef,
     ExecutionManifest,
     ValidatorEvidence,
     load_manifest,
     manifest_path,
+    sha256_file,
     write_manifest_create_only,
 )
 from tooling.workflow.runner import (
@@ -167,6 +169,14 @@ class ResumeEndToEndTests(unittest.TestCase):
                 )
                 .with_checkpoint("intake-complete", at=AT)
                 .with_validators([_passed("client-input-contract")])
+                .with_output(
+                    ArtifactRef(
+                        path="derived/client-profile.yaml",
+                        sha256=sha256_file(
+                            client / "derived" / "client-profile.yaml"
+                        ),
+                    )
+                )
                 .complete(at=AT, required_validators=["client-input-contract"])
             )
             write_manifest_create_only(
@@ -213,6 +223,14 @@ class ResumeEndToEndTests(unittest.TestCase):
                 )
                 .with_checkpoint("intake-complete", at=AT)
                 .with_validators([_passed("client-input-contract")])
+                .with_output(
+                    ArtifactRef(
+                        path="derived/client-profile.yaml",
+                        sha256=sha256_file(
+                            client / "derived" / "client-profile.yaml"
+                        ),
+                    )
+                )
                 .complete(at=AT, required_validators=["client-input-contract"])
             )
             write_manifest_create_only(
@@ -254,6 +272,14 @@ class ResumeEndToEndTests(unittest.TestCase):
                 )
                 .with_checkpoint("intake-complete", at=AT)
                 .with_validators([_passed("client-input-contract")])
+                .with_output(
+                    ArtifactRef(
+                        path="derived/client-profile.yaml",
+                        sha256=sha256_file(
+                            client / "derived" / "client-profile.yaml"
+                        ),
+                    )
+                )
                 .complete(at=AT, required_validators=["client-input-contract"])
             )
             write_manifest_create_only(

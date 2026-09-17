@@ -562,6 +562,13 @@ def require_completion_evidence(
             f"{manifest.stage}: required validators not passed: "
             f"{', '.join(missing_validators)}"
         )
+    recorded = {ref.path for ref in manifest.outputs}
+    unrecorded = [path for path in contract.produces if path not in recorded]
+    if unrecorded:
+        raise StageValidationFailed(
+            f"{manifest.stage}: produced artifacts not recorded as outputs: "
+            f"{', '.join(unrecorded)}"
+        )
 
 
 def complete_attempt(
@@ -576,19 +583,18 @@ def complete_attempt(
 ) -> tuple[dict, ExecutionManifest]:
     _require_attempt_matches_state(client_dir, state, manifest)
     _require_active_lease(state, actor=actor)
-
-    staged = manifest.with_validators(validator_results)
-    require_completion_evidence(root, client_dir, staged)
+    contract = load_stage_contract(root, manifest.stage)
 
     # Produced artifacts are recorded as *outputs*; inputs stay the refs the
     # attempt actually read. Completion evidence is therefore attributable.
-    for ref in artifacts_for_paths(client_dir, load_stage_contract(root, manifest.stage).produces):
+    staged = manifest.with_validators(validator_results)
+    for ref in artifacts_for_paths(client_dir, contract.produces):
         if ref.sha256:
             staged = staged.with_output(ref)
+    require_completion_evidence(root, client_dir, staged)
 
     frozen = staged.complete(
-        at=at,
-        required_validators=load_stage_contract(root, manifest.stage).validators,
+        at=at, required_validators=contract.validators
     )
     write_manifest_create_only(
         manifest_path(client_dir, frozen.run_id, frozen.attempt), frozen

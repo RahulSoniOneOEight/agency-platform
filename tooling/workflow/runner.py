@@ -500,16 +500,18 @@ def reconcile_state(
             f"cannot reconcile a {manifest.status!r} manifest; completion evidence "
             "is required"
         )
-    # RE2 tier 2: reconciliation re-validates the completion gate rather than
-    # trusting the manifest's status, so a forged or incomplete manifest can
-    # never advance the canonical pointer.
-    require_completion_evidence(root, client_dir, manifest)
-
+    # Lease ownership is checked before evidence so a second owner gets the
+    # ownership error rather than an evidence error for work it does not own.
     lease = load_lease(state)
     if lease is not None and lease.owner != actor and not is_expired(lease, now=moment):
         raise RecoveryRequired(
             f"lease {lease.lease_id} is held by {lease.owner!r}, not {actor!r}"
         )
+    # RE2 tier 2: reconciliation re-validates the completion gate rather than
+    # trusting the manifest's status, so a forged or incomplete manifest can
+    # never advance the canonical pointer.
+    require_completion_evidence(root, client_dir, manifest)
+
     # An expired foreign lease is reclaimed through the shared audited path; a
     # live lease owned by the actor (or no lease at all) passes through.
     state, _ = reclaim_expired_lease(

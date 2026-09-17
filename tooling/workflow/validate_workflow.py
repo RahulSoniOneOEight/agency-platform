@@ -359,6 +359,12 @@ def _validate_completion_evidence(
             errors.append(
                 f"{client_dir}: stage {stage} manifest output {ref.path} is missing"
             )
+    recorded = {ref.path for ref in manifest.outputs}
+    for path in contract.produces:
+        if path not in recorded:
+            errors.append(
+                f"{client_dir}: stage {stage} completed without recording output {path}"
+            )
     return errors
 
 
