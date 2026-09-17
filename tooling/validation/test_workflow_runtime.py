@@ -432,7 +432,7 @@ class WorkflowExecutionTests(unittest.TestCase):
                 root, client, state, actor="tester", source_commit_sha=self.COMMIT
             )
             failed_state, failed_manifest = fail_attempt(
-                new_state, manifest, reason="boom", at=self.AT
+                client, new_state, manifest, reason="boom", at=self.AT
             )
             self.assertEqual(state["current_stage"], failed_state["current_stage"])
             self.assertEqual(state["completed"], failed_state["completed"])
@@ -622,6 +622,72 @@ class WorkflowExecutionTests(unittest.TestCase):
                     client,
                     new_state,
                     foreign,
+                    validator_results=[self._passed("client-input-contract")],
+                    at=self.AT,
+                    actor="tester",
+                )
+
+    def test_fail_attempt_rejects_a_non_current_stage_manifest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            state = initial_state("acme")
+            new_state, manifest = start_attempt(
+                root, client, state, actor="tester", source_commit_sha=self.COMMIT
+            )
+            foreign = ExecutionManifest(
+                run_id=manifest.run_id,
+                client_id=manifest.client_id,
+                stage="generate-directions",
+                attempt=1,
+                source_commit_sha=self.COMMIT,
+                started_at=self.AT,
+            )
+            with self.assertRaises(IllegalStageTransition):
+                fail_attempt(client, new_state, foreign, reason="boom", at=self.AT)
+
+    def test_fail_attempt_rejects_a_stale_run_manifest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            state = initial_state("acme")
+            new_state, manifest = start_attempt(
+                root, client, state, actor="tester", source_commit_sha=self.COMMIT
+            )
+            stale = ExecutionManifest(
+                run_id="wf-acme-other",
+                client_id=manifest.client_id,
+                stage=manifest.stage,
+                attempt=1,
+                source_commit_sha=self.COMMIT,
+                started_at=self.AT,
+            )
+            with self.assertRaises(IllegalStageTransition):
+                fail_attempt(client, new_state, stale, reason="boom", at=self.AT)
+
+    def test_complete_attempt_rejects_a_manifest_when_no_run_is_active(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            (client / "derived").mkdir(parents=True, exist_ok=True)
+            (client / "derived" / "client-profile.yaml").write_text(
+                "id: acme\n", encoding="utf-8"
+            )
+            state = initial_state("acme")
+            unlinked = ExecutionManifest(
+                run_id="wf-acme-unlinked",
+                client_id="acme",
+                stage="client-intake",
+                attempt=1,
+                source_commit_sha=self.COMMIT,
+                started_at=self.AT,
+            )
+            with self.assertRaises(IllegalStageTransition):
+                complete_attempt(
+                    root,
+                    client,
+                    state,
+                    unlinked,
                     validator_results=[self._passed("client-input-contract")],
                     at=self.AT,
                     actor="tester",

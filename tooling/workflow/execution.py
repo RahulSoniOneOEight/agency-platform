@@ -149,13 +149,9 @@ def record_checkpoint(
 
 
 def fail_attempt(
-    state: dict, manifest: ExecutionManifest, *, reason: str, at: str
+    client_dir: Path, state: dict, manifest: ExecutionManifest, *, reason: str, at: str
 ) -> tuple[dict, ExecutionManifest]:
-    if manifest.stage != state.get("current_stage"):
-        raise IllegalStageTransition(
-            f"manifest stage {manifest.stage!r} is not the current stage "
-            f"{state.get('current_stage')!r}"
-        )
+    _require_attempt_matches_state(client_dir, state, manifest)
     new_state = copy.deepcopy(state)
     stage_state = dict(new_state.get("stage_state") or {})
     entry = dict(stage_state.get(manifest.stage) or {})
@@ -180,10 +176,10 @@ def _require_attempt_matches_state(
             f"manifest stage {manifest.stage!r} is not the current stage "
             f"{state.get('current_stage')!r}"
         )
-    active_run = state.get("run_id")
-    if active_run is not None and manifest.run_id != active_run:
+    if manifest.run_id != state.get("run_id"):
         raise IllegalStageTransition(
-            f"manifest run {manifest.run_id!r} is not the active run {active_run!r}"
+            f"manifest run {manifest.run_id!r} is not the active run "
+            f"{state.get('run_id')!r}"
         )
     expected_client = state.get("client_id") or Path(client_dir).name
     if manifest.client_id != expected_client:

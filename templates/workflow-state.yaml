@@ -1,4 +1,4 @@
-﻿version: 2
+version: 2
 client_id: example-client
 workflow: standard-agency
 current_stage: client-intake

@@ -1,4 +1,4 @@
-﻿"""Canonical workflow-state authority.
+"""Canonical workflow-state authority.
 
 v2 is the canonical write format; v1 state stays readable through
 deterministic normalization. All writes are atomic.
