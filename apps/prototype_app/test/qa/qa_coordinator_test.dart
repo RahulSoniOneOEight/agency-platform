@@ -1,8 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prototype_app/qa/memory_qa_finding_repository.dart';
+import 'package:prototype_app/qa/memory_qa_run_repository.dart';
 import 'package:prototype_app/qa/qa_coordinator.dart';
 import 'package:prototype_app/qa/qa_domain_error.dart';
 import 'package:prototype_app/qa/qa_finding.dart';
+import 'package:prototype_app/qa/qa_run.dart';
 import 'package:prototype_app/review/feedback_record.dart';
 import 'package:prototype_app/review/memory_approval_repository.dart';
 import 'package:prototype_app/review/memory_feedback_repository.dart';
@@ -54,13 +56,15 @@ final class _Harness {
       refinementBatchRepository: MemoryRefinementBatchRepository(),
     );
     findings = MemoryQaFindingRepository();
-    qa = QaCoordinator(findings: findings, review: review);
+    runs = MemoryQaRunRepository();
+    qa = QaCoordinator(findings: findings, review: review, runs: runs);
   }
 
   late final ReviewController controller;
   late final MemoryFeedbackRepository feedback;
   late final ReviewCoordinator review;
   late final MemoryQaFindingRepository findings;
+  late final MemoryQaRunRepository runs;
   late final QaCoordinator qa;
 }
 
@@ -357,6 +361,169 @@ void main() {
       ]);
       expect(results[0].id, results[1].id);
       expect(await h.review.allFeedback(), hasLength(1));
+    });
+  });
+
+  group('targeted re-check after refinement', () {
+    test('a successful recheck marks the finding no longer reproducible',
+        () async {
+      final h = _Harness();
+      await h.qa.recordFinding(sampleQaFinding());
+      await h.qa.recordSuccessfulRecheck(
+        findingId: 'qa-001',
+        run: QaRun(
+          id: 'run-1',
+          clientId: 'prototype-demo',
+          sourceCommitSha: 'def456',
+          actorId: 'qa-runner',
+          startedAt: DateTime.utc(2026, 9, 17, 12),
+          checks: const [
+            QaCheckResult(
+              name: 'golden:commerce.home',
+              kind: QaCheckKind.golden,
+              passed: true,
+            ),
+          ],
+        ),
+      );
+      final finding = await h.findings.load('prototype-demo', 'qa-001');
+      expect(finding!.isNoLongerReproducible, isTrue);
+      expect((await h.runs.list('prototype-demo')).single.id, 'run-1');
+    });
+
+    test('recheck does not resolve promoted feedback', () async {
+      final h = _Harness();
+      await h.qa.recordFinding(sampleQaFinding());
+      await h.qa.triageFinding(findingId: 'qa-001', actor: reviewer);
+      await h.qa.promoteFinding(findingId: 'qa-001', actor: reviewer);
+
+      await h.qa.recordSuccessfulRecheck(
+        findingId: 'qa-001',
+        run: QaRun(
+          id: 'run-2',
+          clientId: 'prototype-demo',
+          sourceCommitSha: 'def456',
+          actorId: 'qa-runner',
+          startedAt: DateTime.utc(2026, 9, 17, 13),
+          checks: const [
+            QaCheckResult(
+              name: 'golden:commerce.home',
+              kind: QaCheckKind.golden,
+              passed: true,
+            ),
+          ],
+        ),
+      );
+
+      final finding = await h.findings.load('prototype-demo', 'qa-001');
+      expect(finding!.isNoLongerReproducible, isTrue);
+      expect(finding.status, QaFindingStatus.promoted);
+      final record = (await h.review.allFeedback()).single;
+      expect(record.status, isNot(FeedbackStatus.resolved));
+      expect(record.status, FeedbackStatus.open);
+    });
+
+    test('a failed recheck does not close the finding', () async {
+      final h = _Harness();
+      await h.qa.recordFinding(sampleQaFinding());
+      await h.qa.recordSuccessfulRecheck(
+        findingId: 'qa-001',
+        run: QaRun(
+          id: 'run-3',
+          clientId: 'prototype-demo',
+          sourceCommitSha: 'def456',
+          actorId: 'qa-runner',
+          startedAt: DateTime.utc(2026, 9, 17, 14),
+          checks: const [
+            QaCheckResult(
+              name: 'golden:commerce.home',
+              kind: QaCheckKind.golden,
+              passed: false,
+              detail: 'differs from baseline',
+            ),
+          ],
+        ),
+      );
+      final finding = await h.findings.load('prototype-demo', 'qa-001');
+      expect(finding!.isNoLongerReproducible, isFalse);
+      expect((await h.runs.list('prototype-demo')).single.passed, isFalse);
+    });
+
+    test('a rediscovery after a recheck reopens the finding', () async {
+      final h = _Harness();
+      await h.qa.recordFinding(sampleQaFinding());
+      await h.qa.recordSuccessfulRecheck(
+        findingId: 'qa-001',
+        run: QaRun(
+          id: 'run-4',
+          clientId: 'prototype-demo',
+          sourceCommitSha: 'def456',
+          actorId: 'qa-runner',
+          startedAt: DateTime.utc(2026, 9, 17, 15),
+          checks: const [
+            QaCheckResult(
+              name: 'golden:commerce.home',
+              kind: QaCheckKind.golden,
+              passed: true,
+            ),
+          ],
+        ),
+      );
+      await h.qa.recordFinding(sampleQaFinding(id: 'qa-002'));
+      final finding = await h.findings.load('prototype-demo', 'qa-001');
+      expect(finding!.isNoLongerReproducible, isFalse);
+      expect(finding.recurrences, 1);
+    });
+
+    test('an unknown finding id fails without persisting a run', () async {
+      final h = _Harness();
+      await expectLater(
+        h.qa.recordSuccessfulRecheck(
+          findingId: 'qa-missing',
+          run: QaRun(
+            id: 'run-5',
+            clientId: 'prototype-demo',
+            sourceCommitSha: 'def456',
+            actorId: 'qa-runner',
+            startedAt: DateTime.utc(2026, 9, 17, 16),
+            checks: const [],
+          ),
+        ),
+        throwsA(isA<QaFindingNotFound>()),
+      );
+      expect(await h.runs.list('prototype-demo'), isEmpty);
+    });
+
+    test('affected-job planning narrows the re-capture surface', () {
+      final jobs = [
+        QaCaptureJob(
+          captureId: 'sha256:a',
+          clientId: 'prototype-demo',
+          surface: QaSurfaceRef.prototype,
+          screen: 'commerce.home',
+          state: 'default',
+          direction: 'b',
+          viewportWidth: 390,
+          viewportHeight: 844,
+          fixtureVersion: 'demo-v1',
+        ),
+        QaCaptureJob(
+          captureId: 'sha256:b',
+          clientId: 'prototype-demo',
+          surface: QaSurfaceRef.prototype,
+          screen: 'commerce.plp',
+          state: 'default',
+          direction: 'b',
+          viewportWidth: 390,
+          viewportHeight: 844,
+          fixtureVersion: 'demo-v1',
+        ),
+      ];
+      final affected = affectedCaptureJobs(
+        jobs: jobs,
+        changedScreens: {'commerce.home'},
+      );
+      expect(affected.map((item) => item.captureId), ['sha256:a']);
     });
   });
 

@@ -20,21 +20,27 @@ import '../review/feedback_record.dart';
 import '../review/review_actor.dart';
 import '../review/review_coordinator.dart';
 import '../review/review_domain_error.dart';
+import 'memory_qa_run_repository.dart';
 import 'qa_domain_error.dart';
 import 'qa_finding.dart';
 import 'qa_finding_repository.dart';
+import 'qa_run.dart';
+import 'qa_run_repository.dart';
 
 final class QaCoordinator {
   QaCoordinator({
     required QaFindingRepository findings,
     required ReviewCoordinator review,
+    QaRunRepository? runs,
     DateTime Function()? clock,
   })  : _findings = findings,
         _review = review,
+        _runs = runs ?? MemoryQaRunRepository(),
         _clock = clock ?? (() => DateTime.now().toUtc());
 
   final QaFindingRepository _findings;
   final ReviewCoordinator _review;
+  final QaRunRepository _runs;
   final DateTime Function() _clock;
 
   /// In-flight promotions, keyed by finding id, so concurrent calls share one
@@ -240,6 +246,43 @@ final class QaCoordinator {
         at: _clock(),
         evidence: evidence,
         runId: runId,
+      ),
+    );
+  }
+
+  /// All QA runs for this client, in deterministic id order.
+  Future<List<QaRun>> allRuns() => _runs.list(clientId);
+
+  /// Records a QA run and, when the run passed, marks [findingId] as no longer
+  /// reproducible.
+  ///
+  /// Targeted re-check after refinement: only the affected surfaces are
+  /// re-captured (see [affectedCaptureJobs]) and re-checked. This never resolves,
+  /// reopens, or reclassifies a promoted `FeedbackRecord` — C.4 reviewer
+  /// authority remains intact.
+  ///
+  /// Transactional: the finding is validated before the run is persisted, so an
+  /// unknown finding id leaves no run record behind.
+  Future<QaFinding> recordSuccessfulRecheck({
+    required String findingId,
+    required QaRun run,
+  }) async {
+    final finding = await _requireFinding(findingId);
+    if (run.clientId != clientId) {
+      throw InvalidQaFinding(
+        'QA run belongs to client ${run.clientId}, not $clientId',
+      );
+    }
+    await _runs.save(clientId, run);
+    if (!run.passed) {
+      return finding;
+    }
+    return _replace(
+      finding,
+      finding.markNoLongerReproducible(
+        actorId: run.actorId,
+        at: _clock(),
+        runId: run.id,
       ),
     );
   }
