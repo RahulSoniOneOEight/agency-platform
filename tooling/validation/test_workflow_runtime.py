@@ -20,7 +20,12 @@ from tooling.workflow.execution import (
     start_attempt,
 )
 from tooling.workflow.initialize_client import initialize_client
-from tooling.workflow.manifests import ValidatorEvidence, load_manifest, manifest_path
+from tooling.workflow.manifests import (
+    ExecutionManifest,
+    ValidatorEvidence,
+    load_manifest,
+    manifest_path,
+)
 from tooling.workflow.router import next_stage
 from tooling.workflow.state import initial_state, save_state
 from tooling.workflow.validate_workflow import validate_client, validate_runtime, validate_workflow_file
@@ -527,6 +532,176 @@ class WorkflowExecutionTests(unittest.TestCase):
                 manifest, "intake-complete", at=self.AT, contract=contract
             )
             self.assertEqual("intake-complete", updated.checkpoints[-1].name)
+
+    def test_complete_attempt_rejects_a_non_current_stage_manifest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            (client / "derived").mkdir(parents=True, exist_ok=True)
+            (client / "derived" / "client-profile.yaml").write_text(
+                "id: acme\n", encoding="utf-8"
+            )
+            state = initial_state("acme")
+            new_state, manifest = start_attempt(
+                root, client, state, actor="tester", source_commit_sha=self.COMMIT
+            )
+            foreign = ExecutionManifest(
+                run_id=manifest.run_id,
+                client_id=manifest.client_id,
+                stage="generate-directions",
+                attempt=1,
+                source_commit_sha=self.COMMIT,
+                started_at=self.AT,
+            )
+            with self.assertRaises(IllegalStageTransition):
+                complete_attempt(
+                    root,
+                    client,
+                    new_state,
+                    foreign,
+                    validator_results=[self._passed("direction-contract")],
+                    at=self.AT,
+                    actor="tester",
+                )
+            self.assertEqual("client-intake", new_state["current_stage"])
+
+    def test_complete_attempt_rejects_a_stale_run_manifest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            (client / "derived").mkdir(parents=True, exist_ok=True)
+            (client / "derived" / "client-profile.yaml").write_text(
+                "id: acme\n", encoding="utf-8"
+            )
+            state = initial_state("acme")
+            new_state, manifest = start_attempt(
+                root, client, state, actor="tester", source_commit_sha=self.COMMIT
+            )
+            stale = ExecutionManifest(
+                run_id="wf-acme-other",
+                client_id=manifest.client_id,
+                stage=manifest.stage,
+                attempt=1,
+                source_commit_sha=self.COMMIT,
+                started_at=self.AT,
+            )
+            with self.assertRaises(IllegalStageTransition):
+                complete_attempt(
+                    root,
+                    client,
+                    new_state,
+                    stale,
+                    validator_results=[self._passed("client-input-contract")],
+                    at=self.AT,
+                    actor="tester",
+                )
+
+    def test_complete_attempt_rejects_a_cross_client_manifest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            (client / "derived").mkdir(parents=True, exist_ok=True)
+            (client / "derived" / "client-profile.yaml").write_text(
+                "id: acme\n", encoding="utf-8"
+            )
+            state = initial_state("acme")
+            new_state, manifest = start_attempt(
+                root, client, state, actor="tester", source_commit_sha=self.COMMIT
+            )
+            foreign = ExecutionManifest(
+                run_id=manifest.run_id,
+                client_id="other-client",
+                stage=manifest.stage,
+                attempt=1,
+                source_commit_sha=self.COMMIT,
+                started_at=self.AT,
+            )
+            with self.assertRaises(IllegalStageTransition):
+                complete_attempt(
+                    root,
+                    client,
+                    new_state,
+                    foreign,
+                    validator_results=[self._passed("client-input-contract")],
+                    at=self.AT,
+                    actor="tester",
+                )
+
+    def test_validate_client_rejects_a_broken_manifest_reference(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            (client / "derived").mkdir(parents=True, exist_ok=True)
+            (client / "derived" / "client-profile.yaml").write_text(
+                "id: acme\n", encoding="utf-8"
+            )
+            state = initial_state("acme")
+            new_state, manifest = start_attempt(
+                root, client, state, actor="tester", source_commit_sha=self.COMMIT
+            )
+            final_state, frozen = complete_attempt(
+                root,
+                client,
+                new_state,
+                manifest,
+                validator_results=[self._passed("client-input-contract")],
+                at=self.AT,
+                actor="tester",
+            )
+            final_state["stage_state"]["client-intake"]["artifact_manifest_ref"] = (
+                "workflow/executions/missing/attempt-1.yaml"
+            )
+            save_state(client / "workflow-state.yaml", final_state)
+            errors = validate_client(root, client)
+            self.assertTrue(
+                any("references missing execution manifest" in error for error in errors),
+                errors,
+            )
+            self.assertTrue(frozen.status == "completed")
+
+    def test_validate_client_rejects_a_corrupted_frozen_manifest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            (client / "derived").mkdir(parents=True, exist_ok=True)
+            (client / "derived" / "client-profile.yaml").write_text(
+                "id: acme\n", encoding="utf-8"
+            )
+            state = initial_state("acme")
+            new_state, manifest = start_attempt(
+                root, client, state, actor="tester", source_commit_sha=self.COMMIT
+            )
+            final_state, frozen = complete_attempt(
+                root,
+                client,
+                new_state,
+                manifest,
+                validator_results=[self._passed("client-input-contract")],
+                at=self.AT,
+                actor="tester",
+            )
+            save_state(client / "workflow-state.yaml", final_state)
+            path = manifest_path(client, frozen.run_id, frozen.attempt)
+            path.write_text("{ not: valid: yaml", encoding="utf-8")
+            errors = validate_client(root, client)
+            self.assertTrue(any("manifest" in error for error in errors), errors)
+
+    def test_validate_client_rejects_stage_state_complete_without_manifest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            (client / "derived").mkdir(parents=True, exist_ok=True)
+            (client / "derived" / "client-profile.yaml").write_text(
+                "id: acme\n", encoding="utf-8"
+            )
+            state = initial_state("acme")
+            state["completed"] = ["client-intake"]
+            state["stage_state"] = {"client-intake": {"status": "complete"}}
+            save_state(client / "workflow-state.yaml", state)
+            errors = validate_client(root, client)
+            self.assertTrue(
+                any("no completed execution manifest" in error for error in errors), errors
+            )
 
 
 if __name__ == "__main__":

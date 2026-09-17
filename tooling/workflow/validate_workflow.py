@@ -89,7 +89,13 @@ def _validate_execution_manifests(client_dir: Path, state: dict[str, Any]) -> li
                 except ManifestError as exc:
                     errors.append(f"{client_dir}: stage {stage}: {exc}")
                     manifest = None
-        if manifest is None:
+            else:
+                errors.append(
+                    f"{client_dir}: stage {stage} references missing execution manifest {ref}"
+                )
+        else:
+            # Only an entry without a recorded reference may fall back to a
+            # matching completed manifest; a broken reference must not be masked.
             for _, candidate in loaded:
                 if candidate.stage == stage and candidate.status == "completed":
                     manifest = candidate

@@ -239,6 +239,44 @@ class SchemaTests(unittest.TestCase):
         self.assertTrue(list(validator.iter_errors(state)))
 
 
+class Cycle1ReviewFixTests(unittest.TestCase):
+    """Regression tests for the Cycle 1 independent review findings."""
+
+    def test_yaml_date_last_updated_is_coerced_to_iso_string(self):
+        import datetime
+
+        state = normalize_state({**V2_STATE, "last_updated": datetime.date(2026, 9, 17)})
+        self.assertEqual("2026-09-17", state["last_updated"])
+        self.assertIsInstance(state["last_updated"], str)
+
+    def test_shipped_template_is_schema_valid(self):
+        validator = _schema_validator()
+        root = Path(__file__).resolve().parents[2]
+        template = yaml.safe_load(
+            (root / "templates" / "workflow-state.yaml").read_text(encoding="utf-8")
+        )
+        self.assertEqual([], list(validator.iter_errors(normalize_state(template))))
+
+    def test_invalid_stage_attempt_status_is_rejected(self):
+        with self.assertRaises(WorkflowStateError):
+            normalize_state(
+                {
+                    **V2_STATE,
+                    "stage_state": {"visual-qa": {"status": "garbage"}},
+                }
+            )
+
+    def test_schema_rejects_invalid_stage_attempt_status(self):
+        validator = _schema_validator()
+        state = normalize_state(V2_STATE)
+        state["stage_state"] = {"visual-qa": {"status": "garbage"}}
+        self.assertTrue(list(validator.iter_errors(state)))
+
+    def test_non_string_last_updated_is_rejected(self):
+        with self.assertRaises(WorkflowStateError):
+            normalize_state({**V2_STATE, "last_updated": ["2026-09-17"]})
+
+
 class ConstantsTests(unittest.TestCase):
     def test_exported_status_constants(self):
         self.assertEqual(STATUSES, WORKFLOW_STATUSES)

@@ -95,7 +95,12 @@
     },
     "stageAttempt": {
       "type": "object",
-      "additionalProperties": true
+      "additionalProperties": true,
+      "properties": {
+        "status": {
+          "enum": ["not_started", "in_progress", "blocked", "failed", "complete"]
+        }
+      }
     },
     "lease": {
       "type": "object",

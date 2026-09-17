@@ -1,4 +1,4 @@
-"""Canonical workflow-state authority.
+﻿"""Canonical workflow-state authority.
 
 v2 is the canonical write format; v1 state stays readable through
 deterministic normalization. All writes are atomic.
@@ -10,7 +10,7 @@ import copy
 import os
 import tempfile
 from collections.abc import Mapping
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -98,8 +98,26 @@ def _normalize_stage_state(value: Any) -> dict[str, Any]:
         _require_stage(stage, "stage_state key")
         if not isinstance(attempt, Mapping):
             raise WorkflowStateError(f"stage_state[{stage!r}] must be a mapping")
-        normalized[stage] = copy.deepcopy(attempt)
+        entry = copy.deepcopy(attempt)
+        status = entry.get("status")
+        if status is not None and status not in STAGE_ATTEMPT_STATUSES:
+            raise WorkflowStateError(
+                f"invalid stage_state[{stage!r}] status: {status!r}"
+            )
+        normalized[stage] = entry
     return normalized
+
+
+def _normalize_last_updated(value: Any) -> str:
+    if value is None or value == "":
+        return date.today().isoformat()
+    if isinstance(value, datetime):
+        return value.date().isoformat()
+    if isinstance(value, date):
+        return value.isoformat()
+    if isinstance(value, str):
+        return value
+    raise WorkflowStateError(f"invalid last_updated: {value!r}")
 
 
 def _normalize_optional_mapping(value: Any, label: str) -> Any:
@@ -158,7 +176,7 @@ def normalize_state(data: Any, client_id: str | None = None) -> dict[str, Any]:
         "last_transition": _normalize_optional_mapping(
             data.get("last_transition"), "last_transition"
         ),
-        "last_updated": data.get("last_updated") or date.today().isoformat(),
+        "last_updated": _normalize_last_updated(data.get("last_updated")),
     }
 
 

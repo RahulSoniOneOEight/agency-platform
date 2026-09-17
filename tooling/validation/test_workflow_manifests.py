@@ -1,9 +1,11 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import hashlib
 import json
 import tempfile
 import unittest
+
+import yaml
 from pathlib import Path
 
 from tooling.workflow.manifests import (
@@ -11,6 +13,7 @@ from tooling.workflow.manifests import (
     ArtifactRef,
     CheckpointRecord,
     ExecutionManifest,
+    ManifestError,
     ManifestImmutable,
     StageCompletionGateFailed,
     ValidatorEvidence,
@@ -142,6 +145,22 @@ class CompletionTests(unittest.TestCase):
         self.assertEqual(AT, failed.completed_at)
         with self.assertRaises(ManifestImmutable):
             failed.with_output(ArtifactRef(path="a.yaml", sha256=SHA))
+
+    def test_from_dict_rejects_an_unknown_status(self):
+        data = _manifest().to_dict()
+        data["status"] = "archived"
+        with self.assertRaises(ManifestError):
+            ExecutionManifest.from_dict(data)
+
+    def test_write_manifest_refuses_any_non_in_progress_status(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "attempt-1.yaml"
+            write_manifest_create_only(path, _manifest())
+            data = load_manifest(path).to_dict()
+            data["status"] = "failed"
+            path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+            with self.assertRaises(ManifestImmutable):
+                write_manifest_create_only(path, _manifest())
 
 
 class PersistenceTests(unittest.TestCase):

@@ -1,4 +1,4 @@
-version: 2
+﻿version: 2
 client_id: example-client
 workflow: standard-agency
 current_stage: client-intake
@@ -19,4 +19,4 @@ blocked: []
 stage_state: {}
 active_lease: null
 last_transition: null
-last_updated: 2026-09-17
+last_updated: "2026-09-17"

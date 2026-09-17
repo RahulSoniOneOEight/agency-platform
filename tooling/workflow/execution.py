@@ -151,6 +151,11 @@ def record_checkpoint(
 def fail_attempt(
     state: dict, manifest: ExecutionManifest, *, reason: str, at: str
 ) -> tuple[dict, ExecutionManifest]:
+    if manifest.stage != state.get("current_stage"):
+        raise IllegalStageTransition(
+            f"manifest stage {manifest.stage!r} is not the current stage "
+            f"{state.get('current_stage')!r}"
+        )
     new_state = copy.deepcopy(state)
     stage_state = dict(new_state.get("stage_state") or {})
     entry = dict(stage_state.get(manifest.stage) or {})
@@ -159,6 +164,32 @@ def fail_attempt(
     stage_state[manifest.stage] = entry
     new_state["stage_state"] = stage_state
     return new_state, manifest.fail(reason=reason, at=at)
+
+
+def _require_attempt_matches_state(
+    client_dir: Path, state: dict, manifest: ExecutionManifest
+) -> None:
+    """Reject a manifest that does not belong to the state it claims to advance.
+
+    The canonical stage pointer may only advance for the stage the state is
+    currently on, for the state's active run, for this client. Without this
+    guard a directly supplied manifest could skip stages or cross clients.
+    """
+    if manifest.stage != state.get("current_stage"):
+        raise IllegalStageTransition(
+            f"manifest stage {manifest.stage!r} is not the current stage "
+            f"{state.get('current_stage')!r}"
+        )
+    active_run = state.get("run_id")
+    if active_run is not None and manifest.run_id != active_run:
+        raise IllegalStageTransition(
+            f"manifest run {manifest.run_id!r} is not the active run {active_run!r}"
+        )
+    expected_client = state.get("client_id") or Path(client_dir).name
+    if manifest.client_id != expected_client:
+        raise IllegalStageTransition(
+            f"manifest client {manifest.client_id!r} does not match {expected_client!r}"
+        )
 
 
 def complete_attempt(
@@ -171,6 +202,7 @@ def complete_attempt(
     at: str,
     actor: str,
 ) -> tuple[dict, ExecutionManifest]:
+    _require_attempt_matches_state(client_dir, state, manifest)
     contract = load_stage_contract(root, manifest.stage)
 
     missing_artifacts = [

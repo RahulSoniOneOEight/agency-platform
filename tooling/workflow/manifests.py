@@ -194,6 +194,9 @@ class ExecutionManifest:
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> "ExecutionManifest":
+        status = data.get("status", "in_progress")
+        if status not in MANIFEST_STATUSES:
+            raise ManifestError(f"unknown manifest status: {status!r}")
         return cls(
             run_id=data["run_id"],
             client_id=data["client_id"],
@@ -201,7 +204,7 @@ class ExecutionManifest:
             attempt=int(data["attempt"]),
             source_commit_sha=data["source_commit_sha"],
             started_at=data["started_at"],
-            status=data.get("status", "in_progress"),
+            status=status,
             inputs=tuple(_artifact_from_dict(item) for item in data.get("inputs", [])),
             outputs=tuple(_artifact_from_dict(item) for item in data.get("outputs", [])),
             checkpoints=tuple(
@@ -273,7 +276,7 @@ def write_manifest_create_only(path: Path, manifest: ExecutionManifest) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
         existing = load_manifest(path)
-        if existing.status in ("completed", "failed"):
+        if existing.status != "in_progress":
             raise ManifestImmutable(
                 f"{path}: manifest is {existing.status} and cannot be rewritten"
             )
