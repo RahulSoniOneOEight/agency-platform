@@ -142,6 +142,18 @@ committed Dart review records cannot be byte-reproduced. Determinism must be ass
   `resources/provenance.yaml` follows `resources/registry/schema/resource-provenance.schema.json`
   (`source` + `usage_status`), which has no `normalized_into` field; normalization is proven by
   `normalize_bindings` inlining the selected resources into the prototype manifest.
+- **RF17 — The review/approval/QA journey is proven in Dart, not in a Python module.** The plan
+  names `tooling/validation/test_reference_client_review_approval.py`, but the C.3–C.7 and D
+  authorities are Dart domain code that Python cannot drive, and CI's `validate.yml` environment
+  installs only Python (no Flutter). The journey is therefore proven by
+  `apps/prototype_app/test/reference_client/reference_client_{review_approval,qa}_test.dart` (run
+  by `flutter-ci.yml`), and the Python side validates the **committed machine evidence**
+  (`tooling/reference_client/evidence.py` + `test_reference_client_evidence.py`), which is
+  Flutter-free and therefore safe for `validate.yml`. The Dart test emits evidence only when
+  `--dart-define=REFERENCE_EVIDENCE_PATH=...` is supplied, so CI never mutates committed authority.
+  Regeneration command: from `apps/prototype_app`,
+  `flutter test test/reference_client/reference_client_review_approval_test.dart --dart-define=REFERENCE_EVIDENCE_PATH=<repo-root-relative path>`.
+  The synthetic `source_commit_sha` (`0123...4567`) is a determinism fixture value, not a real commit.
 - **RF16 — Assertion integrity.** `evaluate_assertions` fails loudly on an empty assertion set, and
   `fixture_integrity` pins the fixture's canonical content hash plus re-runs `validate_fixture`, so
   content tampering cannot pass silently. `no_duplicate_authority` matches `.json`/`.yaml`/`.yml`
@@ -172,13 +184,21 @@ committed Dart review records cannot be byte-reproduced. Determinism must be ass
     `client-projects/schema/reference-client-report.schema.json`;
     `tooling/validation/test_reference_client_evidence.py`; committed machine evidence
     `client-projects/reference-commerce/reference-e2e/evidence/review-approval-evidence.json`
-    (canonical JSON, 39 passing assertions, no subjective score).
+    (canonical JSON, 38 passing assertions, no subjective score).
   - Tests: reference-client modules 38 (16 fixture + 12 scenario + 10 evidence) → repo suite
     **733 tests OK**; `flutter test test/reference_client` 11, `flutter test test/review` 586,
     `flutter test test/qa` 129, `flutter test` 789, `flutter analyze` clean; all validators and
     both `--check` freshness commands pass.
   - Evidence emission is opt-in: the Dart test writes into the repository only when
     `REFERENCE_EVIDENCE_PATH` is set, so CI never mutates committed authority.
+  - **Accepted minors (recorded, non-gating):** the evidence carries a *derived summary* of mix
+    decisions and feedback outcomes (ids, statuses, counts, history event types) rather than only
+    ids/counts/refs — it never copies a full authority body, and `validate_evidence` forbids the
+    full-state keys; `validate_evidence` does not yet cross-check assertion ids against
+    `assertions.yaml`; the synthetic source SHA is not labelled synthetic in the schema; the
+    "approval refused while a blocker is unresolved" assertion is confounded by the readiness gate
+    (the blocking gate itself is covered by the C.4–C.7 suite); the runtime snapshot helper is
+    shallow but the bundle-byte comparison is the strong immutability proof.
 - 2026-09-18 — Preflight complete. Branch `milestone-f-reference-client` at `a40ccf7`, based on the
   merged E tip `4a9a532`. Spec + plan read in full. Preflight scan found two decisive constraints
   (C1 runtime direction ids, C2 non-`examples` validator coverage) plus C3 (five governed sections)
