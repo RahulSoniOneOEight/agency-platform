@@ -1,8 +1,15 @@
 from __future__ import annotations
 
+import contextlib
+import io
 import json
+import shutil
+import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
+
+import yaml
 
 from tooling.prototype.screenshot_manifest import (
     MANIFEST_VERSION,
@@ -11,6 +18,17 @@ from tooling.prototype.screenshot_manifest import (
     build_capture_jobs,
     build_screenshot_manifest,
     normalize_manifest,
+)
+from tooling.visual_qa.capture_models import ScreenshotArtifact
+from tooling.visual_qa.capture_runner import (
+    CaptureResult,
+    CaptureRunner,
+    png_dimensions,
+)
+from tooling.visual_qa.errors import (
+    CaptureFailed,
+    CaptureNotDeterministic,
+    InvalidScreenshotMetadata,
 )
 
 SCHEMA_PATH = (
@@ -456,6 +474,430 @@ class SchemaAndDemoManifestTests(unittest.TestCase):
         data = yaml.safe_load(DEMO_MANIFEST_PATH.read_text(encoding="utf-8"))
         jobs = build_capture_jobs(data, BASE_URL, COMMIT)
         self.assertEqual({"a", "b", "c"}, {job["direction"] for job in jobs})
+
+
+FIXED_CLOCK = datetime(2026, 9, 17, 12, 0, 0, tzinfo=timezone.utc)
+
+
+def png_bytes(width: int, height: int) -> bytes:
+    """A structurally parseable PNG header carrying explicit dimensions."""
+    signature = b"\x89PNG\r\n\x1a\n"
+    ihdr = (
+        width.to_bytes(4, "big")
+        + height.to_bytes(4, "big")
+        + b"\x08\x06\x00\x00\x00"
+    )
+    chunk = len(ihdr).to_bytes(4, "big") + b"IHDR" + ihdr + b"\x00\x00\x00\x00"
+    return signature + chunk + b"\x00\x00\x00\x00IEND\xaeB`\x82"
+
+
+class FakeBackend:
+    """Writes deterministic bytes for every job."""
+
+    def __init__(self, payload: bytes) -> None:
+        self.payload = payload
+        self.calls: list[tuple[str, str]] = []
+
+    def capture(self, job: dict, destination: Path) -> CaptureResult:
+        self.calls.append((job["capture_id"], job["url"]))
+        destination.write_bytes(self.payload)
+        return CaptureResult()
+
+
+class FailingBackend:
+    def capture(self, job: dict, destination: Path) -> CaptureResult:
+        raise CaptureFailed("browser launch failed")
+
+
+class EmptyBackend:
+    def capture(self, job: dict, destination: Path) -> CaptureResult:
+        destination.write_bytes(b"")
+        return CaptureResult()
+
+
+class MissingOutputBackend:
+    def capture(self, job: dict, destination: Path) -> CaptureResult:
+        return CaptureResult()
+
+
+class PartialThenFailBackend:
+    def capture(self, job: dict, destination: Path) -> CaptureResult:
+        destination.write_bytes(b"\x89PNG\r\n\x1a\npartial")
+        raise CaptureFailed("navigation timed out")
+
+
+class NondeterministicBackend:
+    def __init__(self, payload: bytes) -> None:
+        self.payload = payload
+
+    def capture(self, job: dict, destination: Path) -> CaptureResult:
+        destination.write_bytes(self.payload)
+        return CaptureResult(deterministic=False, detail="animation still settling")
+
+
+def sample_job(**overrides: object) -> dict:
+    job = build_capture_jobs(v2_manifest(), BASE_URL, COMMIT)[0]
+    job.update(overrides)
+    return job
+
+
+class CaptureRunnerTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.output_dir = Path(self._tmp.name)
+
+    def tearDown(self) -> None:
+        self._tmp.cleanup()
+
+    def runner(self, backend: object, **kwargs: object) -> CaptureRunner:
+        return CaptureRunner(
+            backend=backend,
+            output_dir=self.output_dir,
+            clock=lambda: FIXED_CLOCK,
+            **kwargs,
+        )
+
+    def test_runner_persists_no_success_for_failed_capture(self):
+        with self.assertRaises(CaptureFailed):
+            self.runner(FailingBackend()).run([sample_job()])
+        self.assertEqual([], list(self.output_dir.glob("*.artifact.json")))
+        self.assertEqual([], list(self.output_dir.glob("*.png")))
+        self.assertEqual([], list(self.output_dir.glob("*.tmp")))
+
+    def test_partial_capture_is_not_published(self):
+        with self.assertRaises(CaptureFailed):
+            self.runner(PartialThenFailBackend()).run([sample_job()])
+        self.assertEqual([], list(self.output_dir.glob("*.artifact.json")))
+        self.assertEqual([], list(self.output_dir.glob("*.png")))
+
+    def test_empty_capture_is_rejected(self):
+        with self.assertRaises(CaptureFailed):
+            self.runner(EmptyBackend()).run([sample_job()])
+        self.assertEqual([], list(self.output_dir.glob("*.artifact.json")))
+
+    def test_missing_capture_output_is_rejected(self):
+        with self.assertRaises(CaptureFailed):
+            self.runner(MissingOutputBackend()).run([sample_job()])
+        self.assertEqual([], list(self.output_dir.glob("*.artifact.json")))
+
+    def test_nondeterministic_capture_is_rejected(self):
+        with self.assertRaises(CaptureNotDeterministic):
+            self.runner(NondeterministicBackend(png_bytes(390, 844))).run(
+                [sample_job()]
+            )
+        self.assertEqual([], list(self.output_dir.glob("*.artifact.json")))
+
+    def test_artifact_identity_matches_job_and_hash(self):
+        job = sample_job()
+        artifacts = self.runner(FakeBackend(png_bytes(390, 844))).run([job])
+        self.assertEqual(1, len(artifacts))
+        artifact = artifacts[0]
+        self.assertEqual(job["capture_id"], artifact.capture_id)
+        self.assertTrue(artifact.content_hash.startswith("sha256:"))
+        self.assertEqual(64, len(artifact.content_hash.split(":", 1)[1]))
+
+    def test_artifact_records_full_reproducibility_identity(self):
+        job = sample_job(mix_ref="review-state-v2")
+        artifact = self.runner(FakeBackend(png_bytes(390, 844))).run([job])[0]
+        self.assertEqual("prototype-demo", artifact.client_id)
+        self.assertEqual("prototype", artifact.surface)
+        self.assertEqual("commerce.home", artifact.screen)
+        self.assertIsNone(artifact.story)
+        self.assertEqual("default", artifact.state)
+        self.assertEqual("b", artifact.direction)
+        self.assertEqual("review-state-v2", artifact.mix_ref)
+        self.assertEqual(390, artifact.viewport["width"])
+        self.assertEqual(844, artifact.viewport["height"])
+        self.assertEqual(1, artifact.device_scale_factor)
+        self.assertEqual("demo-v1", artifact.fixture_version)
+        self.assertEqual(COMMIT, artifact.source_commit_sha)
+        self.assertEqual(job["url"], artifact.url)
+        self.assertEqual(job["filename"], artifact.filename)
+
+    def test_artifact_writes_png_and_sidecar(self):
+        job = sample_job()
+        artifact = self.runner(FakeBackend(png_bytes(390, 844))).run([job])[0]
+        png = self.output_dir / job["filename"]
+        sidecar = self.output_dir / f"{job['filename']}.artifact.json"
+        self.assertTrue(png.exists())
+        self.assertTrue(sidecar.exists())
+        self.assertEqual(job["filename"], artifact.path)
+        payload = json.loads(sidecar.read_text(encoding="utf-8"))
+        self.assertEqual(artifact.to_json(), payload)
+
+    def test_artifact_dimensions_are_read_from_the_capture(self):
+        artifact = self.runner(FakeBackend(png_bytes(390, 844))).run(
+            [sample_job()]
+        )[0]
+        self.assertEqual(390, artifact.width)
+        self.assertEqual(844, artifact.height)
+
+    def test_artifact_rejects_dimension_mismatch(self):
+        with self.assertRaises(InvalidScreenshotMetadata):
+            self.runner(FakeBackend(png_bytes(200, 200))).run([sample_job()])
+        self.assertEqual([], list(self.output_dir.glob("*.artifact.json")))
+
+    def test_runner_returns_artifacts_in_job_order(self):
+        manifest = v2_manifest()
+        manifest["jobs"] = [
+            manifest["jobs"][0],
+            {
+                "surface": "prototype",
+                "screen": "commerce.search",
+                "state": "default",
+                "direction": "b",
+                "viewport": {"width": 390, "height": 844},
+            },
+        ]
+        jobs = build_capture_jobs(manifest, BASE_URL, COMMIT)
+        backend = FakeBackend(png_bytes(390, 844))
+        artifacts = self.runner(backend).run(jobs)
+        self.assertEqual(
+            [job["capture_id"] for job in jobs],
+            [artifact.capture_id for artifact in artifacts],
+        )
+        self.assertEqual(2, len(backend.calls))
+
+    def test_artifact_metadata_is_reproducible_across_runs(self):
+        payload = png_bytes(390, 844)
+        first = self.runner(FakeBackend(payload)).run([sample_job()])[0]
+        second_dir = Path(self._tmp.name) / "second"
+        second = CaptureRunner(
+            backend=FakeBackend(payload),
+            output_dir=second_dir,
+            clock=lambda: FIXED_CLOCK,
+        ).run([sample_job()])[0]
+        self.assertEqual(first.to_json(), second.to_json())
+        self.assertEqual(first.captured_at, second.captured_at)
+
+    def test_runner_does_not_mutate_jobs(self):
+        job = sample_job()
+        before = json.dumps(job, sort_keys=True)
+        self.runner(FakeBackend(png_bytes(390, 844))).run([job])
+        self.assertEqual(before, json.dumps(job, sort_keys=True))
+
+    def test_runner_writes_only_inside_the_output_directory(self):
+        before = sorted(p.name for p in self.output_dir.parent.iterdir())
+        self.runner(FakeBackend(png_bytes(390, 844))).run([sample_job()])
+        after = sorted(p.name for p in self.output_dir.parent.iterdir())
+        self.assertEqual(before, after)
+
+    def test_sidecar_is_pretty_printed_with_trailing_newline(self):
+        job = sample_job()
+        self.runner(FakeBackend(png_bytes(390, 844))).run([job])
+        raw = (self.output_dir / f"{job['filename']}.artifact.json").read_text(
+            encoding="utf-8"
+        )
+        self.assertTrue(raw.endswith("\n"))
+        self.assertIn("\n  ", raw)
+
+
+class ScreenshotArtifactTests(unittest.TestCase):
+    def artifact_json(self) -> dict:
+        job = sample_job()
+        return ScreenshotArtifact.from_capture_job(
+            job,
+            path=job["filename"],
+            content_hash="sha256:" + "a" * 64,
+            width=390,
+            height=844,
+            captured_at=FIXED_CLOCK.isoformat(),
+        ).to_json()
+
+    def test_serialization_round_trip(self):
+        payload = self.artifact_json()
+        self.assertEqual(payload, ScreenshotArtifact.from_json(payload).to_json())
+
+    def test_requires_capture_id(self):
+        payload = self.artifact_json()
+        del payload["capture_id"]
+        with self.assertRaises(InvalidScreenshotMetadata):
+            ScreenshotArtifact.from_json(payload)
+
+    def test_requires_content_hash(self):
+        payload = self.artifact_json()
+        payload["content_hash"] = "not-a-hash"
+        with self.assertRaises(InvalidScreenshotMetadata):
+            ScreenshotArtifact.from_json(payload)
+
+    def test_requires_source_commit(self):
+        payload = self.artifact_json()
+        del payload["source_commit_sha"]
+        with self.assertRaises(InvalidScreenshotMetadata):
+            ScreenshotArtifact.from_json(payload)
+
+    def test_requires_viewport(self):
+        payload = self.artifact_json()
+        del payload["viewport"]
+        with self.assertRaises(InvalidScreenshotMetadata):
+            ScreenshotArtifact.from_json(payload)
+
+
+class PngDimensionsTests(unittest.TestCase):
+    def test_reads_dimensions(self):
+        self.assertEqual((390, 844), png_dimensions(png_bytes(390, 844)))
+
+    def test_returns_none_for_non_png(self):
+        self.assertIsNone(png_dimensions(b"not a png"))
+        self.assertIsNone(png_dimensions(b""))
+
+
+NODE = shutil.which("node")
+
+
+class ProcessCaptureBackendTests(unittest.TestCase):
+    """The browser adapter contract is transport-only and JSON-typed."""
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.tmp = Path(self._tmp.name)
+
+    def tearDown(self) -> None:
+        self._tmp.cleanup()
+
+    def script(self, body: str) -> Path:
+        path = self.tmp / "adapter.mjs"
+        path.write_text(body, encoding="utf-8")
+        return path
+
+    def test_missing_adapter_script_is_a_typed_failure(self):
+        from tooling.visual_qa.capture_runner import ProcessCaptureBackend
+
+        backend = ProcessCaptureBackend(self.tmp / "does-not-exist.mjs")
+        self.assertFalse(backend.available())
+        with self.assertRaises(CaptureFailed):
+            backend.capture(sample_job(), self.tmp / "out.png")
+
+    @unittest.skipIf(NODE is None, "node is not installed")
+    def test_successful_adapter_capture_is_published(self):
+        from tooling.visual_qa.capture_runner import ProcessCaptureBackend
+
+        payload = png_bytes(390, 844)
+        script = self.script(
+            "import { writeFileSync } from 'node:fs';\n"
+            "const out = process.argv[process.argv.indexOf('--out') + 1];\n"
+            f"writeFileSync(out, Buffer.from('{payload.hex()}', 'hex'));\n"
+            "process.stdout.write(JSON.stringify({ok:true,deterministic:true}) + '\\n');\n"
+        )
+        backend = ProcessCaptureBackend(script, node=NODE or "node")
+        artifacts = CaptureRunner(
+            backend=backend, output_dir=self.tmp / "out", clock=lambda: FIXED_CLOCK
+        ).run([sample_job()])
+        self.assertEqual(1, len(artifacts))
+        self.assertEqual(390, artifacts[0].width)
+
+    @unittest.skipIf(NODE is None, "node is not installed")
+    def test_adapter_failure_maps_to_capture_failed(self):
+        from tooling.visual_qa.capture_runner import ProcessCaptureBackend
+
+        script = self.script(
+            "process.stdout.write(JSON.stringify({ok:false,code:'capture_failed',"
+            "message:'navigation failed'}) + '\\n');\n"
+            "process.exit(1);\n"
+        )
+        backend = ProcessCaptureBackend(script, node=NODE or "node")
+        with self.assertRaises(CaptureFailed):
+            backend.capture(sample_job(), self.tmp / "out.png")
+
+    @unittest.skipIf(NODE is None, "node is not installed")
+    def test_adapter_nondeterminism_maps_to_typed_error(self):
+        from tooling.visual_qa.capture_runner import ProcessCaptureBackend
+
+        script = self.script(
+            "process.stdout.write(JSON.stringify({ok:false,"
+            "code:'capture_not_deterministic',message:'animation settling'}) + '\\n');\n"
+            "process.exit(1);\n"
+        )
+        backend = ProcessCaptureBackend(script, node=NODE or "node")
+        with self.assertRaises(CaptureNotDeterministic):
+            backend.capture(sample_job(), self.tmp / "out.png")
+
+    @unittest.skipIf(NODE is None, "node is not installed")
+    def test_adapter_without_json_output_is_a_typed_failure(self):
+        from tooling.visual_qa.capture_runner import ProcessCaptureBackend
+
+        script = self.script("process.stdout.write('not json\\n');\n")
+        backend = ProcessCaptureBackend(script, node=NODE or "node")
+        with self.assertRaises(CaptureFailed):
+            backend.capture(sample_job(), self.tmp / "out.png")
+
+
+class CaptureCliTests(unittest.TestCase):
+    def test_parser_exposes_governed_flags(self):
+        from tooling.prototype.capture_screenshots import build_parser
+
+        parser = build_parser()
+        options = {action.dest for action in parser._actions}
+        self.assertTrue(
+            {"manifest", "base_url", "commit", "out", "dry_run"}.issubset(options)
+        )
+
+    def test_dry_run_lists_jobs_without_capturing(self):
+        from tooling.prototype import capture_screenshots
+
+        manifest = self._write_manifest()
+        out = Path(tempfile.mkdtemp()) / "screens"
+        with contextlib.redirect_stdout(io.StringIO()) as buffer:
+            code = capture_screenshots.main(
+                [
+                    "--manifest",
+                    str(manifest),
+                    "--commit",
+                    COMMIT,
+                    "--out",
+                    str(out),
+                    "--dry-run",
+                ]
+            )
+        self.assertEqual(0, code)
+        jobs = json.loads(buffer.getvalue())
+        self.assertEqual(1, len(jobs))
+        self.assertEqual(COMMIT, jobs[0]["source_commit_sha"])
+        self.assertFalse(out.exists())
+
+    def test_missing_browser_adapter_is_a_typed_cli_failure(self):
+        from tooling.prototype import capture_screenshots
+
+        manifest = self._write_manifest()
+        with contextlib.redirect_stderr(io.StringIO()) as buffer:
+            code = capture_screenshots.main(
+                [
+                    "--manifest",
+                    str(manifest),
+                    "--commit",
+                    COMMIT,
+                    "--out",
+                    str(Path(tempfile.mkdtemp()) / "screens"),
+                    "--browser-script",
+                    str(Path(tempfile.mkdtemp()) / "absent.mjs"),
+                ]
+            )
+        self.assertEqual(3, code)
+        self.assertIn("capture_failed", buffer.getvalue())
+
+    def test_invalid_manifest_is_a_typed_cli_failure(self):
+        from tooling.prototype import capture_screenshots
+
+        manifest = Path(tempfile.mkdtemp()) / "manifest.yaml"
+        manifest.write_text(
+            "version: 2\nclient_id: demo\nfixture_version: v1\njobs:\n- surface: prototype\n"
+            "  screen: commerce.home\n  state: default\n  direction: z\n"
+            "  viewport: {width: 390, height: 844}\n",
+            encoding="utf-8",
+        )
+        with contextlib.redirect_stderr(io.StringIO()) as buffer:
+            code = capture_screenshots.main(
+                ["--manifest", str(manifest), "--dry-run"]
+            )
+        self.assertEqual(2, code)
+        self.assertIn("invalid_capture_job", buffer.getvalue())
+
+    def _write_manifest(self) -> Path:
+        manifest = Path(tempfile.mkdtemp()) / "manifest.yaml"
+        manifest.write_text(
+            yaml.safe_dump(v2_manifest(), sort_keys=False), encoding="utf-8"
+        )
+        return manifest
 
 
 if __name__ == "__main__":

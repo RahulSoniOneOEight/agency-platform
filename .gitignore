@@ -28,3 +28,8 @@ __pycache__/
 # Temporary outputs
 *.log
 .tmp/
+
+# Generated visual-QA capture artifacts (governed goldens/baselines are committed)
+client-projects/**/prototype/screenshots/*.png
+client-projects/**/prototype/screenshots/*.artifact.json
+build/visual-qa/
