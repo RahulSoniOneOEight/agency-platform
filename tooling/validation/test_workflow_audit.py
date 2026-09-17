@@ -223,6 +223,56 @@ class AppendTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 load_audit_records(path)
 
+    def test_persistence_rejects_a_hand_built_agent_override(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "audit.jsonl"
+            payload = make_override(
+                actor="human-reviewer",
+                at=AT,
+                summary="gate bypass",
+                reason="urgent",
+                affected_gate="stage-completion",
+            ).to_dict()
+            payload["actor"] = "opencode:rogue-session"
+            record = AuditRecord(
+                id=payload["id"],
+                kind="override",
+                actor="opencode:rogue-session",
+                at=payload["at"],
+                stage=None,
+                run_id=None,
+                summary=payload["summary"],
+                reason=payload["reason"],
+                details=payload["details"],
+            )
+            with self.assertRaises(ValueError):
+                append_audit_record(path, record)
+            self.assertFalse(path.exists())
+
+    def test_from_dict_rejects_an_agent_override(self):
+        payload = make_override(
+            actor="human-reviewer",
+            at=AT,
+            summary="gate bypass",
+            reason="urgent",
+            affected_gate="stage-completion",
+        ).to_dict()
+        payload["actor"] = "opencode:rogue-session"
+        with self.assertRaises(ValueError):
+            AuditRecord.from_dict(payload)
+
+    def test_validate_record_rejects_an_agent_override(self):
+        payload = make_override(
+            actor="human-reviewer",
+            at=AT,
+            summary="gate bypass",
+            reason="urgent",
+            affected_gate="stage-completion",
+        ).to_dict()
+        payload["actor"] = "opencode:rogue-session"
+        errors = validate_audit_record(payload)
+        self.assertTrue(any("human actor" in error for error in errors), errors)
+
 
 class ValidateRecordTests(unittest.TestCase):
     def _valid_records(self) -> list[dict]:

@@ -215,6 +215,33 @@ class InspectRecoveryTests(unittest.TestCase):
             self.assertEqual(RecoveryAction.NONE, decision.action)
 
 
+class PointerAheadTests(unittest.TestCase):
+    def test_pointer_ahead_of_prerequisites_blocks(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = _root(tmp)
+            client = _client(root)
+            state = _state(
+                stage="build-prototype",
+                status="in_progress",
+                completed=["client-intake"],
+            )
+            decision = inspect_recovery(root, client, state, now=NOW)
+            self.assertEqual(RecoveryAction.BLOCK, decision.action)
+            self.assertIn("prerequisites not completed", decision.reason)
+
+    def test_completed_workflow_is_not_blocked(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = _root(tmp)
+            client = _client(root)
+            state = _state(
+                stage="productionize",
+                status="complete",
+                completed=["productionize"],
+            )
+            decision = inspect_recovery(root, client, state, now=NOW)
+            self.assertEqual(RecoveryAction.NONE, decision.action)
+
+
 class PureReadTests(unittest.TestCase):
     def test_inspect_recovery_does_not_mutate_state_or_files(self):
         with tempfile.TemporaryDirectory() as tmp:

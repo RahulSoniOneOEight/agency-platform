@@ -17,8 +17,17 @@ from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 
+from tooling.workflow.audit import append_audit_record, make_recovery_record
 from tooling.workflow.contracts import StageContract, load_stage_contract
-from tooling.workflow.lease import WorkflowLease, release_lease
+from tooling.workflow.lease import (
+    WorkflowLease,
+    WorkflowLeaseOwnershipError,
+    acquire_lease,
+    is_expired,
+    load_lease,
+    reconcile_expired_lease,
+    release_lease,
+)
 from tooling.workflow.manifests import (
     EXECUTIONS_DIR_NAME,
     ArtifactRef,
@@ -228,6 +237,61 @@ def _require_prerequisites(
         )
 
 
+def _audit_path(client_dir: Path) -> Path:
+    return Path(client_dir) / "workflow" / "audit.jsonl"
+
+
+def _require_active_lease(state: dict, *, actor: str) -> WorkflowLease:
+    """A state-mutating execution must hold the client lease (spec §6)."""
+    lease = load_lease(state)
+    if lease is None:
+        raise WorkflowLeaseOwnershipError(
+            "state-mutating execution requires an active client workflow lease"
+        )
+    if lease.owner != actor:
+        raise WorkflowLeaseOwnershipError(
+            f"lease {lease.lease_id} is owned by {lease.owner!r}, not {actor!r}"
+        )
+    return lease
+
+
+def _acquire_execution_lease(
+    client_dir: Path,
+    state: dict,
+    *,
+    actor: str,
+    run_id: str,
+    now: datetime,
+    ttl_seconds: int,
+) -> tuple[dict, WorkflowLease]:
+    """Acquire the lease, deterministically recovering an expired one first.
+
+    Reclaiming an expired lease is the only takeover path, and it records a
+    durable recovery audit event so the reclaim is never silent.
+    """
+    existing = load_lease(state)
+    if existing is not None and is_expired(existing, now=now):
+        recovered_state, expired = reconcile_expired_lease(state, now=now)
+        if expired is not None:
+            append_audit_record(
+                _audit_path(client_dir),
+                make_recovery_record(
+                    actor=actor,
+                    at=_iso(now),
+                    summary=f"reclaimed expired lease {expired.lease_id}",
+                    reason="lease expired before completion",
+                    stage=state.get("current_stage"),
+                    run_id=expired.run_id,
+                    previous_state={"lease_id": expired.lease_id, "owner": expired.owner},
+                    requested_state={"owner": actor, "run_id": run_id},
+                ),
+            )
+        state = recovered_state
+    return acquire_lease(
+        state, owner=actor, run_id=run_id, now=now, ttl_seconds=ttl_seconds
+    )
+
+
 def start_attempt(
     root: Path,
     client_dir: Path,
@@ -238,7 +302,8 @@ def start_attempt(
     stage: str | None = None,
     run_id: str | None = None,
     now: datetime | None = None,
-    inputs: Sequence[ArtifactRef] = (),
+    inputs: Sequence[ArtifactRef] | None = None,
+    lease_ttl_seconds: int = 1800,
 ) -> tuple[dict, ExecutionManifest]:
     stage = stage or state["current_stage"]
     contract = load_stage_contract(root, stage)
@@ -247,10 +312,10 @@ def start_attempt(
     now = now or datetime.now(timezone.utc)
     client_id = state.get("client_id") or Path(client_dir).name
 
-    if inputs:
-        current_inputs = tuple(inputs)
-    else:
+    if inputs is None:
         current_inputs = _contract_input_refs(client_dir, contract)
+    else:
+        current_inputs = tuple(inputs)
 
     prior = prior_manifests(client_dir, stage)
     decision = decide_idempotency(contract, prior, current_inputs, run_id=run_id)
@@ -272,6 +337,17 @@ def start_attempt(
     else:
         resolved_run_id = run_id
 
+    # The lease is acquired only for a genuinely new attempt, and always before
+    # any evidence is written: a second owner is rejected here with no mutation.
+    leased_state, _ = _acquire_execution_lease(
+        client_dir,
+        state,
+        actor=actor,
+        run_id=resolved_run_id,
+        now=now,
+        ttl_seconds=lease_ttl_seconds,
+    )
+
     started_at = _iso(now)
     manifest = ExecutionManifest.start(
         run_id=resolved_run_id,
@@ -284,7 +360,7 @@ def start_attempt(
     )
     write_manifest_create_only(manifest_path(client_dir, resolved_run_id, attempt), manifest)
 
-    new_state = copy.deepcopy(state)
+    new_state = leased_state
     new_state["run_id"] = resolved_run_id
     new_state["status"] = "in_progress"
     stage_state = dict(new_state.get("stage_state") or {})
@@ -313,6 +389,10 @@ def fail_attempt(
     client_dir: Path, state: dict, manifest: ExecutionManifest, *, reason: str, at: str
 ) -> tuple[dict, ExecutionManifest]:
     _require_attempt_matches_state(client_dir, state, manifest)
+    if load_lease(state) is None:
+        raise WorkflowLeaseOwnershipError(
+            "state-mutating execution requires an active client workflow lease"
+        )
     failed = manifest.fail(reason=reason, at=at)
     write_manifest_create_only(
         manifest_path(client_dir, failed.run_id, failed.attempt), failed
@@ -324,6 +404,8 @@ def fail_attempt(
     entry["failed_at"] = at
     stage_state[manifest.stage] = entry
     new_state["stage_state"] = stage_state
+    # Failure evidence is durable before ownership is released.
+    new_state["active_lease"] = None
     return new_state, failed
 
 
@@ -375,6 +457,7 @@ def complete_attempt(
     actor: str,
 ) -> tuple[dict, ExecutionManifest]:
     _require_attempt_matches_state(client_dir, state, manifest)
+    _require_active_lease(state, actor=actor)
     contract = load_stage_contract(root, manifest.stage)
 
     missing_artifacts = [
@@ -432,4 +515,7 @@ def complete_attempt(
         "at": at,
         "actor": actor,
     }
+    # Ownership is released only after the evidence is durable and the canonical
+    # transition is computed (RE5 ordering: evidence -> state pointer -> release).
+    new_state["active_lease"] = None
     return new_state, frozen

@@ -17,6 +17,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from tooling.workflow.contracts import StageContractError, load_stage_contract
 from tooling.workflow.execution import prior_manifests
 from tooling.workflow.lease import is_expired, load_lease
 from tooling.workflow.state import STAGES
@@ -53,7 +54,9 @@ def _unfinished_work(state: Mapping[str, Any]) -> bool:
         return False
     stage = state.get("current_stage")
     if stage in set(state.get("completed") or []):
-        return False
+        # Contradictory: the pointer still sits on a completed stage. Treat it as
+        # unfinished so an expired lease is still reconciled rather than ignored.
+        return True
     stage_state = state.get("stage_state") or {}
     entry = stage_state.get(stage) if isinstance(stage_state, Mapping) else None
     if isinstance(entry, Mapping) and entry.get("status") == "complete":
@@ -100,6 +103,34 @@ def inspect_recovery(
     completed = [manifest for manifest in current if manifest.status == "completed"]
     entry = stage_state.get(stage) if isinstance(stage_state, Mapping) else None
     entry_complete = isinstance(entry, Mapping) and entry.get("status") == "complete"
+
+    # Row 1b: the pointer sits on a stage whose declared prerequisites are not
+    # completed (RE5: a pointer ahead of valid evidence must block). A workflow
+    # that already reports `complete` needs no recovery.
+    if stage and state.get("status") != "complete":
+        try:
+            contract = load_stage_contract(root, stage)
+        except StageContractError:
+            contract = None
+        if contract is not None:
+            completed_stages = set(state.get("completed") or [])
+            missing = [
+                required
+                for required in contract.requires_stages
+                if required not in completed_stages
+            ]
+            if missing:
+                return RecoveryDecision(
+                    action=RecoveryAction.BLOCK,
+                    stage=stage,
+                    run_id=None,
+                    attempt=None,
+                    checkpoint=None,
+                    reason=(
+                        "current stage prerequisites not completed: "
+                        + ", ".join(missing)
+                    ),
+                )
 
     # Row 2: completed evidence exists but the canonical pointer is behind.
     if completed and not entry_complete:

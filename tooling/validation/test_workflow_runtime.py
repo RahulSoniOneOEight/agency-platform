@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import json
 import shutil
 import tempfile
 import unittest
@@ -9,6 +10,7 @@ from pathlib import Path
 
 import yaml
 
+from tooling.workflow.audit import load_audit_records
 from tooling.workflow.client_input import validate_client_input
 from tooling.workflow.contracts import load_stage_contract
 from tooling.workflow.execution import (
@@ -25,6 +27,7 @@ from tooling.workflow.execution import (
 from tooling.workflow.initialize_client import initialize_client
 from tooling.workflow.lease import (
     WorkflowLeaseConflict,
+    WorkflowLeaseOwnershipError,
     acquire_lease,
     load_lease,
 )
@@ -701,6 +704,130 @@ class WorkflowExecutionTests(unittest.TestCase):
                     at=self.AT,
                     actor="tester",
                 )
+
+    def test_start_attempt_acquires_the_lease_and_releases_on_completion(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            (client / "derived").mkdir(parents=True, exist_ok=True)
+            (client / "derived" / "client-profile.yaml").write_text(
+                "id: acme\n", encoding="utf-8"
+            )
+            state = initial_state("acme")
+            started_state, manifest = start_attempt(
+                root, client, state, actor="tester", source_commit_sha=self.COMMIT
+            )
+            self.assertIsNotNone(started_state["active_lease"])
+            self.assertEqual("tester", started_state["active_lease"]["owner"])
+
+            final_state, _ = complete_attempt(
+                root,
+                client,
+                started_state,
+                manifest,
+                validator_results=[self._passed("client-input-contract")],
+                at=self.AT,
+                actor="tester",
+            )
+            self.assertIsNone(final_state["active_lease"])
+
+    def test_second_owner_cannot_start_while_a_live_lease_is_held(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            state = initial_state("acme")
+            leased_state, _ = start_attempt(
+                root, client, state, actor="opencode:session-a", source_commit_sha=self.COMMIT
+            )
+            before = json.dumps(leased_state, sort_keys=True)
+            manifests_before = sorted(
+                path.name
+                for path in (client / "workflow" / "executions").rglob("attempt-*.yaml")
+            )
+            with self.assertRaises(WorkflowLeaseConflict):
+                start_attempt(
+                    root,
+                    client,
+                    leased_state,
+                    actor="opencode:session-b",
+                    source_commit_sha=self.COMMIT,
+                )
+            self.assertEqual(before, json.dumps(leased_state, sort_keys=True))
+            self.assertEqual(
+                manifests_before,
+                sorted(
+                    path.name
+                    for path in (client / "workflow" / "executions").rglob("attempt-*.yaml")
+                ),
+            )
+
+    def test_complete_attempt_requires_the_owning_lease(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            (client / "derived").mkdir(parents=True, exist_ok=True)
+            (client / "derived" / "client-profile.yaml").write_text(
+                "id: acme\n", encoding="utf-8"
+            )
+            state = initial_state("acme")
+            started_state, manifest = start_attempt(
+                root, client, state, actor="tester", source_commit_sha=self.COMMIT
+            )
+            with self.assertRaises(WorkflowLeaseOwnershipError):
+                complete_attempt(
+                    root,
+                    client,
+                    started_state,
+                    manifest,
+                    validator_results=[self._passed("client-input-contract")],
+                    at=self.AT,
+                    actor="someone-else",
+                )
+            released = dict(started_state)
+            released["active_lease"] = None
+            with self.assertRaises(WorkflowLeaseOwnershipError):
+                complete_attempt(
+                    root,
+                    client,
+                    released,
+                    manifest,
+                    validator_results=[self._passed("client-input-contract")],
+                    at=self.AT,
+                    actor="tester",
+                )
+
+    def test_expired_lease_is_reclaimed_with_an_audit_record(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            state = initial_state("acme")
+            leased_state, _ = start_attempt(
+                root,
+                client,
+                state,
+                actor="opencode:session-a",
+                source_commit_sha=self.COMMIT,
+                now=datetime(2026, 9, 17, 12, 0, tzinfo=timezone.utc),
+                lease_ttl_seconds=60,
+            )
+            expired_lease_id = leased_state["active_lease"]["lease_id"]
+            reclaimed_state, _ = start_attempt(
+                root,
+                client,
+                leased_state,
+                actor="opencode:session-b",
+                source_commit_sha=self.COMMIT,
+                now=datetime(2026, 9, 17, 12, 5, tzinfo=timezone.utc),
+            )
+            self.assertEqual(
+                "opencode:session-b", reclaimed_state["active_lease"]["owner"]
+            )
+            records = load_audit_records(client / "workflow" / "audit.jsonl")
+            self.assertEqual(1, len(records))
+            self.assertEqual("recovery", records[0].kind)
+            self.assertEqual(
+                expired_lease_id, records[0].details["previous_state"]["lease_id"]
+            )
 
     def test_validate_client_rejects_a_broken_manifest_reference(self):
         with tempfile.TemporaryDirectory() as tmp:

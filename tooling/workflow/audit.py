@@ -33,6 +33,16 @@ _REQUIRED_KEYS = (
 _AGENT_ACTOR_PREFIX = "opencode:"
 
 
+def _require_human_override(kind: Any, actor: Any) -> None:
+    """A manual override is a human action; an agent may never author one."""
+    if kind == "override" and isinstance(actor, str) and actor.startswith(
+        _AGENT_ACTOR_PREFIX
+    ):
+        raise ValueError(
+            "manual override requires a human actor, not an opencode agent"
+        )
+
+
 @dataclass(frozen=True)
 class AuditRecord:
     id: str
@@ -66,7 +76,7 @@ class AuditRecord:
         details = data["details"]
         if not isinstance(details, Mapping):
             raise ValueError("audit record details must be a mapping")
-        return cls(
+        record = cls(
             id=data["id"],
             kind=data["kind"],
             actor=data["actor"],
@@ -77,6 +87,8 @@ class AuditRecord:
             reason=data["reason"],
             details=dict(details),
         )
+        _require_human_override(record.kind, record.actor)
+        return record
 
 
 def _require_text(value: Any, label: str) -> str:
@@ -261,7 +273,15 @@ def make_recovery_record(
 
 
 def append_audit_record(path: Path, record: AuditRecord) -> None:
-    """Append one compact JSON line; existing lines are never rewritten."""
+    """Append one compact JSON line; existing lines are never rewritten.
+
+    The record is validated before it is persisted, so a hand-built override
+    that bypassed the factories is still rejected here.
+    """
+    _require_human_override(record.kind, record.actor)
+    errors = validate_audit_record(record.to_dict())
+    if errors:
+        raise ValueError("invalid audit record: " + "; ".join(errors))
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     line = json.dumps(record.to_dict(), sort_keys=True, separators=(",", ":")) + "\n"
@@ -324,4 +344,8 @@ def validate_audit_record(data: Mapping[str, Any]) -> list[str]:
         gate = details.get("affected_gate")
         if not isinstance(gate, str) or not gate.strip():
             errors.append("override details require a non-blank affected_gate")
+        if isinstance(data.get("actor"), str) and str(data["actor"]).startswith(
+            _AGENT_ACTOR_PREFIX
+        ):
+            errors.append("manual override requires a human actor")
     return sorted(errors)
