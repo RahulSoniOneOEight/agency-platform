@@ -245,3 +245,29 @@
     router still routes on unverified `stage_state` (routing is not proof); no cross-check of manifest
     hashes against artifact bytes (hashing is identity, not security, per spec §3).
   - Post-fix counts: repo suite **691 tests OK**; `validate_repo` 141 required paths.
+- 2026-09-17 — **Final whole-branch review** (`git diff ba28242...HEAD`, strongest available model):
+  **REJECT — 0 blockers, 2 majors.** All 31 required checks except two passed; adversarial probes were
+  otherwise well-guarded.
+  - **M1** — completed manifests never recorded `outputs`: produced artifacts were merged into
+    `inputs`, so `outputs` was always empty (violating spec §3 and required item 10).
+  - **M2** — RE2 tier-2 evidence was not fully enforced: `validate_workflow` accepted a completed
+    manifest with no passed validators, and `reconcile_state` re-checked only schema + status, so a
+    forged validator-less completed manifest could advance the pointer.
+  - **Fixes:** `complete_attempt` now records produced artifacts via `with_output` and a shared
+    `execution.require_completion_evidence` re-validates the contract's outputs + validators;
+    `manifests.manifest_identity` (de-duplicated inputs ∪ outputs) drives reuse detection;
+    `validate_workflow` gained `_validate_completion_evidence` (produced artifacts, passed validators,
+    manifest outputs present) plus a `stage_state` key allowlist (`STAGE_ATTEMPT_KEYS`) and a
+    `stage_state` schema that forbids extra keys; `runner.reconcile_state` calls
+    `require_completion_evidence` before advancing; `execution.start_attempt` refuses a RESUME for a
+    foreign live lease; the audit schema rejects case/whitespace variants of the agent actor;
+    Markdown section parity now matches headings exactly; the `start_stage` doc example and the
+    state-writer claims were corrected.
+  - **Accepted minors (recorded, non-gating):** contract `produces` lists are narrower than the
+    Markdown `WRITE` prose (RE3 requires only `next` parity); `_existing_attempts` remains an unused
+    private reader; the router still routes on unverified `stage_state` (routing is not proof); no
+    cross-check of manifest hashes against artifact bytes (hashing is identity, not security, per
+    spec §3); the local `main` ref is stale relative to `origin/main`, so the review base is
+    `ba28242` (Milestone D merge).
+  - Post-fix counts: repo suite **695 tests OK**; `validate_repo` 141 required paths; all validators
+    and B.1D/B.1E freshness green.

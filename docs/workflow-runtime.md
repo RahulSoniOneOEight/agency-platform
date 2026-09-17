@@ -79,7 +79,7 @@ python -c "from pathlib import Path; from tooling.workflow.runner import start_s
 genuinely new attempt, and writes the create-only `attempt-N.yaml`. If the current inputs already
 match a completed attempt it **reuses** it; if the latest attempt is in-progress with a durable
 checkpoint it **resumes** it. In both reuse/resume cases it does not create a second attempt and
-returns `lease=None`, so read `run.lease` defensively.
+a **reuse** returns `lease=None`, while a **resume** returns the lease the actor already holds, so read `run.lease` defensively.
 
 ### Checkpoint (durable atomic step)
 

@@ -26,6 +26,11 @@ CONTRACT_VERSION = 1
 
 REQUIRED_SECTIONS = ("PURPOSE", "READ", "PROCESS", "WRITE", "VALIDATE", "DO NOT", "NEXT")
 
+
+def _has_section(text: str, section: str) -> bool:
+    """Whether *text* declares the `## <section>` heading exactly."""
+    return re.search(rf"^##\s+{re.escape(section)}\s*$", text, re.MULTILINE) is not None
+
 CONTRACT_KEYS = (
     "stage",
     "version",
@@ -192,7 +197,7 @@ def validate_stage_contracts(root: Path) -> list[str]:
             continue
         text = md_path.read_text(encoding="utf-8")
         for section in REQUIRED_SECTIONS:
-            if f"## {section}" not in text:
+            if not _has_section(text, section):
                 errors.append(f"{md_path}: missing section {section}")
         markdown_next[stage] = _parse_next_stages(text)
 

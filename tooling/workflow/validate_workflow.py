@@ -36,6 +36,11 @@ from tooling.workflow.state import (
 
 
 REQUIRED_SECTIONS = ["PURPOSE", "READ", "PROCESS", "WRITE", "VALIDATE", "DO NOT", "NEXT"]
+
+
+def _has_section(text: str, section: str) -> bool:
+    """Whether *text* declares the `## <section>` heading exactly."""
+    return re.search(rf"^##\s+{re.escape(section)}\s*$", text, re.MULTILINE) is not None
 WORKFLOW_FILES = [
     "01-client-intake.md",
     "02-resolve-intelligence.md",
@@ -71,7 +76,7 @@ def validate_workflow_file(path: Path) -> list[str]:
     text = path.read_text(encoding="utf-8")
     errors: list[str] = []
     for section in REQUIRED_SECTIONS:
-        if f"## {section}" not in text:
+        if not _has_section(text, section):
             errors.append(f"{path}: missing section {section}")
     return errors
 
@@ -118,6 +123,19 @@ def _validate_state_schema(
     return sorted(errors)
 
 
+STAGE_ATTEMPT_KEYS = frozenset(
+    {
+        "attempt",
+        "status",
+        "started_at",
+        "completed_at",
+        "failed_at",
+        "last_checkpoint",
+        "artifact_manifest_ref",
+    }
+)
+
+
 def _validate_stage_state(client_dir: Path, state: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     stage_state = state.get("stage_state") or {}
@@ -134,6 +152,13 @@ def _validate_stage_state(client_dir: Path, state: dict[str, Any]) -> list[str]:
         status = entry.get("status")
         if status is not None and status not in STAGE_ATTEMPT_STATUSES:
             errors.append(f"{client_dir}: stage_state[{stage!r}] invalid status {status!r}")
+        # The workflow layer must never absorb C/D domain state: a stage entry
+        # carries only attempt bookkeeping keys.
+        extra = sorted(set(entry) - STAGE_ATTEMPT_KEYS)
+        if extra:
+            errors.append(
+                f"{client_dir}: stage_state[{stage!r}] has non-workflow keys {extra}"
+            )
     return errors
 
 
@@ -232,7 +257,7 @@ def _validate_manifest_identity(
         )
 
 
-def _validate_execution_manifests(client_dir: Path, state: dict[str, Any]) -> list[str]:
+def _validate_execution_manifests(root: Path, client_dir: Path, state: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     loaded: list[tuple[Path, Any]] = []
     executions_dir = client_dir / "workflow" / "executions"
@@ -296,6 +321,43 @@ def _validate_execution_manifests(client_dir: Path, state: dict[str, Any]) -> li
         elif manifest.status != "completed":
             errors.append(
                 f"{client_dir}: stage {stage} execution manifest is {manifest.status}, expected completed"
+            )
+        else:
+            # RE2 tier 2: a completed manifest must actually carry the stage's
+            # declared evidence, not merely claim completion.
+            errors.extend(_validate_completion_evidence(root, client_dir, stage, manifest))
+    return errors
+
+
+def _validate_completion_evidence(
+    root: Path, client_dir: Path, stage: str, manifest: Any
+) -> list[str]:
+    errors: list[str] = []
+    try:
+        contract = load_stage_contract(root, stage)
+    except StageContractError as exc:
+        return [f"{client_dir}: stage {stage}: {exc}"]
+
+    for path in contract.produces:
+        if not (client_dir / path).exists():
+            errors.append(
+                f"{client_dir}: stage {stage} completed but missing produced artifact {path}"
+            )
+    passed = {
+        evidence.name
+        for evidence in manifest.validators
+        if evidence.status == "passed"
+    }
+    for name in contract.validators:
+        if name not in passed:
+            errors.append(
+                f"{client_dir}: stage {stage} completed without a passed "
+                f"{name!r} validator"
+            )
+    for ref in manifest.outputs:
+        if not (client_dir / ref.path).exists():
+            errors.append(
+                f"{client_dir}: stage {stage} manifest output {ref.path} is missing"
             )
     return errors
 
@@ -370,7 +432,7 @@ def validate_client(root: Path, client_dir: Path) -> list[str]:
         else:
             errors.extend(f"{client_dir}: {error}" for error in validate_approved_experience(root, client_dir))
 
-    errors.extend(_validate_execution_manifests(client_dir, state))
+    errors.extend(_validate_execution_manifests(root, client_dir, state))
     return errors
 
 

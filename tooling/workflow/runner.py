@@ -37,6 +37,7 @@ from tooling.workflow.execution import (
     prior_manifests,
     reclaim_expired_lease,
     record_checkpoint,
+    require_completion_evidence,
     start_attempt,
 )
 from tooling.workflow.lease import (
@@ -499,6 +500,10 @@ def reconcile_state(
             f"cannot reconcile a {manifest.status!r} manifest; completion evidence "
             "is required"
         )
+    # RE2 tier 2: reconciliation re-validates the completion gate rather than
+    # trusting the manifest's status, so a forged or incomplete manifest can
+    # never advance the canonical pointer.
+    require_completion_evidence(root, client_dir, manifest)
 
     lease = load_lease(state)
     if lease is not None and lease.owner != actor and not is_expired(lease, now=moment):

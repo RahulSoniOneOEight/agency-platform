@@ -263,6 +263,20 @@ def input_identity(refs: Sequence[ArtifactRef]) -> tuple[tuple[str, str], ...]:
     return tuple(sorted((ref.path, ref.sha256) for ref in refs))
 
 
+def manifest_identity(manifest: "ExecutionManifest") -> tuple[tuple[str, str], ...]:
+    """Contract-relevant identity of an attempt: its inputs plus its outputs.
+
+    A stage's relevant bytes are the artifacts it read and the artifacts it
+    produced, so reuse detection compares both. Paths are de-duplicated (an
+    artifact that was both read and written appears once) and sorted, which keeps
+    the comparison deterministic and order-independent.
+    """
+    by_path = {ref.path: ref.sha256 for ref in manifest.inputs}
+    for ref in manifest.outputs:
+        by_path[ref.path] = ref.sha256
+    return tuple(sorted(by_path.items()))
+
+
 def artifacts_for_paths(
     client_dir: Path, paths: Sequence[str]
 ) -> tuple[ArtifactRef, ...]:

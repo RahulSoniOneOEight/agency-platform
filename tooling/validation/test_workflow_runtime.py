@@ -37,9 +37,12 @@ from tooling.workflow.manifests import (
     artifacts_for_paths,
     load_manifest,
     manifest_path,
+    manifest_relpath,
+    write_manifest_create_only,
 )
 from tooling.workflow.router import next_stage
-from tooling.workflow.state import initial_state, save_state
+from tooling.workflow.runner import reconcile_state
+from tooling.workflow.state import initial_state, load_state, save_state
 from tooling.workflow.validate_workflow import validate_client, validate_runtime, validate_workflow_file
 
 
@@ -1002,6 +1005,120 @@ class WorkflowExecutionTests(unittest.TestCase):
             audit.write_text("not-json\n", encoding="utf-8")
             errors = validate_client(root, client)
             self.assertTrue(any("audit" in error for error in errors), errors)
+
+    def test_completed_manifest_records_produced_artifacts_as_outputs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            (client / "derived").mkdir(parents=True, exist_ok=True)
+            profile = client / "derived" / "client-profile.yaml"
+            profile.write_text("id: acme\n", encoding="utf-8")
+            state = initial_state("acme")
+            new_state, manifest = start_attempt(
+                root, client, state, actor="tester", source_commit_sha=self.COMMIT
+            )
+            _, frozen = complete_attempt(
+                root,
+                client,
+                new_state,
+                manifest,
+                validator_results=[self._passed("client-input-contract")],
+                at=self.AT,
+                actor="tester",
+            )
+            self.assertEqual(
+                ["derived/client-profile.yaml"],
+                [ref.path for ref in frozen.outputs],
+            )
+            self.assertTrue(frozen.outputs[0].sha256)
+
+    def test_validate_client_rejects_a_completed_manifest_without_validators(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            (client / "derived").mkdir(parents=True, exist_ok=True)
+            (client / "derived" / "client-profile.yaml").write_text(
+                "id: acme\n", encoding="utf-8"
+            )
+            forged = ExecutionManifest(
+                run_id="wf-acme-20260917T120000Z-abc12345",
+                client_id="acme",
+                stage="client-intake",
+                attempt=1,
+                source_commit_sha=self.COMMIT,
+                started_at=self.AT,
+                status="completed",
+                completed_at=self.AT,
+            )
+            write_manifest_create_only(
+                manifest_path(client, forged.run_id, forged.attempt), forged
+            )
+            state = initial_state("acme")
+            state["stage_state"] = {
+                "client-intake": {
+                    "attempt": 1,
+                    "status": "complete",
+                    "artifact_manifest_ref": manifest_relpath(
+                        forged.run_id, forged.attempt
+                    ),
+                }
+            }
+            save_state(client / "workflow-state.yaml", state)
+            errors = validate_client(root, client)
+            self.assertTrue(
+                any("without a passed" in error for error in errors), errors
+            )
+
+    def test_reconcile_refuses_a_completed_manifest_without_validators(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            (client / "derived").mkdir(parents=True, exist_ok=True)
+            (client / "derived" / "client-profile.yaml").write_text(
+                "id: acme\n", encoding="utf-8"
+            )
+            forged = ExecutionManifest(
+                run_id="wf-acme-20260917T120000Z-abc12345",
+                client_id="acme",
+                stage="client-intake",
+                attempt=1,
+                source_commit_sha=self.COMMIT,
+                started_at=self.AT,
+                status="completed",
+                completed_at=self.AT,
+            )
+            write_manifest_create_only(
+                manifest_path(client, forged.run_id, forged.attempt), forged
+            )
+            state = initial_state("acme")
+            state["status"] = "in_progress"
+            state["stage_state"] = {
+                "client-intake": {"attempt": 1, "status": "in_progress"}
+            }
+            save_state(client / "workflow-state.yaml", state)
+
+            with self.assertRaises(StageCompletionGateFailed):
+                reconcile_state(root, client, actor="tester", now=datetime(2026, 9, 17, 12, tzinfo=timezone.utc))
+            reloaded = load_state(client / "workflow-state.yaml")
+            self.assertEqual("client-intake", reloaded["current_stage"])
+
+    def test_validate_client_rejects_nested_domain_state_in_stage_state(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            (client / "derived").mkdir(parents=True, exist_ok=True)
+            (client / "derived" / "client-profile.yaml").write_text(
+                "id: acme\n", encoding="utf-8"
+            )
+            state = initial_state("acme")
+            state["stage_state"] = {
+                "client-intake": {"status": "in_progress", "qa_findings": ["qa-1"]}
+            }
+            save_state(client / "workflow-state.yaml", state)
+            errors = validate_client(root, client)
+            self.assertTrue(
+                any("stage_state" in error for error in errors), errors
+            )
 
     def test_validate_client_rejects_a_broken_manifest_reference(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -21,6 +21,7 @@ from tooling.workflow.audit import append_audit_record, make_recovery_record
 from tooling.workflow.contracts import StageContract, load_stage_contract
 from tooling.workflow.lease import (
     WorkflowLease,
+    WorkflowLeaseConflict,
     WorkflowLeaseOwnershipError,
     acquire_lease,
     is_expired,
@@ -37,6 +38,7 @@ from tooling.workflow.manifests import (
     ValidatorEvidence,
     artifacts_for_paths,
     input_identity,
+    manifest_identity,
     load_manifest,
     manifest_path,
     manifest_relpath,
@@ -174,7 +176,7 @@ def decide_idempotency(
     completed = [manifest for manifest in stage_prior if manifest.status == "completed"]
     if completed:
         candidate = completed[-1]
-        if input_identity(candidate.inputs) == current_identity:
+        if manifest_identity(candidate) == current_identity:
             return IdempotencyDecision(
                 action=IdempotencyAction.REUSE,
                 run_id=candidate.run_id,
@@ -342,6 +344,13 @@ def start_attempt(
         )
         return copy.deepcopy(state), existing
     if decision.action is IdempotencyAction.RESUME:
+        # Resuming hands back in-flight evidence, so a foreign live lease is
+        # refused rather than silently served to a second owner.
+        held = load_lease(state)
+        if held is not None and held.owner != actor and not is_expired(held, now=now):
+            raise WorkflowLeaseConflict(
+                f"client already leased by {held.owner!r} for run {held.run_id!r}"
+            )
         existing = load_manifest(
             manifest_path(client_dir, decision.run_id, decision.attempt)
         )
@@ -525,6 +534,36 @@ def completion_state_transition(
     return new_state
 
 
+def require_completion_evidence(
+    root: Path, client_dir: Path, manifest: ExecutionManifest
+) -> None:
+    """Re-validate a completed manifest against its stage contract (RE2).
+
+    Used both by :func:`complete_attempt` and by the recovery reconciler, so a
+    forged or incomplete manifest can never advance the canonical pointer on
+    either path. Raises :class:`StageValidationFailed` when a declared output is
+    missing and :class:`StageCompletionGateFailed` when a required validator did
+    not pass.
+    """
+    contract = load_stage_contract(root, manifest.stage)
+    missing_artifacts = [
+        path for path in contract.produces if not (client_dir / path).exists()
+    ]
+    if missing_artifacts:
+        raise StageValidationFailed(
+            f"{manifest.stage}: missing produced artifacts: {', '.join(missing_artifacts)}"
+        )
+    passed = {
+        evidence.name for evidence in manifest.validators if evidence.status == "passed"
+    }
+    missing_validators = [name for name in contract.validators if name not in passed]
+    if missing_validators:
+        raise StageCompletionGateFailed(
+            f"{manifest.stage}: required validators not passed: "
+            f"{', '.join(missing_validators)}"
+        )
+
+
 def complete_attempt(
     root: Path,
     client_dir: Path,
@@ -537,27 +576,20 @@ def complete_attempt(
 ) -> tuple[dict, ExecutionManifest]:
     _require_attempt_matches_state(client_dir, state, manifest)
     _require_active_lease(state, actor=actor)
-    contract = load_stage_contract(root, manifest.stage)
 
-    missing_artifacts = [
-        path for path in contract.produces if not (client_dir / path).exists()
-    ]
-    if missing_artifacts:
-        raise StageValidationFailed(
-            f"{manifest.stage}: missing produced artifacts: {', '.join(missing_artifacts)}"
-        )
+    staged = manifest.with_validators(validator_results)
+    require_completion_evidence(root, client_dir, staged)
 
-    passed = {evidence.name for evidence in validator_results if evidence.status == "passed"}
-    missing_validators = [name for name in contract.validators if name not in passed]
-    if missing_validators:
-        raise StageCompletionGateFailed(
-            f"{manifest.stage}: required validators not passed: {', '.join(missing_validators)}"
-        )
+    # Produced artifacts are recorded as *outputs*; inputs stay the refs the
+    # attempt actually read. Completion evidence is therefore attributable.
+    for ref in artifacts_for_paths(client_dir, load_stage_contract(root, manifest.stage).produces):
+        if ref.sha256:
+            staged = staged.with_output(ref)
 
-    produced_refs = artifacts_for_paths(client_dir, contract.produces)
-    frozen = _with_input_refs(manifest, produced_refs).with_validators(
-        validator_results
-    ).complete(at=at, required_validators=contract.validators)
+    frozen = staged.complete(
+        at=at,
+        required_validators=load_stage_contract(root, manifest.stage).validators,
+    )
     write_manifest_create_only(
         manifest_path(client_dir, frozen.run_id, frozen.attempt), frozen
     )
