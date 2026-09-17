@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agency-platform/schema/reference-client-scenario.schema.json",
+  "title": "Reference client machine scenario",
+  "description": "Deterministic machine-readable scenario contract for the reference-commerce client. Evidence only: it never becomes a review, approval, QA, refinement, or workflow authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "client_id",
+    "fixture_version",
+    "direction_identities",
+    "scenarios"
+  ],
+  "properties": {
+    "version": { "const": 1 },
+    "client_id": { "type": "string", "minLength": 1 },
+    "fixture_version": { "type": "integer", "minimum": 1 },
+    "direction_identities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["a", "b", "c"],
+      "properties": {
+        "a": { "const": "efficient-commerce" },
+        "b": { "const": "premium-discovery" },
+        "c": { "const": "trade-first" }
+      }
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "description"],
+        "properties": {
+          "id": {
+            "enum": [
+              "normal-happy-path",
+              "contract-change-reapproval",
+              "implementation-only-change",
+              "resume-after-interruption"
+            ]
+          },
+          "description": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

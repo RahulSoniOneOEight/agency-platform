@@ -1,0 +1,167 @@
+- id: fixture-covers-b2c-and-b2b
+  scenario: normal-happy-path
+  kind: fixture_coverage
+  description: >-
+    The synthetic reference fixture declares both consumer (B2C) and trade
+    (B2B) coverage.
+  params:
+    b2c: true
+    b2b: true
+- id: runtime-direction-ids
+  scenario: normal-happy-path
+  kind: direction_ids
+  description: >-
+    The generated runtime bundle declares exactly the canonical runtime
+    direction ids a, b, and c.
+  params:
+    expected: [a, b, c]
+- id: direction-identity-mapping
+  scenario: normal-happy-path
+  kind: direction_identity
+  description: >-
+    The named experience identities are metadata over the fixed runtime ids:
+    a=efficient-commerce, b=premium-discovery, c=trade-first.
+  params:
+    expected:
+      a: efficient-commerce
+      b: premium-discovery
+      c: trade-first
+- id: artifact-client-input
+  scenario: normal-happy-path
+  kind: artifact_exists
+  description: Canonical client intake artifact exists.
+  params:
+    path: input/client-input.yaml
+- id: artifact-client-profile
+  scenario: normal-happy-path
+  kind: artifact_exists
+  description: Derived client profile artifact exists.
+  params:
+    path: derived/client-profile.yaml
+- id: artifact-resolved-intelligence
+  scenario: normal-happy-path
+  kind: artifact_exists
+  description: Resolved design intelligence artifact exists.
+  params:
+    path: resolved-intelligence.yaml
+- id: artifact-direction-a
+  scenario: normal-happy-path
+  kind: artifact_exists
+  description: Direction a strategy artifact exists.
+  params:
+    path: directions/direction-a.yaml
+- id: artifact-direction-b
+  scenario: normal-happy-path
+  kind: artifact_exists
+  description: Direction b strategy artifact exists.
+  params:
+    path: directions/direction-b.yaml
+- id: artifact-direction-c
+  scenario: normal-happy-path
+  kind: artifact_exists
+  description: Direction c strategy artifact exists.
+  params:
+    path: directions/direction-c.yaml
+- id: artifact-direction-comparison
+  scenario: normal-happy-path
+  kind: artifact_exists
+  description: Direction comparison artifact exists.
+  params:
+    path: directions/comparison.yaml
+- id: artifact-resource-selection
+  scenario: normal-happy-path
+  kind: artifact_exists
+  description: Resource selection artifact exists.
+  params:
+    path: resources/selection.yaml
+- id: artifact-prototype-manifest
+  scenario: normal-happy-path
+  kind: artifact_exists
+  description: Prototype manifest artifact exists.
+  params:
+    path: prototype/prototype-manifest.yaml
+- id: artifact-runtime-direction-a
+  scenario: normal-happy-path
+  kind: artifact_exists
+  description: Direction a runtime projection exists.
+  params:
+    path: prototype/runtime/direction-a.json
+- id: artifact-runtime-direction-b
+  scenario: normal-happy-path
+  kind: artifact_exists
+  description: Direction b runtime projection exists.
+  params:
+    path: prototype/runtime/direction-b.json
+- id: artifact-runtime-direction-c
+  scenario: normal-happy-path
+  kind: artifact_exists
+  description: Direction c runtime projection exists.
+  params:
+    path: prototype/runtime/direction-c.json
+- id: artifact-fixture-pack
+  scenario: normal-happy-path
+  kind: artifact_exists
+  description: Prototype fixture pack exists.
+  params:
+    path: prototype/fixtures/demo.yaml
+- id: artifact-screenshot-manifest
+  scenario: normal-happy-path
+  kind: artifact_exists
+  description: Visual QA screenshot manifest exists.
+  params:
+    path: prototype/qa/screenshot-manifest.yaml
+- id: artifact-visual-findings
+  scenario: normal-happy-path
+  kind: artifact_exists
+  description: Visual QA findings artifact exists.
+  params:
+    path: prototype/qa/visual-findings.yaml
+- id: artifact-workflow-state
+  scenario: normal-happy-path
+  kind: artifact_exists
+  description: Workflow state authority exists.
+  params:
+    path: workflow-state.yaml
+- id: artifact-reference-fixture
+  scenario: normal-happy-path
+  kind: artifact_exists
+  description: Reference end-to-end synthetic fixture exists.
+  params:
+    path: reference-e2e/fixture.yaml
+- id: workflow-state-foundation
+  scenario: normal-happy-path
+  kind: workflow_state
+  description: >-
+    The workflow state records the foundation stages as completed, the skipped
+    resource-research stage with a reason, and is currently in visual-qa.
+  params:
+    current_stage: visual-qa
+    status: in_progress
+    completed:
+      - client-intake
+      - resolve-intelligence
+      - generate-directions
+      - build-prototype
+    skipped_stages:
+      - resource-research
+- id: bundle-client-id
+  scenario: normal-happy-path
+  kind: bundle_client_id
+  description: The committed generated runtime bundle declares reference-commerce.
+  params:
+    expected: reference-commerce
+- id: bundle-byte-fresh
+  scenario: normal-happy-path
+  kind: bundle_fresh
+  description: >-
+    The committed generated runtime bundle byte-matches a fresh in-memory
+    composition through the canonical runtime-bundle composer.
+  params: {}
+- id: no-duplicated-authority
+  scenario: normal-happy-path
+  kind: no_duplicate_authority
+  description: >-
+    reference-e2e/ is evidence only and contains no review, feedback,
+    refinement, approval, or QA state records that duplicate canonical
+    authorities.
+  params: {}
