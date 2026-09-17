@@ -47,3 +47,6 @@ Execute governed resource selection for client-owned, agency-approved, and exter
 
 ## NEXT
 `04-generate-directions.md`
+
+## RUNTIME
+Execute through `tooling.workflow.runner`; the machine-readable contract is `workflows/contracts/03-resource-research.yaml`.

@@ -33,3 +33,6 @@ Convert client evaluation of A/B/C working prototypes into one approved implemen
 
 ## NEXT
 `08-productionize.md`
+
+## RUNTIME
+Execute through `tooling.workflow.runner`; the machine-readable contract is `workflows/contracts/07-client-review.yaml`.

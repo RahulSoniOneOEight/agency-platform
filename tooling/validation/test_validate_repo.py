@@ -227,6 +227,45 @@ class ValidatorContractTests(unittest.TestCase):
         ):
             self.assertIn(path, validator.REQUIRED_PATHS)
 
+    def test_milestone_e_workflow_paths_are_required(self):
+        validator = self.load_validator()
+        for path in (
+            "tooling/workflow/contracts.py",
+            "tooling/workflow/execution.py",
+            "tooling/workflow/manifests.py",
+            "tooling/workflow/lease.py",
+            "tooling/workflow/audit.py",
+            "tooling/workflow/recovery.py",
+            "tooling/workflow/runner.py",
+            "client-projects/schema/workflow-state.schema.json",
+            "client-projects/schema/workflow-stage-contract.schema.json",
+            "client-projects/schema/workflow-execution-manifest.schema.json",
+            "client-projects/schema/workflow-audit-record.schema.json",
+            "workflows/contracts/01-client-intake.yaml",
+            "workflows/contracts/08-productionize.yaml",
+            "tooling/validation/test_workflow_state_v2.py",
+            "tooling/validation/test_workflow_contracts.py",
+            "tooling/validation/test_workflow_manifests.py",
+            "tooling/validation/test_workflow_lease.py",
+            "tooling/validation/test_workflow_audit.py",
+            "tooling/validation/test_workflow_idempotency.py",
+            "tooling/validation/test_workflow_recovery.py",
+            "tooling/validation/test_workflow_runner.py",
+            "tooling/validation/test_workflow_resume_e2e.py",
+            "docs/superpowers/specs/2026-09-17-milestone-e-workflow-hardening-design.md",
+            "docs/superpowers/plans/2026-09-17-milestone-e-workflow-hardening-implementation.md",
+            "docs/superpowers/ledgers/2026-09-17-milestone-e-workflow-hardening-ledger.md",
+        ):
+            self.assertIn(path, validator.REQUIRED_PATHS)
+        self.assertFalse(
+            [
+                path
+                for path in validator.REQUIRED_PATHS
+                if path.startswith("client-projects/workflow/executions")
+            ],
+            "generated per-client execution manifests must never be required globally",
+        )
+
     def test_main_reports_refinement_note_errors(self):
         validator = self.load_validator()
         with tempfile.TemporaryDirectory() as tmp:

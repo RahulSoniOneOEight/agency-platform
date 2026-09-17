@@ -33,3 +33,6 @@ Convert raw client requirements into the canonical source-truth layer (`input/`)
 
 ## NEXT
 `02-resolve-intelligence.md`
+
+## RUNTIME
+Execute through `tooling.workflow.runner`; the machine-readable contract is `workflows/contracts/01-client-intake.yaml`.

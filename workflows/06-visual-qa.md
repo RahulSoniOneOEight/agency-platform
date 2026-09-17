@@ -46,3 +46,6 @@ Run deterministic capture, golden comparison, and structured visual review on re
 
 ## NEXT
 `07-client-review.md`
+
+## RUNTIME
+Execute through `tooling.workflow.runner`; the machine-readable contract is `workflows/contracts/06-visual-qa.yaml`.

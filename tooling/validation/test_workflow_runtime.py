@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import copy
 import json
@@ -1031,6 +1031,145 @@ class WorkflowIdempotencyRuntimeTests(unittest.TestCase):
         released = release_after_completion(leased_state, lease)
         self.assertIsNone(released["active_lease"])
         self.assertEqual(lease.to_dict(), leased_state["active_lease"])
+
+
+class WorkflowValidatorHardeningTests(unittest.TestCase):
+    """Cycle 3 slice 3b: hardened, strictly read-only repository validation."""
+
+    COMMIT = "0" * 40
+    AT = "2026-09-17T00:00:00Z"
+
+    def _root(self, tmp: str) -> Path:
+        root = Path(tmp)
+        (root / "client-projects").mkdir(parents=True, exist_ok=True)
+        shutil.copytree(ROOT / "workflows" / "contracts", root / "workflows" / "contracts")
+        return root
+
+    def _client(self, root: Path) -> Path:
+        client = root / "client-projects" / "acme"
+        client.mkdir(parents=True, exist_ok=True)
+        return client
+
+    def _write_raw_state(self, client: Path, state: dict) -> None:
+        (client / "workflow-state.yaml").write_text(
+            yaml.safe_dump(state, sort_keys=False), encoding="utf-8"
+        )
+
+    def test_validate_client_reports_unknown_top_level_key(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            state = initial_state("acme")
+            state["unexpected_key"] = True
+            self._write_raw_state(client, state)
+
+            errors = validate_client(root, client)
+
+        self.assertTrue(any("unexpected_key" in error for error in errors), errors)
+
+    def test_validate_client_reports_lease_expiring_before_acquisition(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            state = initial_state("acme")
+            state["status"] = "in_progress"
+            state["active_lease"] = {
+                "lease_id": "lease-abc",
+                "owner": "opencode:test",
+                "run_id": "wf-acme-1",
+                "acquired_at": "2026-09-17T12:00:00Z",
+                "expires_at": "2026-09-17T11:00:00Z",
+            }
+            self._write_raw_state(client, state)
+
+            errors = validate_client(root, client)
+
+        self.assertTrue(
+            any("expires_at" in error and "acquired_at" in error for error in errors),
+            errors,
+        )
+
+    def test_validate_client_reports_manifest_ref_with_wrong_stage(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            manifest = (
+                ExecutionManifest.start(
+                    run_id="wf-acme-1",
+                    client_id="acme",
+                    stage="resolve-intelligence",
+                    attempt=1,
+                    source_commit_sha=self.COMMIT,
+                    started_at=self.AT,
+                )
+                .with_validators(
+                    [ValidatorEvidence(name="resolved-intelligence-contract", status="passed", at=self.AT)]
+                )
+                .complete(at=self.AT, required_validators=["resolved-intelligence-contract"])
+            )
+            path = manifest_path(client, "wf-acme-1", 1)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(yaml.safe_dump(manifest.to_dict(), sort_keys=False), encoding="utf-8")
+
+            state = initial_state("acme")
+            state["current_stage"] = "resolve-intelligence"
+            state["status"] = "in_progress"
+            state["completed"] = ["client-intake"]
+            state["stage_state"] = {
+                "client-intake": {
+                    "attempt": 1,
+                    "status": "complete",
+                    "artifact_manifest_ref": "workflow/executions/wf-acme-1/attempt-1.yaml",
+                }
+            }
+            save_state(client / "workflow-state.yaml", state)
+
+            errors = validate_client(root, client)
+
+        self.assertTrue(any("references manifest of stage" in error for error in errors), errors)
+
+    def test_validate_client_reports_malformed_manifest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            path = client / "workflow" / "executions" / "wf-acme-1" / "attempt-1.yaml"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("run_id: wf-acme-1\nstage: client-intake\n", encoding="utf-8")
+            self._write_raw_state(client, initial_state("acme"))
+
+            errors = validate_client(root, client)
+
+        self.assertTrue(any("manifest" in error for error in errors), errors)
+
+    def test_validate_client_reports_malformed_audit_line(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            audit = client / "workflow" / "audit.jsonl"
+            audit.parent.mkdir(parents=True, exist_ok=True)
+            audit.write_text("{ not valid json\n", encoding="utf-8")
+            self._write_raw_state(client, initial_state("acme"))
+
+            errors = validate_client(root, client)
+
+        self.assertTrue(any("audit.jsonl" in error for error in errors), errors)
+
+    def test_validate_client_reports_pointer_ahead_of_prerequisites(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            state = initial_state("acme")
+            state["current_stage"] = "build-prototype"
+            state["status"] = "in_progress"
+            state["completed"] = ["client-intake"]
+            save_state(client / "workflow-state.yaml", state)
+
+            errors = validate_client(root, client)
+
+        self.assertTrue(any("prerequisites not completed" in error for error in errors), errors)
+
+    def test_real_repository_workflow_validation_is_clean(self):
+        self.assertEqual([], validate_runtime(ROOT))
 
 
 if __name__ == "__main__":

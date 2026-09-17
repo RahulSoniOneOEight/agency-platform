@@ -35,15 +35,19 @@ Only load policies relevant to the current task, but never skip a relevant polic
 Client work must follow the repository-driven runtime rather than ad-hoc prompt sequences.
 
 For a new client:
-1. initialize the workspace with `python -m tooling.workflow.initialize_client <client-id> --name "<display name>"`;
-2. read `client-projects/<client>/workflow-state.yaml`;
-3. determine the next legal stage with the runtime router;
-4. read only the matching numbered file under `workflows/` plus the files named in its `READ` section;
-5. execute the stage;
-6. validate the required outputs;
-7. update `workflow-state.yaml` only after the gate is satisfied.
+1. initialize the workspace with `python -m tooling.workflow.initialize_client <client-id> --name "<display name>"`.
 
-For an existing client, never infer progress from chat history or prose. The GitHub artifacts and `workflow-state.yaml` are authoritative.
+For any client, a fresh session must:
+1. read `client-projects/<client>/workflow-state.yaml`; never infer progress from chat history or prose — the GitHub artifacts and the state file are authoritative;
+2. run the runner's inspect/recovery (`tooling.workflow.runner.inspect_client`) to get the deterministic recovery decision and the next legal stage, and run `resume_stage`/`reconcile_state` when recovery requires it;
+3. read only the current stage's numbered file under `workflows/` plus the files named in its `READ` section and the matching `workflows/contracts/` contract;
+4. acquire/start/resume the attempt through the runner (`start_stage`/`resume_stage`) — never mutate state directly;
+5. execute the stage;
+6. checkpoint each durable atomic step through the runner (`checkpoint_stage`);
+7. run the validators declared by the stage contract;
+8. complete through the runner (`complete_stage`) only after every gate passes, or record failure with `fail_stage`;
+9. persist ruling/deviation/override records to `workflow/audit.jsonl` (overrides require a human actor);
+10. never edit `current_stage` by hand — only `tooling.workflow.runner` writes `workflow-state.yaml`.
 
 Every workflow file must contain `PURPOSE`, `READ`, `PROCESS`, `WRITE`, `VALIDATE`, `DO NOT`, and `NEXT`.
 
