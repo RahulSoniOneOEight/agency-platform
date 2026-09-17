@@ -1,0 +1,37 @@
+name: Golden Baseline Generation (temporary, reviewer-controlled)
+
+# TEMPORARY workflow used once to generate governed golden baselines on the
+# canonical Linux CI runner, so committed baselines match the platform CI runs
+# on. It only uploads the regenerated baselines as an artifact for a human to
+# review and commit; it never commits or pushes them itself.
+on:
+  push:
+    branches:
+      - milestone-d-visual-qa
+    paths:
+      - '.github/workflows/golden-baseline-linux.yml'
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Generate goldens on the canonical runner
+        run: |
+          cd apps/widgetbook
+          flutter pub get
+          flutter test test/golden --update-goldens
+
+      - name: Upload regenerated baselines
+        uses: actions/upload-artifact@v4
+        with:
+          name: widgetbook-goldens-linux
+          path: apps/widgetbook/test/golden/goldens
+          if-no-files-found: error
