@@ -15,6 +15,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -85,7 +86,7 @@ class CaptureRunner:
         clock: Callable[[], datetime] | None = None,
     ) -> None:
         self._backend = backend
-        self._output_dir = Path(output_dir)
+        self._output_dir = Path(output_dir).resolve()
         self._clock = clock or _default_clock
 
     @property
@@ -108,7 +109,11 @@ class CaptureRunner:
             raise InvalidScreenshotMetadata("capture filename must not contain a path")
 
         self._output_dir.mkdir(parents=True, exist_ok=True)
-        temp = self._output_dir / f".{filename}.capture.tmp"
+        # Backends (browsers) require a real image extension, so the unpublished
+        # capture lives in a private temp directory until it is verified.
+        temp_dir = self._output_dir / ".capture-tmp"
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        temp = temp_dir / f"{uuid.uuid4().hex}-{filename}"
 
         try:
             if temp.exists():
@@ -167,6 +172,8 @@ class CaptureRunner:
         finally:
             if temp.exists():
                 temp.unlink()
+            if temp_dir.exists() and not any(temp_dir.iterdir()):
+                temp_dir.rmdir()
 
 
 DEFAULT_BROWSER_SCRIPT = (
