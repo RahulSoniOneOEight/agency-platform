@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
 import yaml
+
+from tooling.visual_qa.errors import VisualQaSchemaInvalid
+from tooling.visual_qa.qa_contracts import validate_finding
 
 from .screenshot_manifest import InvalidCaptureJob, normalize_manifest
 
@@ -47,10 +51,9 @@ def unresolved_critical_findings(data: dict) -> list[dict]:
 def validate_client_visual_qa(client_dir: Path) -> list[str]:
     """Validate a client's governed QA artifacts.
 
-    Checks the deterministic screenshot manifest (v1 or v2) and, when present,
-    the legacy ``visual-findings.yaml`` compatibility artifact. v2 ``QAFinding``
-    records under ``prototype/qa/findings/`` are validated by the D.2 contracts
-    (``tooling.visual_qa.qa_contracts``).
+    Checks the deterministic screenshot manifest (v1 or v2), the legacy
+    ``visual-findings.yaml`` compatibility artifact when present, and every v2
+    ``QAFinding`` record under ``prototype/qa/findings/`` (schema + domain).
     """
     errors: list[str] = []
     client_dir = Path(client_dir)
@@ -84,6 +87,19 @@ def validate_client_visual_qa(client_dir: Path) -> list[str]:
                 )
             else:
                 errors.append(f"{findings_path}: visual findings must be a mapping")
+
+    findings_dir = qa_dir / "findings"
+    if findings_dir.exists():
+        for finding_path in sorted(findings_dir.glob("*.json")):
+            try:
+                payload = json.loads(finding_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                errors.append(f"{finding_path}: invalid QA finding json: {exc}")
+                continue
+            try:
+                validate_finding(payload)
+            except VisualQaSchemaInvalid as exc:
+                errors.append(f"{finding_path}: {exc}")
 
     return errors
 

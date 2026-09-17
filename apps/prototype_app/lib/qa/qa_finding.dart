@@ -473,18 +473,21 @@ String computeQaDedupeKey({
   QaRegion? region,
   String? baselineRef,
 }) {
-  final scope = screen ?? story ?? '';
+  // Identity fields are compared in canonical (trimmed) form so a padded value
+  // can never masquerade as a different issue.
+  String canonical(String? value) => value?.trim() ?? '';
+  final scope = screen != null ? canonical(screen) : canonical(story);
   return [
     'qa-dedupe:v1',
-    clientId,
+    canonical(clientId),
     qaSurfaceToWire(surface),
     scope,
     qaRuleSourceToWire(ruleSource),
-    ruleRef,
-    category,
-    section ?? '',
+    canonical(ruleRef),
+    canonical(category),
+    canonical(section),
     region?.canonical ?? '',
-    baselineRef ?? '',
+    canonical(baselineRef),
   ].join('|');
 }
 

@@ -307,6 +307,20 @@ class DedupeTests(unittest.TestCase):
             base, dedupe_key(candidate(severity="blocker"), client_id="prototype-demo")
         )
 
+    def test_padded_identity_fields_normalize_to_the_same_key(self):
+        self.assertEqual(
+            dedupe_key(candidate(), client_id="prototype-demo"),
+            dedupe_key(
+                candidate(
+                    category="  spacing  ",
+                    rule_ref=" spacing.card.gap ",
+                    screen=" commerce.home ",
+                    section=" home.product-grid ",
+                ),
+                client_id="  prototype-demo  ",
+            ),
+        )
+
 
 class AuthorityBundleTests(unittest.TestCase):
     def test_authority_order_is_descending(self):
@@ -486,6 +500,66 @@ class FindingShapeContractTests(unittest.TestCase):
                     source,
                     f"{path.name} references {needle}",
                 )
+
+
+class ClientFindingValidationTests(unittest.TestCase):
+    def _client_with_finding(self, payload: dict) -> Path:
+        client = Path(tempfile.mkdtemp()) / "acme"
+        qa = client / "prototype" / "qa"
+        findings = qa / "findings"
+        findings.mkdir(parents=True)
+        (qa / "screenshot-manifest.yaml").write_text(
+            "version: 2\nclient_id: acme\nfixture_version: v1\njobs:\n"
+            "- surface: prototype\n  screen: commerce.home\n  state: default\n"
+            "  direction: a\n  viewport: {width: 390, height: 844}\n",
+            encoding="utf-8",
+        )
+        (findings / "qa-001.json").write_text(
+            json.dumps(payload), encoding="utf-8"
+        )
+        return client
+
+    def test_a_valid_finding_passes_the_client_gate(self):
+        from tooling.prototype.validate_visual_qa import validate_client_visual_qa
+
+        template = json.loads(TEMPLATE_PATH.read_text(encoding="utf-8"))
+        client = self._client_with_finding(template)
+        self.assertEqual([], validate_client_visual_qa(client))
+
+    def test_a_tampered_dedupe_key_fails_the_client_gate(self):
+        from tooling.prototype.validate_visual_qa import validate_client_visual_qa
+
+        template = json.loads(TEMPLATE_PATH.read_text(encoding="utf-8"))
+        template["dedupe_key"] = "qa-dedupe:v1|wrong"
+        client = self._client_with_finding(template)
+        errors = validate_client_visual_qa(client)
+        self.assertTrue(
+            any("dedupe_key is not reproducible" in error for error in errors),
+            errors,
+        )
+
+    def test_a_malformed_finding_file_fails_the_client_gate(self):
+        from tooling.prototype.validate_visual_qa import validate_client_visual_qa
+
+        client = Path(tempfile.mkdtemp()) / "acme"
+        qa = client / "prototype" / "qa"
+        findings = qa / "findings"
+        findings.mkdir(parents=True)
+        (qa / "screenshot-manifest.yaml").write_text(
+            "version: 2\nclient_id: acme\nfixture_version: v1\njobs:\n"
+            "- surface: prototype\n  screen: commerce.home\n  state: default\n"
+            "  direction: a\n  viewport: {width: 390, height: 844}\n",
+            encoding="utf-8",
+        )
+        (findings / "qa-001.json").write_text("{not json", encoding="utf-8")
+        errors = validate_client_visual_qa(client)
+        self.assertTrue(any("invalid QA finding json" in error for error in errors), errors)
+
+    def test_prototype_finding_with_a_story_is_rejected(self):
+        template = json.loads(TEMPLATE_PATH.read_text(encoding="utf-8"))
+        template["story"] = "AgencyButton.Primary"
+        with self.assertRaises(VisualQaSchemaInvalid):
+            validate_finding(template)
 
 
 if __name__ == "__main__":

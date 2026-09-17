@@ -126,6 +126,15 @@ def validate_finding(finding: object, schema: dict | None = None) -> dict:
     """
     validate_finding_against_schema(finding, schema)
     assert isinstance(finding, dict)
+
+    surface = finding.get("surface")
+    screen = finding.get("screen")
+    story = finding.get("story")
+    if surface == "prototype" and story is not None:
+        raise VisualQaSchemaInvalid("prototype QA finding must not declare a story")
+    if surface == "widgetbook" and screen is not None:
+        raise VisualQaSchemaInvalid("widgetbook QA finding must not declare a screen")
+
     region = finding.get("region")
     if region is not None:
         normalize_region(region)

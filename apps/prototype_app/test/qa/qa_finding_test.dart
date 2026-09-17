@@ -386,6 +386,29 @@ void main() {
         'design_contract|spacing.card.gap|spacing|home.product-grid||',
       );
     });
+
+    test('padded identity fields normalize to the same dedupe key', () {
+      final clean = sampleFinding();
+      final padded = QaFinding.detected(
+        id: 'qa-padded',
+        clientId: ' prototype-demo ',
+        severity: QaSeverity.major,
+        category: '  spacing  ',
+        surface: QaSurface.prototype,
+        screen: ' commerce.home ',
+        state: 'default',
+        direction: 'b',
+        section: ' home.product-grid ',
+        screenshotRef: 'sha256:capture-1',
+        sourceCommitSha: 'abc123',
+        ruleSource: QaRuleSource.designContract,
+        ruleRef: ' spacing.card.gap ',
+        summary: 'x',
+        actorId: 'visual-qa',
+        at: at(0),
+      );
+      expect(padded.dedupeKey, clean.dedupeKey);
+    });
   });
 
   group('recurrence and no-longer-reproducible', () {
