@@ -35,12 +35,21 @@ _AGENT_ACTOR_PREFIX = "opencode:"
 
 def _require_human_override(kind: Any, actor: Any) -> None:
     """A manual override is a human action; an agent may never author one."""
-    if kind == "override" and isinstance(actor, str) and actor.startswith(
-        _AGENT_ACTOR_PREFIX
-    ):
+    if kind == "override" and _is_agent_actor(actor):
         raise ValueError(
             "manual override requires a human actor, not an opencode agent"
         )
+
+
+def _is_agent_actor(actor: Any) -> bool:
+    """Whether *actor* identifies an agent rather than a human.
+
+    Compared case-insensitively and ignoring surrounding whitespace so a
+    cosmetic variant cannot slip past the human-only override rule.
+    """
+    return isinstance(actor, str) and actor.strip().lower().startswith(
+        _AGENT_ACTOR_PREFIX
+    )
 
 
 @dataclass(frozen=True)
@@ -222,7 +231,7 @@ def make_override(
     requested_state: Any = None,
     evidence: Any = None,
 ) -> AuditRecord:
-    if isinstance(actor, str) and actor.startswith(_AGENT_ACTOR_PREFIX):
+    if _is_agent_actor(actor):
         raise ValueError("manual override requires a human actor, not an opencode agent")
     _require_text(affected_gate, "affected_gate")
     details: dict[str, Any] = {"affected_gate": affected_gate}
@@ -344,8 +353,6 @@ def validate_audit_record(data: Mapping[str, Any]) -> list[str]:
         gate = details.get("affected_gate")
         if not isinstance(gate, str) or not gate.strip():
             errors.append("override details require a non-blank affected_gate")
-        if isinstance(data.get("actor"), str) and str(data["actor"]).startswith(
-            _AGENT_ACTOR_PREFIX
-        ):
+        if _is_agent_actor(data.get("actor")):
             errors.append("manual override requires a human actor")
     return sorted(errors)

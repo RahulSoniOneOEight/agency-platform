@@ -273,6 +273,17 @@ class AppendTests(unittest.TestCase):
         errors = validate_audit_record(payload)
         self.assertTrue(any("human actor" in error for error in errors), errors)
 
+    def test_agent_override_is_rejected_case_and_whitespace_insensitively(self):
+        for variant in ("  opencode:x  ", "OpenCode:x", "OPENCODE:x"):
+            with self.assertRaises(ValueError):
+                make_override(
+                    actor=variant,
+                    at=AT,
+                    summary="gate bypass",
+                    reason="urgent",
+                    affected_gate="stage-completion",
+                )
+
 
 class ValidateRecordTests(unittest.TestCase):
     def _valid_records(self) -> list[dict]:
@@ -328,7 +339,17 @@ class SchemaAgreementTests(unittest.TestCase):
         del override_no_gate["details"]["affected_gate"]
         unknown = _ruling().to_dict()
         unknown["extra"] = True
-        return [valid, missing, bad_kind, override, override_no_gate, unknown]
+        agent_override = json.loads(json.dumps(override))
+        agent_override["actor"] = "opencode:rogue-session"
+        return [
+            valid,
+            missing,
+            bad_kind,
+            override,
+            override_no_gate,
+            unknown,
+            agent_override,
+        ]
 
     def test_schema_agrees_with_validate_audit_record(self):
         validator = _schema_validator()

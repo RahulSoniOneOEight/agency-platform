@@ -132,12 +132,85 @@
 
 | Cycle | Scope | Status | Commits |
 |-------|-------|--------|---------|
-| 1 | State machine + stage contracts + execution manifests | PENDING | — |
-| 2 | Idempotency + leases + retry/resume + audit/recovery | PENDING | — |
+| 1 | State machine + stage contracts + execution manifests | ACCEPTED | `02afbd9` `493b032` `99c9ee4` `146eba9` `a4d50a0` |
+| 2 | Idempotency + leases + retry/resume + audit/recovery | ACCEPTED | `a28d2b3` `c36c1d1` `b86b9b8` `1fc71bd` `…` |
 | 3 | OpenCode orchestration + CI hardening + E2E resumability | PENDING | — |
 
 ## Progress log
-
 - 2026-09-17 — Preflight complete. Branch `milestone-e-workflow-hardening` at `21eb01f`; spec + plan
   present; Milestone D merged on `main`. RE1–RE15 recorded. Untracked `pubspec.lock` files
-  intentionally uncommitted.
+  intentionally uncommitted. Baseline: 455 Python tests OK.
+- 2026-09-17 — **Cycle 1 implemented.** Commits: `02afbd9` workflow-state v2 + schema + template;
+  `493b032` machine-readable stage contracts + parity validator + 8 contracts + schema; `99c9ee4`
+  execution manifests + validator-gated transition service + schema + validator/router/initializer
+  wiring.
+  - Delivered: `state.normalize_state`/`save_state_atomic`/`initial_state` v2 (v1 read-compatible);
+    `workflow-state.schema.json`; `contracts.StageContract` + `validate_stage_contracts` parity against
+    the Markdown `NEXT` graph; `workflows/contracts/01..08-*.yaml`; `manifests.ExecutionManifest`
+    (+`ArtifactRef`/`CheckpointRecord`/`ValidatorEvidence`, `sha256_file`,
+    `write_manifest_create_only`, `load_manifest`, `validate_manifest`); `execution.start_attempt`/
+    `record_checkpoint`/`fail_attempt`/`complete_attempt` (evidence-before-state);
+    `validate_workflow` tier-2 manifest evidence + contract parity; `router` normalization +
+    `stage_state` awareness; `initialize_client` creates `workflow/executions/`.
+  - Tests: `test_workflow_state_v2` 27, `test_workflow_contracts` 19, `test_workflow_manifests` 21,
+    `test_workflow_runtime` 24 → repo suite **530 tests OK**; `validate_workflow`, `validate_repo`,
+    `validate_knowledge`, `validate_prototype` pass.
+  - Independent review: **ACCEPT-WITH-MINORS**, 0 blockers, **1 major** — `complete_attempt` did not
+    verify that the supplied manifest belonged to the state it advanced, so a directly supplied
+    manifest could skip stages (`client-intake → build-prototype`) or cross clients. All 14 required
+    checks PASS. 9 minors recorded.
+  - Fixes (`146eba9`): added `_require_attempt_matches_state` (stage + run + client guards) to
+    `complete_attempt`, the stage guard to `fail_attempt`; `normalize_state` coerces YAML
+    `date`/`datetime` `last_updated` to ISO and validates `stage_state.<stage>.status`;
+    `write_manifest_create_only` refuses any non-`in_progress` manifest; `ExecutionManifest.from_dict`
+    rejects unknown statuses; `validate_workflow` no longer masks a broken `artifact_manifest_ref`
+    with a fallback; template quoted; 6 new runtime tests + 5 state tests + 2 manifest tests.
+  - Scoped re-review: **ACCEPT-WITH-MINORS — major M1 closed**; exploit reproduced pre-fix and now
+    raises `IllegalStageTransition` with state byte-identical. New minors fixed immediately: stripped
+    UTF-8 BOMs accidentally introduced by PowerShell `Set-Content -Encoding utf8` in three files;
+    tightened the `run_id` guard (no longer skipped when `state["run_id"]` is `None`); gave
+    `fail_attempt` the full stage/run/client guard via the shared helper (signature is now
+    `fail_attempt(client_dir, state, manifest, *, reason, at)`).
+  - Post-fix counts: `test_workflow_state_v2` 32, `test_workflow_contracts` 19,
+    `test_workflow_manifests` 23, `test_workflow_runtime` 33 → repo suite **546 tests OK**.
+  - **Accepted/deferred minors:** `fail_attempt` still does not persist the failed manifest (plan
+    Cycle 2 Step 11 owns failure-evidence persistence); the router still routes on unverified
+    `stage_state` (routing is not proof; `validate_client` remains the evidence gate); frozen
+    manifests hold mutable nested ruling/deviation dicts in memory (overwrite is blocked); no
+    cross-check of manifest hashes against artifact bytes (hashing is identity, not security, per
+    spec §3). CI does not yet run the new E test modules — Cycle 3 Step 8 (RE9) owns that.
+- 2026-09-17 — **Cycle 2 implemented.** Commits: `a28d2b3` lease domain; `c36c1d1` audit records;
+  `b86b9b8` idempotency decision + recovery + failure-evidence persistence; `1fc71bd` review fixes.
+  - Delivered: `lease.WorkflowLease` + `acquire/renew/release/reconcile_expired_lease/load_lease/is_expired`
+    (deterministic `lease-` ids, idempotent same-owner re-acquire, `WorkflowLeaseConflict`/`Expired`/
+    `OwnershipError`, never touches the stage pointer); `audit.AuditRecord` + `make_ruling`/
+    `make_deviation`/`make_override`/`make_recovery_record`/`append_audit_record`/`load_audit_records`/
+    `validate_audit_record` (append-only JSONL, content-derived ids, human-only overrides);
+    `workflow-audit-record.schema.json`; `execution.IdempotencyAction`/`IdempotencyDecision`/
+    `prior_manifests`/`decide_idempotency` (content-based identity, no wall clock);
+    `recovery.RecoveryAction`/`RecoveryDecision`/`inspect_recovery` (pure read, six-row table);
+    lease + audit + failure-evidence wiring into the execution ordering.
+  - Tests: `test_workflow_lease` 31, `test_workflow_audit` 28, `test_workflow_idempotency` 23,
+    `test_workflow_recovery` 12, `test_workflow_runtime` 41 → repo suite **650 tests OK**;
+    `validate_workflow`, `validate_repo`, `validate_knowledge`, `validate_prototype` pass.
+  - Independent review: **REJECT** — **1 blocker** (B1: the lease was never enforced on the
+    state-mutating execution path, so a second owner could `start_attempt` and write an artifact while
+    another owner held a live lease) and **1 major** (M1: the human-only override rule was enforced
+    only in the factory, so a hand-built `opencode:` override could be persisted). 6 minors.
+  - Fixes (`1fc71bd`): `start_attempt` now acquires the lease before writing any evidence
+    (idempotent same-owner re-acquire; `WorkflowLeaseConflict` for a second owner with zero mutation;
+    deterministic expired-lease reclaim that appends a durable `recovery` audit record);
+    `complete_attempt` requires the owning lease and releases ownership only after evidence is durable;
+    `fail_attempt` requires a lease and persists failure evidence before releasing; recovery gained a
+    pointer-ahead-of-prerequisites `BLOCK` row and a corrected `_unfinished_work`; overrides are
+    rejected at `from_dict`/`append_audit_record`/`validate_audit_record` and in the schema.
+  - Scoped re-review: **ACCEPT-WITH-MINORS — B1 and M1 closed**; all repro probes now fail safely.
+    Residual minor fixed immediately: `fail_attempt` now takes a required `actor` and enforces lease
+    *ownership* (not just presence), matching `complete_attempt`; the override actor check is
+    normalized (case/whitespace) and the schema-agreement cases now cover the agent-override rule.
+  - **Accepted minors (recorded, non-gating):** `release_after_completion` and `renew_lease` are
+    currently only test-reachable (Cycle 3's runner will use them); `_existing_attempts` is retained as
+    an unused private reader; the router still routes on unverified `stage_state` (routing is not
+    proof); no cross-check of manifest hashes against artifact bytes (hashing is identity, not
+    security, per spec §3). CI does not yet run the new E test modules — Cycle 3 Step 8 (RE9) owns that.
+  - Post-fix counts: repo suite **650 tests OK**.

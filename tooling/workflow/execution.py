@@ -386,13 +386,16 @@ def record_checkpoint(
 
 
 def fail_attempt(
-    client_dir: Path, state: dict, manifest: ExecutionManifest, *, reason: str, at: str
+    client_dir: Path,
+    state: dict,
+    manifest: ExecutionManifest,
+    *,
+    reason: str,
+    at: str,
+    actor: str,
 ) -> tuple[dict, ExecutionManifest]:
     _require_attempt_matches_state(client_dir, state, manifest)
-    if load_lease(state) is None:
-        raise WorkflowLeaseOwnershipError(
-            "state-mutating execution requires an active client workflow lease"
-        )
+    _require_active_lease(state, actor=actor)
     failed = manifest.fail(reason=reason, at=at)
     write_manifest_create_only(
         manifest_path(client_dir, failed.run_id, failed.attempt), failed

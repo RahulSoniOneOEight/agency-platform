@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import copy
 import json
@@ -444,7 +444,7 @@ class WorkflowExecutionTests(unittest.TestCase):
                 root, client, state, actor="tester", source_commit_sha=self.COMMIT
             )
             failed_state, failed_manifest = fail_attempt(
-                client, new_state, manifest, reason="boom", at=self.AT
+                client, new_state, manifest, reason="boom", at=self.AT, actor="tester"
             )
             self.assertEqual(state["current_stage"], failed_state["current_stage"])
             self.assertEqual(state["completed"], failed_state["completed"])
@@ -656,7 +656,7 @@ class WorkflowExecutionTests(unittest.TestCase):
                 started_at=self.AT,
             )
             with self.assertRaises(IllegalStageTransition):
-                fail_attempt(client, new_state, foreign, reason="boom", at=self.AT)
+                fail_attempt(client, new_state, foreign, reason="boom", at=self.AT, actor="tester")
 
     def test_fail_attempt_rejects_a_stale_run_manifest(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -675,7 +675,7 @@ class WorkflowExecutionTests(unittest.TestCase):
                 started_at=self.AT,
             )
             with self.assertRaises(IllegalStageTransition):
-                fail_attempt(client, new_state, stale, reason="boom", at=self.AT)
+                fail_attempt(client, new_state, stale, reason="boom", at=self.AT, actor="tester")
 
     def test_complete_attempt_rejects_a_manifest_when_no_run_is_active(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -704,6 +704,25 @@ class WorkflowExecutionTests(unittest.TestCase):
                     at=self.AT,
                     actor="tester",
                 )
+
+    def test_fail_attempt_requires_the_owning_lease(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            state = initial_state("acme")
+            started_state, manifest = start_attempt(
+                root, client, state, actor="tester", source_commit_sha=self.COMMIT
+            )
+            with self.assertRaises(WorkflowLeaseOwnershipError):
+                fail_attempt(
+                    client,
+                    started_state,
+                    manifest,
+                    reason="boom",
+                    at=self.AT,
+                    actor="someone-else",
+                )
+            self.assertEqual("in_progress", started_state["stage_state"]["client-intake"]["status"])
 
     def test_start_attempt_acquires_the_lease_and_releases_on_completion(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -936,7 +955,7 @@ class WorkflowIdempotencyRuntimeTests(unittest.TestCase):
                 root, client, state, actor="tester", source_commit_sha=self.COMMIT
             )
             _, failed = fail_attempt(
-                client, new_state, manifest, reason="boom", at=self.AT
+                client, new_state, manifest, reason="boom", at=self.AT, actor="tester"
             )
             on_disk = load_manifest(manifest_path(client, failed.run_id, failed.attempt))
             self.assertEqual("failed", on_disk.status)
