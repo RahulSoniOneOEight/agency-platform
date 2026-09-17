@@ -1,0 +1,48 @@
+{
+  "id": "qa-001",
+  "client_id": "prototype-demo",
+  "status": "detected",
+  "severity": "major",
+  "category": "spacing",
+  "surface": "prototype",
+  "screen": "commerce.home",
+  "story": null,
+  "state": "default",
+  "direction": "b",
+  "mix_ref": null,
+  "section": "home.product-grid",
+  "region": {
+    "x": 0.1,
+    "y": 0.42,
+    "width": 0.8,
+    "height": 0.24
+  },
+  "screenshot_ref": "sha256:4187fa0a2878b8298f57f293c933c880520b2014ff1279c00d029c566e16ce44",
+  "source_commit_sha": "abc123",
+  "rule_source": "design_contract",
+  "rule_ref": "spacing.card.gap",
+  "baseline_ref": null,
+  "summary": "Product-card spacing is inconsistent with the governed token.",
+  "evidence": [
+    {
+      "region": {
+        "x": 0.1,
+        "y": 0.42,
+        "width": 0.8,
+        "height": 0.24
+      }
+    }
+  ],
+  "confidence": 0.91,
+  "dedupe_key": "qa-dedupe:v1|prototype-demo|prototype|commerce.home|design_contract|spacing.card.gap|spacing|home.product-grid||",
+  "feedback_id": null,
+  "no_longer_reproducible": false,
+  "recurrences": 0,
+  "history": [
+    {
+      "event": "detected",
+      "actor_id": "visual-qa",
+      "at": "2026-09-17T10:00:00.000Z"
+    }
+  ]
+}
