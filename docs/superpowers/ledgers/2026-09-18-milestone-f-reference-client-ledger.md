@@ -1,0 +1,139 @@
+# Milestone F — End-to-End Reference Client — SDD Ledger
+
+> Superpowers subagent-driven-development progress ledger. Authoritative for resuming after
+> compaction/interruption. Read this first, then re-derive reality from the repository.
+
+## Run metadata
+
+- Repository: `C:\Users\LENOVO\Documents\agency-platform`
+- Branch: `milestone-f-reference-client` (do not work on `main`; do not merge)
+- Base: `main` at `4a9a532` (Milestone E merge, PR #22); branch point `4a9a532`
+- Spec: `docs/superpowers/specs/2026-09-18-milestone-f-reference-client-design.md` (`0d904c2`)
+- Plan: `docs/superpowers/plans/2026-09-18-milestone-f-reference-client-implementation.md` (`a40ccf7`)
+- Execution model: exactly 3 cycles (F.1 foundation; F.2 review→approval v1→QA; F.3 change/resume/reports).
+- Mode: TDD, fresh implementer + fresh independent reviewer per cycle, final whole-branch review.
+- Started: 2026-09-18
+
+## Resume protocol
+
+1. `git branch --show-current` — confirm `milestone-f-reference-client`.
+2. `git log --oneline -20` — reconcile commits below with actual history.
+3. Resume at the first cycle not marked `ACCEPTED`; re-run its focused tests first.
+
+## Preflight verification
+
+- `git fetch` → `origin/milestone-f-reference-client` exists with the F design (`0d904c2`) + plan
+  (`a40ccf7`) on top of the merged E tip (`4a9a532`).
+- `git merge-base HEAD origin/main` = `4a9a532` → branch contains merged Milestone E. ✔
+- `git status` → only the three untracked `pubspec.lock` files; `git ls-files | grep pubspec.lock`
+  is empty (no lockfile is tracked). ✔
+- D and E authorities present on the branch (`tooling/visual_qa/`, `apps/prototype_app/lib/qa/`,
+  `tooling/workflow/`, `apps/prototype_app/lib/review/`). ✔
+- F design spec + implementation plan present. ✔
+
+## Preflight consistency scan — binding constraints discovered
+
+### C1. Runtime direction ids are fixed to `a`/`b`/`c` (merged B contract)
+
+`tooling/prototype/validate_prototype.py` (`_ALLOWED_DIRECTION_IDS = {"a","b","c"}`, requires `a`
+and `b`, `review.allowed_values == keys`), `tooling/prototype/build_prototype.py`
+(`direction["id"] == direction_key`), `tooling/prototype/validate_runtime_bundle.py` (directions are
+exactly 2–3 keys ⊆ {a,b,c}), and `tooling/prototype/approved_experience.py`
+(`base_direction`/`source_direction` ∈ {a,b,c}) all fix the runtime direction vocabulary.
+
+The plan's named ids (`efficient-commerce`, `premium-discovery`, `trade-first`) therefore **cannot**
+be runtime direction ids. → **RF1**.
+
+### C2. A non-`examples/` client is scanned by every validator
+
+`validate_workflow.validate_runtime` skips only `{"schema","examples"}`; `validate_repo` and
+`validate_prototype` glob `client-projects/**`. So `client-projects/reference-commerce/` must
+satisfy, at minimum:
+
+- `workflow-state.yaml` — valid v2 state (`normalize_state` + schema), lease/audit/pointer rules.
+- `prototype/prototype-manifest.yaml` — `version: 1`, safe `client_id`, `theme.preset` ∈ approved
+  presets, `default_direction`, 2–3 `directions` mapping to runtime JSONs, `fixture_pack`,
+  `review.allowed_values` in key order.
+- `prototype/runtime/direction-{a,b,c}.json` — must resolve through **approved Flutter bindings**
+  (`validate_repo.flutter_binding_errors`), i.e. patterns ⊆ 8 bound patterns, components ⊆ 5 bound
+  components, `component_variants` only `commerce.product-card × {standard,b2b}`, density supported
+  per component (`spacious` only with components ⊆ {product-card}).
+- `prototype/fixtures/demo.yaml` — fixture contract (`industry`, `seed`, `products[]`, `services[]`).
+- `prototype/qa/screenshot-manifest.yaml` — v2 manifest whose direction set equals the manifest keys.
+- `apps/prototype_app/assets/generated/reference-commerce.json` — **committed generated bundle**,
+  byte-fresh per `check_resolved_bundles_fresh`, produced by
+  `python -m tooling.design_contract.generate_resolved_themes --write`.
+
+→ **RF2**, **RF10**.
+
+### C3. Only five governed sections exist for section-level mixing
+
+`tooling/prototype`… `apps/prototype_app/lib/review/review_section_registry.dart` registers exactly:
+`home.product-grid`, `plp.product-grid`, `search.search-field`, `search.results-grid`, `pdp.price`.
+→ **RF3**.
+
+### C4. The Dart review/QA domain has no injectable clock
+
+`ReviewCoordinator.createFeedback` and friends stamp `DateTime.now().toUtc()` internally, so
+committed Dart review records cannot be byte-reproduced. Determinism must be asserted
+**behaviourally** (statuses, counts, lifecycle, provenance), not byte-wise. → **RF5**.
+
+## Rulings
+
+- **RF1 — Runtime direction ids stay `a`/`b`/`c`; the named experience identities are metadata.**
+  `direction-a.yaml` carries `name: Efficient Commerce` + `archetype: efficient-commerce`;
+  `direction-b.yaml` → `Premium Discovery` / `premium-discovery`; `direction-c.yaml` →
+  `Trade First` / `trade-first`. The canonical mapping `a→efficient-commerce`,
+  `b→premium-discovery`, `c→trade-first` is declared once in
+  `client-projects/reference-commerce/reference-e2e/scenario.yaml` (`direction_identities`) and used
+  by every assertion/report. F does **not** modify the merged B direction vocabulary.
+- **RF2 — The reference client is a fully valid repository client.** All artifacts listed in C2 are
+  created and the client passes `validate_prototype`, `validate_workflow`, `validate_repo`, and
+  `validate_visual_qa` unchanged.
+- **RF3 — Section-level mixing targets a governed section.** The canonical section override uses
+  `pdp.price` (screen `commerce.pdp`), and the screen override uses `commerce.search`. Source
+  directions are chosen so `ReviewSectionCompatibility` allows them.
+- **RF4 — The reference client is a deterministic foundation; the E2E journey runs in a temp copy.**
+  Committed under `client-projects/reference-commerce/`: `input/`, `derived/`, `directions/`,
+  `resources/`, `prototype/{prototype-manifest.yaml,runtime,fixtures,qa}`, `workflow-state.yaml`,
+  and `reference-e2e/{fixture,scenario,assertions}.yaml` + `reference-e2e/report/*`. The C/D/E
+  journey (review→approval→QA→change→resume) is executed by a Dart E2E test against a **temp copy**
+  so CI never mutates live workflow authority or committed review state.
+- **RF5 — Determinism is behavioural.** Because the Dart domain has no injectable clock (C4),
+  determinism is proven by: (a) the fixture/scenario/bundle being byte-reproducible, and (b) the E2E
+  run asserting the same statuses, counts, round numbers, approval versions, and provenance on every
+  run. The machine report records assertion outcomes and artifact hashes, never a subjective score.
+- **RF6 — `reference-e2e/` is evidence only.** It holds the scenario definition, assertions,
+  evidence references, and reports. It never becomes a workflow/review/feedback/refinement/approval/
+  QA authority and never duplicates canonical domain state.
+- **RF7 — No Milestone G/H work.** No `ProductionAuthorization`, no release/deployment engine, no
+  production backend.
+- **RF8 — Model routing deviation.** Only `explore` and `general` subagent types are available. Each
+  cycle uses a fresh `general` implementer and a fresh independent `general` reviewer; the final
+  whole-branch review uses the strongest available reasoning configuration.
+- **RF9 — CI never mutates authority.** CI validates the fixture/scenario/report schemas, runs the
+  Python reference-client validator and the Dart E2E test (in temp workspaces), and never creates
+  approvals, advances workflow state, or updates goldens.
+- **RF10 — The generated bundle is committed and fresh.** `apps/prototype_app/assets/generated/
+  reference-commerce.json` is produced by `python -m tooling.design_contract.generate_resolved_themes
+  --write` and committed; `--check` must stay fresh.
+- **RF11 — Reference fixture is synthetic.** No PII; all names/ids/prices/accounts are invented and
+  documented as synthetic.
+- **RF12 — Visual QA stays provider-neutral and offline.** CI uses `FixtureVisualQaProvider`; no live
+  Visual AI credentials.
+
+## Cycle table
+
+| Cycle | Scope | Status | Commits |
+|-------|-------|--------|---------|
+| F.1 | Reference client foundation (Tasks 1–4) | PENDING | — |
+| F.2 | Review → Approval v1 → Visual QA (Tasks 5–7) | PENDING | — |
+| F.3 | Change boundaries + resume + reports/CI (Tasks 8–10) | PENDING | — |
+
+## Progress log
+
+- 2026-09-18 — Preflight complete. Branch `milestone-f-reference-client` at `a40ccf7`, based on the
+  merged E tip `4a9a532`. Spec + plan read in full. Preflight scan found two decisive constraints
+  (C1 runtime direction ids, C2 non-`examples` validator coverage) plus C3 (five governed sections)
+  and C4 (no injectable Dart clock). RF1–RF12 recorded. Untracked `pubspec.lock` files intentionally
+  uncommitted.
