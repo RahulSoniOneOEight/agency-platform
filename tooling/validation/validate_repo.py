@@ -134,6 +134,23 @@ REQUIRED_PATHS = (
     "README.md",
     "melos.yaml",
     ".gitignore",
+    "tooling/visual_qa",
+    "tooling/visual_qa/errors.py",
+    "tooling/visual_qa/capture_models.py",
+    "tooling/visual_qa/capture_runner.py",
+    "tooling/visual_qa/qa_contracts.py",
+    "tooling/visual_qa/visual_provider.py",
+    "tooling/visual_qa/golden_compare.py",
+    "tooling/screenshots/capture_web.mjs",
+    "client-projects/schema/screenshot-manifest.schema.json",
+    "client-projects/schema/qa-finding.schema.json",
+    "templates/qa-finding.json",
+    "tooling/validation/test_visual_qa_capture.py",
+    "tooling/validation/test_visual_qa_contracts.py",
+    "apps/widgetbook/test/golden/widgetbook_golden_test.dart",
+    "docs/superpowers/specs/2026-09-17-milestone-d-automated-visual-qa-design.md",
+    "docs/superpowers/plans/2026-09-17-milestone-d-automated-visual-qa-implementation.md",
+    "docs/superpowers/ledgers/2026-09-17-milestone-d-automated-visual-qa-ledger.md",
 )
 
 
