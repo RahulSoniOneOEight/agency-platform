@@ -134,7 +134,7 @@
 |-------|-------|--------|---------|
 | 1 | State machine + stage contracts + execution manifests | ACCEPTED | `02afbd9` `493b032` `99c9ee4` `146eba9` `a4d50a0` |
 | 2 | Idempotency + leases + retry/resume + audit/recovery | ACCEPTED | `a28d2b3` `c36c1d1` `b86b9b8` `1fc71bd` `…` |
-| 3 | OpenCode orchestration + CI hardening + E2E resumability | PENDING | — |
+| 3 | OpenCode orchestration + CI hardening + E2E resumability | ACCEPTED | `a094d6b` `59d0507` `6397c73` |
 
 ## Progress log
 - 2026-09-17 — Preflight complete. Branch `milestone-e-workflow-hardening` at `21eb01f`; spec + plan
@@ -214,3 +214,34 @@
     proof); no cross-check of manifest hashes against artifact bytes (hashing is identity, not
     security, per spec §3). CI does not yet run the new E test modules — Cycle 3 Step 8 (RE9) owns that.
   - Post-fix counts: repo suite **650 tests OK**.
+- 2026-09-17 — **Cycle 3 implemented.** Commits: `a094d6b` resumable runner + runner/E2E tests;
+  `59d0507` validator/CI/validate_repo hardening + docs/AGENTS/`## RUNTIME` notes; `6397c73` review fixes.
+  - Delivered: `runner.py` (`inspect_client`, `start_stage`, `checkpoint_stage`, `fail_stage`,
+    `complete_stage`, `resume_stage`, `reconcile_state`, `WorkflowRunStatus`, `StageRun`,
+    `RecoveryRequired`/`WorkflowBlocked`); validator hardening (raw-vs-normalized state schema, lease
+    key/ordering, `artifact_manifest_ref` identity, manifest schema, audit line validation,
+    pointer-ahead-of-prerequisites); `validate_repo` 141 required paths; CI runs 24 explicit test
+    modules with `validate_workflow` still required and no mutating step; `docs/workflow-runtime.md`
+    rewritten with verified API entry points; `AGENTS.md` fresh-session loop; `## RUNTIME` notes
+    appended to all eight Markdown stage contracts; `test_workflow_authority_boundaries.py`.
+  - Tests: `test_workflow_runner` 13, `test_workflow_resume_e2e` 8, `test_workflow_authority_boundaries`
+    4, `test_workflow_runtime` 57 → repo suite **691 tests OK**; `validate_workflow`, `validate_repo`
+    (141 paths), `validate_knowledge`, `validate_prototype`, `validate_visual_qa` pass.
+  - Independent review: **REJECT** — **1 blocker** (B1: the new raw-state schema check rejected
+    committed v1 `workflow-state.yaml`, contradicting RE1 and acceptance criterion #2) and
+    **1 major** (M1: `reconcile_state` cleared a foreign *live* lease with no ownership check and no
+    audit record). 9 minors.
+  - Fixes (`6397c73`): the strict raw schema check now applies only to `version == 2` files while the
+    normalized state is always schema-checked (v1 stays valid); `reconcile_state` now refuses a foreign
+    live lease with `RecoveryRequired`, reclaims an expired lease through the shared audited
+    `reclaim_expired_lease` helper, and never clears an ownership it does not hold; the duplicated
+    completion-transition and lease-reclaim logic was extracted into
+    `execution.completion_state_transition` / `execution.reclaim_expired_lease` (m1/m2);
+    `execution.iso_timestamp` is now public (m9); the missing C/D authority-boundary architecture test
+    was added (m4); doc/AGENTS imprecisions fixed (m5/m6/m8).
+  - **Accepted minors (recorded, non-gating):** the `stage_state` status validator branch in
+    `validate_workflow` is unreachable because `normalize_state` raises first (the condition is still
+    reported via the load-failure path); `_existing_attempts` remains an unused private reader; the
+    router still routes on unverified `stage_state` (routing is not proof); no cross-check of manifest
+    hashes against artifact bytes (hashing is identity, not security, per spec §3).
+  - Post-fix counts: repo suite **691 tests OK**; `validate_repo` 141 required paths.
