@@ -248,6 +248,39 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def sha256_bytes(data: bytes) -> str:
+    """Return the bare 64-character lowercase hex SHA-256 digest of *data*."""
+    return hashlib.sha256(data).hexdigest()
+
+
+def input_identity(refs: Sequence[ArtifactRef]) -> tuple[tuple[str, str], ...]:
+    """Return the deterministic ``(path, sha256)`` identity of *refs*.
+
+    Entries are sorted by path so the identity is independent of caller order.
+    An empty sequence yields an empty tuple; empty-vs-empty therefore compares
+    equal only when both sides are empty.
+    """
+    return tuple(sorted((ref.path, ref.sha256) for ref in refs))
+
+
+def artifacts_for_paths(
+    client_dir: Path, paths: Sequence[str]
+) -> tuple[ArtifactRef, ...]:
+    """Return client-relative POSIX artifact refs for *paths*.
+
+    A missing file yields an ``ArtifactRef`` with an empty ``sha256`` instead of
+    raising, so a later identity comparison deterministically detects the
+    difference between "present with content" and "absent".
+    """
+    base = Path(client_dir)
+    refs: list[ArtifactRef] = []
+    for relative in paths:
+        candidate = base / relative
+        digest = sha256_file(candidate) if candidate.is_file() else ""
+        refs.append(ArtifactRef(path=Path(relative).as_posix(), sha256=digest))
+    return tuple(refs)
+
+
 def manifest_relpath(run_id: str, attempt: int) -> str:
     return f"workflow/{EXECUTIONS_DIR_NAME}/{run_id}/attempt-{attempt}.yaml"
 

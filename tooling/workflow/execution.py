@@ -12,16 +12,22 @@ from __future__ import annotations
 import copy
 import hashlib
 from collections.abc import Sequence
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
+from enum import Enum
 from pathlib import Path
 
 from tooling.workflow.contracts import StageContract, load_stage_contract
+from tooling.workflow.lease import WorkflowLease, release_lease
 from tooling.workflow.manifests import (
+    EXECUTIONS_DIR_NAME,
     ArtifactRef,
     ExecutionManifest,
     ManifestError,
     StageCompletionGateFailed,
     ValidatorEvidence,
+    artifacts_for_paths,
+    input_identity,
     load_manifest,
     manifest_path,
     manifest_relpath,
@@ -54,6 +60,11 @@ def _default_run_id(client_id: str, stage: str, attempt: int, now: datetime) -> 
 
 
 def _existing_attempts(client_dir: Path, run_id: str, stage: str) -> list[int]:
+    """Deprecated: attempt numbers now come from :func:`decide_idempotency`.
+
+    Retained as a thin reader for callers that only need the attempt numbers of
+    one run directory; the idempotency path no longer depends on it.
+    """
     run_dir = Path(client_dir) / "workflow" / "executions" / run_id
     attempts: list[int] = []
     if not run_dir.is_dir():
@@ -66,6 +77,137 @@ def _existing_attempts(client_dir: Path, run_id: str, stage: str) -> list[int]:
         if manifest.stage == stage:
             attempts.append(manifest.attempt)
     return attempts
+
+
+class IdempotencyAction(str, Enum):
+    """Content-based decision for a stage that is about to start (RE7)."""
+
+    REUSE = "reuse"
+    RESUME = "resume"
+    NEW_ATTEMPT = "new_attempt"
+
+
+@dataclass(frozen=True)
+class IdempotencyDecision:
+    action: IdempotencyAction
+    run_id: str
+    attempt: int
+    reason: str
+
+
+def _manifest_sort_key(manifest: ExecutionManifest) -> tuple[str, str, int]:
+    return (manifest.started_at, manifest.run_id, manifest.attempt)
+
+
+def prior_manifests(client_dir: Path, stage: str) -> list[ExecutionManifest]:
+    """Return every loadable manifest for *stage*, oldest first.
+
+    Ordering is deterministic (``started_at``, ``run_id``, ``attempt``) and never
+    depends on wall-clock time or filesystem enumeration order.
+    """
+    executions = Path(client_dir) / "workflow" / EXECUTIONS_DIR_NAME
+    manifests: list[ExecutionManifest] = []
+    if executions.is_dir():
+        for run_dir in sorted(executions.iterdir()):
+            if not run_dir.is_dir():
+                continue
+            for path in sorted(run_dir.glob("attempt-*.yaml")):
+                try:
+                    manifest = load_manifest(path)
+                except ManifestError:
+                    continue
+                if manifest.stage == stage:
+                    manifests.append(manifest)
+    manifests.sort(key=_manifest_sort_key)
+    return manifests
+
+
+def decide_idempotency(
+    contract: StageContract,
+    prior: Sequence[ExecutionManifest],
+    current_inputs: Sequence[ArtifactRef],
+    *,
+    run_id: str | None = None,
+) -> IdempotencyDecision:
+    """Decide REUSE / RESUME / NEW_ATTEMPT from content identity alone (RE7).
+
+    Pure: no I/O, no clock. ``RESUME`` outranks ``REUSE``; only manifests for
+    ``contract.stage`` are considered. A prior ``failed`` attempt (or changed
+    input bytes) yields ``NEW_ATTEMPT`` with the next attempt number.
+    """
+    stage_prior = sorted(
+        (manifest for manifest in prior if manifest.stage == contract.stage),
+        key=_manifest_sort_key,
+    )
+    current_identity = input_identity(current_inputs)
+
+    if not stage_prior:
+        return IdempotencyDecision(
+            action=IdempotencyAction.NEW_ATTEMPT,
+            run_id=run_id or "",
+            attempt=1,
+            reason="no prior attempts for stage",
+        )
+
+    latest = stage_prior[-1]
+    if (
+        latest.status == "in_progress"
+        and latest.checkpoints
+        and (run_id is None or latest.run_id == run_id)
+    ):
+        return IdempotencyDecision(
+            action=IdempotencyAction.RESUME,
+            run_id=latest.run_id,
+            attempt=latest.attempt,
+            reason="most recent attempt is in progress with a durable checkpoint",
+        )
+
+    completed = [manifest for manifest in stage_prior if manifest.status == "completed"]
+    if completed:
+        candidate = completed[-1]
+        if input_identity(candidate.inputs) == current_identity:
+            return IdempotencyDecision(
+                action=IdempotencyAction.REUSE,
+                run_id=candidate.run_id,
+                attempt=candidate.attempt,
+                reason="completed attempt matches the current inputs",
+            )
+
+    return IdempotencyDecision(
+        action=IdempotencyAction.NEW_ATTEMPT,
+        run_id=run_id or "",
+        attempt=1 + max(manifest.attempt for manifest in stage_prior),
+        reason="no reusable completed attempt for the current inputs",
+    )
+
+
+def _contract_input_refs(
+    client_dir: Path, contract: StageContract
+) -> tuple[ArtifactRef, ...]:
+    """Return the existing contract-relevant refs (``requires`` + ``produces``).
+
+    Missing files are omitted rather than recorded with an empty digest: an
+    in-progress manifest must stay schema-valid, and the not-yet-produced
+    outputs are merged in when the attempt completes. Identity comparison is
+    order-independent, so this stays deterministic across the attempt lifecycle.
+    """
+    relevant = tuple(contract.requires_artifacts) + tuple(contract.produces)
+    return tuple(ref for ref in artifacts_for_paths(client_dir, relevant) if ref.sha256)
+
+
+def _with_input_refs(
+    manifest: ExecutionManifest, refs: Sequence[ArtifactRef]
+) -> ExecutionManifest:
+    """Return *manifest* with *refs* merged into its inputs by path."""
+    by_path = {ref.path: ref for ref in manifest.inputs}
+    order = [ref.path for ref in manifest.inputs]
+    for ref in refs:
+        if not ref.sha256:
+            continue
+        if ref.path not in by_path:
+            order.append(ref.path)
+        by_path[ref.path] = ref
+    return replace(manifest, inputs=tuple(by_path[path] for path in order))
 
 
 def _require_prerequisites(
@@ -104,12 +246,31 @@ def start_attempt(
 
     now = now or datetime.now(timezone.utc)
     client_id = state.get("client_id") or Path(client_dir).name
+
+    if inputs:
+        current_inputs = tuple(inputs)
+    else:
+        current_inputs = _contract_input_refs(client_dir, contract)
+
+    prior = prior_manifests(client_dir, stage)
+    decision = decide_idempotency(contract, prior, current_inputs, run_id=run_id)
+
+    if decision.action is IdempotencyAction.REUSE:
+        existing = load_manifest(
+            manifest_path(client_dir, decision.run_id, decision.attempt)
+        )
+        return copy.deepcopy(state), existing
+    if decision.action is IdempotencyAction.RESUME:
+        existing = load_manifest(
+            manifest_path(client_dir, decision.run_id, decision.attempt)
+        )
+        return copy.deepcopy(state), existing
+
+    attempt = decision.attempt
     if run_id is None:
-        attempt = 1
         resolved_run_id = _default_run_id(client_id, stage, attempt, now)
     else:
         resolved_run_id = run_id
-        attempt = 1 + max(_existing_attempts(client_dir, resolved_run_id, stage), default=0)
 
     started_at = _iso(now)
     manifest = ExecutionManifest.start(
@@ -119,7 +280,7 @@ def start_attempt(
         attempt=attempt,
         source_commit_sha=source_commit_sha,
         started_at=started_at,
-        inputs=inputs,
+        inputs=current_inputs,
     )
     write_manifest_create_only(manifest_path(client_dir, resolved_run_id, attempt), manifest)
 
@@ -152,6 +313,10 @@ def fail_attempt(
     client_dir: Path, state: dict, manifest: ExecutionManifest, *, reason: str, at: str
 ) -> tuple[dict, ExecutionManifest]:
     _require_attempt_matches_state(client_dir, state, manifest)
+    failed = manifest.fail(reason=reason, at=at)
+    write_manifest_create_only(
+        manifest_path(client_dir, failed.run_id, failed.attempt), failed
+    )
     new_state = copy.deepcopy(state)
     stage_state = dict(new_state.get("stage_state") or {})
     entry = dict(stage_state.get(manifest.stage) or {})
@@ -159,7 +324,18 @@ def fail_attempt(
     entry["failed_at"] = at
     stage_state[manifest.stage] = entry
     new_state["stage_state"] = stage_state
-    return new_state, manifest.fail(reason=reason, at=at)
+    return new_state, failed
+
+
+def release_after_completion(state: dict, lease: WorkflowLease) -> dict:
+    """Release the lease once the canonical state transition is persisted.
+
+    Ordering contract (RE5): evidence -> state pointer -> lease release. This
+    thin wrapper exists so that the release step is expressible as a single call
+    and always routes through :func:`lease.release_lease`, which enforces the
+    lease id + owner match before clearing ``active_lease``.
+    """
+    return release_lease(state, lease)
 
 
 def _require_attempt_matches_state(
@@ -216,9 +392,10 @@ def complete_attempt(
             f"{manifest.stage}: required validators not passed: {', '.join(missing_validators)}"
         )
 
-    frozen = manifest.with_validators(validator_results).complete(
-        at=at, required_validators=contract.validators
-    )
+    produced_refs = artifacts_for_paths(client_dir, contract.produces)
+    frozen = _with_input_refs(manifest, produced_refs).with_validators(
+        validator_results
+    ).complete(at=at, required_validators=contract.validators)
     write_manifest_create_only(
         manifest_path(client_dir, frozen.run_id, frozen.attempt), frozen
     )

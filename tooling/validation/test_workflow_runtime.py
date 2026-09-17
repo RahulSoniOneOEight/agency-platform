@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import copy
 import shutil
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
@@ -17,12 +19,19 @@ from tooling.workflow.execution import (
     complete_attempt,
     fail_attempt,
     record_checkpoint,
+    release_after_completion,
     start_attempt,
 )
 from tooling.workflow.initialize_client import initialize_client
+from tooling.workflow.lease import (
+    WorkflowLeaseConflict,
+    acquire_lease,
+    load_lease,
+)
 from tooling.workflow.manifests import (
     ExecutionManifest,
     ValidatorEvidence,
+    artifacts_for_paths,
     load_manifest,
     manifest_path,
 )
@@ -768,6 +777,114 @@ class WorkflowExecutionTests(unittest.TestCase):
             self.assertTrue(
                 any("no completed execution manifest" in error for error in errors), errors
             )
+
+
+class WorkflowIdempotencyRuntimeTests(unittest.TestCase):
+    """Cycle 2: failure evidence, idempotent reruns, and lease ownership."""
+
+    COMMIT = "0" * 40
+    AT = "2026-09-17T00:00:00Z"
+    NOW = datetime(2026, 9, 17, 12, 0, tzinfo=timezone.utc)
+
+    def _root(self, tmp: str) -> Path:
+        root = Path(tmp)
+        (root / "client-projects").mkdir(parents=True, exist_ok=True)
+        shutil.copytree(ROOT / "workflows" / "contracts", root / "workflows" / "contracts")
+        return root
+
+    def _client(self, root: Path) -> Path:
+        client = root / "client-projects" / "acme"
+        client.mkdir(parents=True, exist_ok=True)
+        return client
+
+    def _passed(self, name: str) -> ValidatorEvidence:
+        return ValidatorEvidence(name=name, status="passed", at=self.AT)
+
+    def test_fail_attempt_persists_failed_manifest_on_disk(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            state = initial_state("acme")
+            new_state, manifest = start_attempt(
+                root, client, state, actor="tester", source_commit_sha=self.COMMIT
+            )
+            _, failed = fail_attempt(
+                client, new_state, manifest, reason="boom", at=self.AT
+            )
+            on_disk = load_manifest(manifest_path(client, failed.run_id, failed.attempt))
+            self.assertEqual("failed", on_disk.status)
+            self.assertEqual("boom", on_disk.failure_reason)
+            self.assertEqual(self.AT, on_disk.completed_at)
+
+    def test_reuse_rerun_does_not_duplicate_completed_manifest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            (client / "derived").mkdir(parents=True, exist_ok=True)
+            (client / "derived" / "client-profile.yaml").write_text(
+                "id: acme\n", encoding="utf-8"
+            )
+            refs = artifacts_for_paths(client, ["derived/client-profile.yaml"])
+            state = initial_state("acme")
+            new_state, manifest = start_attempt(
+                root,
+                client,
+                state,
+                actor="tester",
+                source_commit_sha=self.COMMIT,
+                inputs=refs,
+            )
+            final_state, frozen = complete_attempt(
+                root,
+                client,
+                new_state,
+                manifest,
+                validator_results=[self._passed("client-input-contract")],
+                at=self.AT,
+                actor="tester",
+            )
+
+            reused_state, reused = start_attempt(
+                root,
+                client,
+                final_state,
+                actor="tester",
+                source_commit_sha=self.COMMIT,
+                stage="client-intake",
+                inputs=refs,
+            )
+
+            self.assertEqual(frozen.run_id, reused.run_id)
+            self.assertEqual(frozen.attempt, reused.attempt)
+            self.assertEqual("completed", reused.status)
+            self.assertEqual(final_state, reused_state)
+            manifests = sorted(
+                (client / "workflow" / "executions").glob("*/attempt-*.yaml")
+            )
+            self.assertEqual(1, len(manifests))
+
+    def test_lease_blocks_second_owner_and_state_is_not_mutated(self):
+        state = initial_state("acme")
+        leased_state, lease = acquire_lease(
+            state, owner="opencode:session-a", run_id=None, now=self.NOW
+        )
+        before = copy.deepcopy(leased_state)
+        with self.assertRaises(WorkflowLeaseConflict):
+            acquire_lease(
+                leased_state, owner="opencode:session-b", run_id=None, now=self.NOW
+            )
+        self.assertEqual(before, leased_state)
+        self.assertEqual(lease, load_lease(leased_state))
+        self.assertIsNone(state["active_lease"])
+
+    def test_release_after_completion_clears_the_lease(self):
+        state = initial_state("acme")
+        leased_state, lease = acquire_lease(
+            state, owner="opencode:session-a", run_id=None, now=self.NOW
+        )
+        released = release_after_completion(leased_state, lease)
+        self.assertIsNone(released["active_lease"])
+        self.assertEqual(lease.to_dict(), leased_state["active_lease"])
 
 
 if __name__ == "__main__":
