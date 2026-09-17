@@ -13,7 +13,8 @@ Design rulings honoured here:
 * RE9 - the runner is orchestration only. It carries no client-specific
   business logic and never approves review/QA/production decisions.
 * RE5 - evidence (manifest/audit) is persisted before the canonical state
-  pointer, and the runner is the only module that writes ``workflow-state.yaml``.
+  pointer, and the runner is the only runtime module that writes
+  ``workflow-state.yaml`` (the one-time initializer writes it at creation).
 * RE11 - no queue, daemon, or distributed machinery: every operation is a
   synchronous, deterministic function of repository state plus an injected
   clock.
@@ -26,7 +27,6 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from tooling.workflow.audit import append_audit_record, make_recovery_record
 from tooling.workflow.contracts import load_stage_contract
 from tooling.workflow.execution import (
     acquire_execution_lease,
@@ -45,7 +45,6 @@ from tooling.workflow.lease import (
     acquire_lease,
     is_expired,
     load_lease,
-    reconcile_expired_lease,
     renew_lease,
 )
 from tooling.workflow.manifests import (
@@ -53,7 +52,6 @@ from tooling.workflow.manifests import (
     ValidatorEvidence,
     load_manifest,
     manifest_path,
-    manifest_relpath,
     validate_manifest,
     write_manifest_create_only,
 )
@@ -63,7 +61,6 @@ from tooling.workflow.state import load_state, save_state_atomic
 
 
 STATE_FILENAME = "workflow-state.yaml"
-AUDIT_RELPATH = Path("workflow") / "audit.jsonl"
 
 
 class WorkflowRunnerError(RuntimeError):
@@ -359,7 +356,6 @@ def complete_stage(
 
 
 def _reclaim_expired_lease(
-    root: Path,
     client_dir: Path,
     state: dict,
     *,
@@ -411,7 +407,6 @@ def _resume_existing(
         )
     elif is_expired(lease, now=now):
         new_state, _ = _reclaim_expired_lease(
-            root,
             client_dir,
             state,
             actor=actor,

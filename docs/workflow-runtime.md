@@ -15,7 +15,7 @@ workflows/contracts/NN-<stage>.yaml = the machine-readable contract (requires/pr
 workflow/executions/<run>/attempt-N.yaml = the frozen evidence manifest for one attempt
 active_lease (inside state)         = single-owner coordination for state-mutating execution
 workflow/audit.jsonl                = append-only rulings, deviations, overrides, and recovery events
-tooling.workflow.runner             = the only module that writes workflow-state.yaml
+tooling.workflow.runner             = the only runtime module that writes workflow-state.yaml (the initializer writes it once at creation)
 ```
 
 Two tiers, never confused:
