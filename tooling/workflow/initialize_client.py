@@ -50,12 +50,14 @@ _DIRECTORIES = [
     "resources",
     "directions",
     "prototype",
+    "workflow/executions",
 ]
 
 _EMPTY_DIRECTORIES = [
     "resources",
     "directions",
     "prototype",
+    "workflow/executions",
     "input/brand/brand-assets",
     "input/references/current-app",
     "input/references/competitor",

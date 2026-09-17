@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agency-platform/schema/workflow-execution-manifest.schema.json",
+  "title": "Workflow execution manifest",
+  "description": "Frozen per-attempt execution evidence. One manifest is written create-only for each stage attempt under workflow/executions/<run-id>/attempt-<n>.yaml.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "run_id",
+    "client_id",
+    "stage",
+    "attempt",
+    "source_commit_sha",
+    "started_at",
+    "status",
+    "inputs",
+    "outputs",
+    "checkpoints",
+    "validators",
+    "rulings",
+    "deviations",
+    "completed_at",
+    "failure_reason"
+  ],
+  "properties": {
+    "run_id": { "type": "string", "minLength": 1 },
+    "client_id": { "type": "string", "minLength": 1 },
+    "stage": { "$ref": "#/$defs/stage" },
+    "attempt": { "type": "integer", "minimum": 1 },
+    "source_commit_sha": { "type": "string", "minLength": 1 },
+    "started_at": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["in_progress", "completed", "failed"] },
+    "inputs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/artifactRef" }
+    },
+    "outputs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/artifactRef" }
+    },
+    "checkpoints": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/checkpointRecord" }
+    },
+    "validators": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/validatorEvidence" }
+    },
+    "rulings": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "deviations": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "completed_at": { "type": ["string", "null"] },
+    "failure_reason": { "type": ["string", "null"] }
+  },
+  "$defs": {
+    "stage": {
+      "enum": [
+        "client-intake",
+        "resolve-intelligence",
+        "resource-research",
+        "generate-directions",
+        "build-prototype",
+        "visual-qa",
+        "client-review",
+        "productionize"
+      ]
+    },
+    "artifactRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "authority"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "authority": { "type": ["string", "null"] }
+      }
+    },
+    "checkpointRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "at"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "at": { "type": "string", "minLength": 1 }
+      }
+    },
+    "validatorEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "status", "at", "evidence_ref"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "status": { "enum": ["passed", "failed"] },
+        "at": { "type": "string", "minLength": 1 },
+        "evidence_ref": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

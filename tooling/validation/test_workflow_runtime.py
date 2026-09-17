@@ -8,7 +8,19 @@ from pathlib import Path
 import yaml
 
 from tooling.workflow.client_input import validate_client_input
+from tooling.workflow.contracts import load_stage_contract
+from tooling.workflow.execution import (
+    IllegalStageTransition,
+    StageCompletionGateFailed,
+    StagePrerequisiteFailed,
+    StageValidationFailed,
+    complete_attempt,
+    fail_attempt,
+    record_checkpoint,
+    start_attempt,
+)
 from tooling.workflow.initialize_client import initialize_client
+from tooling.workflow.manifests import ValidatorEvidence, load_manifest, manifest_path
 from tooling.workflow.router import next_stage
 from tooling.workflow.state import initial_state, save_state
 from tooling.workflow.validate_workflow import validate_client, validate_runtime, validate_workflow_file
@@ -338,6 +350,183 @@ class WorkflowRuntimeTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[2]
         errors = validate_runtime(root)
         self.assertEqual([], errors)
+
+
+class WorkflowExecutionTests(unittest.TestCase):
+    COMMIT = "0" * 40
+    AT = "2026-09-17T00:00:00Z"
+
+    def _root(self, tmp: str) -> Path:
+        root = Path(tmp)
+        (root / "client-projects").mkdir(parents=True, exist_ok=True)
+        shutil.copytree(ROOT / "workflows" / "contracts", root / "workflows" / "contracts")
+        return root
+
+    def _client(self, root: Path) -> Path:
+        client = root / "client-projects" / "acme"
+        client.mkdir(parents=True, exist_ok=True)
+        return client
+
+    def _passed(self, name: str) -> ValidatorEvidence:
+        return ValidatorEvidence(name=name, status="passed", at=self.AT)
+
+    def test_start_attempt_refuses_when_prerequisites_unmet(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            state = initial_state("acme")
+            with self.assertRaises(StagePrerequisiteFailed):
+                start_attempt(
+                    root,
+                    client,
+                    state,
+                    actor="tester",
+                    source_commit_sha=self.COMMIT,
+                    stage="resolve-intelligence",
+                )
+
+    def test_start_attempt_refuses_when_prerequisite_artifact_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            state = initial_state("acme")
+            state["completed"] = ["client-intake"]
+            with self.assertRaises(StagePrerequisiteFailed):
+                start_attempt(
+                    root,
+                    client,
+                    state,
+                    actor="tester",
+                    source_commit_sha=self.COMMIT,
+                    stage="resolve-intelligence",
+                )
+
+    def test_start_attempt_writes_manifest_and_advances_run(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            state = initial_state("acme")
+            new_state, manifest = start_attempt(
+                root, client, state, actor="tester", source_commit_sha=self.COMMIT
+            )
+            self.assertEqual("client-intake", manifest.stage)
+            self.assertEqual("in_progress", manifest.status)
+            self.assertTrue(manifest_path(client, manifest.run_id, manifest.attempt).exists())
+            self.assertEqual(manifest.run_id, new_state["run_id"])
+            self.assertEqual("in_progress", new_state["status"])
+            self.assertEqual(1, new_state["stage_state"]["client-intake"]["attempt"])
+            self.assertIsNone(state["run_id"])
+            self.assertEqual({}, state["stage_state"])
+
+    def test_failed_attempt_leaves_pointer_collections_unchanged(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            state = initial_state("acme")
+            new_state, manifest = start_attempt(
+                root, client, state, actor="tester", source_commit_sha=self.COMMIT
+            )
+            failed_state, failed_manifest = fail_attempt(
+                new_state, manifest, reason="boom", at=self.AT
+            )
+            self.assertEqual(state["current_stage"], failed_state["current_stage"])
+            self.assertEqual(state["completed"], failed_state["completed"])
+            self.assertEqual(state["pending"], failed_state["pending"])
+            self.assertEqual("failed", failed_manifest.status)
+            self.assertEqual("failed", failed_state["stage_state"]["client-intake"]["status"])
+            self.assertEqual(self.AT, failed_state["stage_state"]["client-intake"]["failed_at"])
+
+    def test_complete_attempt_missing_produced_artifact_raises(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            state = initial_state("acme")
+            new_state, manifest = start_attempt(
+                root, client, state, actor="tester", source_commit_sha=self.COMMIT
+            )
+            with self.assertRaises(StageValidationFailed):
+                complete_attempt(
+                    root,
+                    client,
+                    new_state,
+                    manifest,
+                    validator_results=[self._passed("client-input-contract")],
+                    at=self.AT,
+                    actor="tester",
+                )
+
+    def test_complete_attempt_failed_validator_raises(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            (client / "derived").mkdir(parents=True, exist_ok=True)
+            (client / "derived" / "client-profile.yaml").write_text("id: acme\n", encoding="utf-8")
+            state = initial_state("acme")
+            new_state, manifest = start_attempt(
+                root, client, state, actor="tester", source_commit_sha=self.COMMIT
+            )
+            with self.assertRaises(StageCompletionGateFailed):
+                complete_attempt(
+                    root,
+                    client,
+                    new_state,
+                    manifest,
+                    validator_results=[
+                        ValidatorEvidence(name="client-input-contract", status="failed", at=self.AT)
+                    ],
+                    at=self.AT,
+                    actor="tester",
+                )
+
+    def test_successful_complete_attempt_writes_manifest_before_state(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            (client / "derived").mkdir(parents=True, exist_ok=True)
+            (client / "derived" / "client-profile.yaml").write_text("id: acme\n", encoding="utf-8")
+            state = initial_state("acme")
+            new_state, manifest = start_attempt(
+                root, client, state, actor="tester", source_commit_sha=self.COMMIT
+            )
+            final_state, frozen = complete_attempt(
+                root,
+                client,
+                new_state,
+                manifest,
+                validator_results=[self._passed("client-input-contract")],
+                at=self.AT,
+                actor="tester",
+            )
+
+            path = manifest_path(client, frozen.run_id, frozen.attempt)
+            self.assertTrue(path.exists())
+            self.assertEqual("completed", load_manifest(path).status)
+            self.assertEqual("resolve-intelligence", final_state["current_stage"])
+            self.assertIn("client-intake", final_state["completed"])
+            self.assertNotIn("client-intake", final_state["pending"])
+            self.assertEqual(
+                {"from": "client-intake", "to": "resolve-intelligence", "at": self.AT, "actor": "tester"},
+                final_state["last_transition"],
+            )
+            self.assertEqual(
+                "complete", final_state["stage_state"]["client-intake"]["status"]
+            )
+
+    def test_record_checkpoint_rejects_undeclared_checkpoint(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            client = self._client(root)
+            contract = load_stage_contract(root, "client-intake")
+            state = initial_state("acme")
+            _, manifest = start_attempt(
+                root, client, state, actor="tester", source_commit_sha=self.COMMIT
+            )
+            with self.assertRaises(IllegalStageTransition):
+                record_checkpoint(manifest, "bogus-checkpoint", at=self.AT, contract=contract)
+            updated = record_checkpoint(
+                manifest, "intake-complete", at=self.AT, contract=contract
+            )
+            self.assertEqual("intake-complete", updated.checkpoints[-1].name)
 
 
 if __name__ == "__main__":

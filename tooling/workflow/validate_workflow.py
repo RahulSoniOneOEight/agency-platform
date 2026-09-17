@@ -8,7 +8,9 @@ import yaml
 from tooling.prototype.approved_experience import validate_approved_experience
 from tooling.prototype.validate_visual_qa import unresolved_critical_findings, validate_visual_findings
 from tooling.workflow.client_input import blocking_open_questions, validate_client_input
-from tooling.workflow.state import STAGES, STATUSES, load_state
+from tooling.workflow.contracts import validate_stage_contracts
+from tooling.workflow.manifests import ManifestError, load_manifest, validate_manifest
+from tooling.workflow.state import WorkflowStateError, load_state, normalize_state
 
 
 REQUIRED_SECTIONS = ["PURPOSE", "READ", "PROCESS", "WRITE", "VALIDATE", "DO NOT", "NEXT"]
@@ -43,30 +45,64 @@ def validate_workflow_file(path: Path) -> list[str]:
     return errors
 
 
-def _validate_state(state: dict[str, Any], label: str) -> list[str]:
-    errors: list[str] = []
-    if state.get("version") != 1:
-        errors.append(f"{label}: workflow-state version must be 1")
-    if state.get("current_stage") not in STAGES:
-        errors.append(f"{label}: invalid current_stage {state.get('current_stage')!r}")
-    if state.get("status") not in STATUSES:
-        errors.append(f"{label}: invalid status {state.get('status')!r}")
-    completed = state.get("completed", [])
-    if not isinstance(completed, list) or any(stage not in STAGES for stage in completed):
-        errors.append(f"{label}: completed contains invalid stages")
-    skipped = state.get("skipped", [])
-    if not isinstance(skipped, list):
-        errors.append(f"{label}: skipped must be a list")
-    else:
-        for item in skipped:
-            if not isinstance(item, dict) or item.get("stage") not in STAGES or not item.get("reason"):
-                errors.append(f"{label}: every skipped stage requires a valid stage and reason")
-    return errors
+def _validate_state(state: dict[str, Any], label: str, client_id: str) -> list[str]:
+    try:
+        normalize_state(state, client_id=client_id)
+    except WorkflowStateError as exc:
+        return [f"{label}: {exc}"]
+    return []
 
 
 def _load_yaml(path: Path) -> dict:
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
     return data if isinstance(data, dict) else {}
+
+
+def _validate_execution_manifests(client_dir: Path, state: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    loaded: list[tuple[Path, Any]] = []
+    executions_dir = client_dir / "workflow" / "executions"
+    if executions_dir.is_dir():
+        for path in sorted(executions_dir.glob("*/attempt-*.yaml")):
+            relative = path.relative_to(client_dir)
+            try:
+                manifest = load_manifest(path)
+            except ManifestError as exc:
+                errors.append(f"{client_dir}: {relative}: {exc}")
+                continue
+            for error in validate_manifest(manifest.to_dict()):
+                errors.append(f"{client_dir}: {relative}: {error}")
+            loaded.append((path, manifest))
+
+    stage_state = state.get("stage_state") or {}
+    for stage in sorted(stage_state):
+        entry = stage_state.get(stage)
+        if not isinstance(entry, dict) or entry.get("status") != "complete":
+            continue
+        manifest = None
+        ref = entry.get("artifact_manifest_ref")
+        if isinstance(ref, str) and ref:
+            candidate = client_dir / ref
+            if candidate.exists():
+                try:
+                    manifest = load_manifest(candidate)
+                except ManifestError as exc:
+                    errors.append(f"{client_dir}: stage {stage}: {exc}")
+                    manifest = None
+        if manifest is None:
+            for _, candidate in loaded:
+                if candidate.stage == stage and candidate.status == "completed":
+                    manifest = candidate
+                    break
+        if manifest is None:
+            errors.append(
+                f"{client_dir}: stage {stage} marked complete but no completed execution manifest exists"
+            )
+        elif manifest.status != "completed":
+            errors.append(
+                f"{client_dir}: stage {stage} execution manifest is {manifest.status}, expected completed"
+            )
+    return errors
 
 
 def validate_client(root: Path, client_dir: Path) -> list[str]:
@@ -78,7 +114,7 @@ def validate_client(root: Path, client_dir: Path) -> list[str]:
         state = load_state(state_path)
     except Exception as exc:
         return [f"{client_dir}: cannot load workflow-state.yaml: {exc}"]
-    errors.extend(_validate_state(state, str(client_dir)))
+    errors.extend(_validate_state(state, str(client_dir), client_dir.name))
     completed = set(state.get("completed", []))
 
     required: dict[str, list[Path]] = {
@@ -124,11 +160,14 @@ def validate_client(root: Path, client_dir: Path) -> list[str]:
             errors.append(f"{client_dir}: productionize requires approved-experience.yaml")
         else:
             errors.extend(f"{client_dir}: {error}" for error in validate_approved_experience(root, client_dir))
+
+    errors.extend(_validate_execution_manifests(client_dir, state))
     return errors
 
 
 def validate_runtime(root: Path) -> list[str]:
     errors: list[str] = []
+    errors.extend(validate_stage_contracts(root))
     for name in WORKFLOW_FILES:
         errors.extend(validate_workflow_file(root / "workflows" / name))
     for name in TEMPLATE_FILES:

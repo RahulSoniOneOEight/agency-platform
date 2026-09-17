@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -8,6 +9,7 @@ import yaml
 from tooling.prototype.approved_experience import validate_approved_experience
 from tooling.prototype.validate_visual_qa import unresolved_critical_findings, validate_visual_findings
 from tooling.workflow.client_input import blocking_open_questions, validate_client_input
+from tooling.workflow.state import normalize_state
 
 
 def _is_skipped(state: dict[str, Any], stage: str) -> bool:
@@ -33,7 +35,11 @@ def _load_yaml(path: Path) -> dict[str, Any]:
 
 
 def next_stage(root: Path, client_dir: Path, state: dict[str, Any]) -> dict[str, Any]:
+    state = normalize_state(state, client_id=client_dir.name)
     completed = set(state.get("completed", []))
+    for stage, entry in (state.get("stage_state") or {}).items():
+        if isinstance(entry, Mapping) and entry.get("status") == "complete":
+            completed.add(stage)
 
     if validate_client_input(root, client_dir):
         return {"stage": "client-intake", "status": "blocked", "reason": "client-input-invalid"}
