@@ -1,9 +1,6 @@
-"""Deterministic visual-QA tooling: capture, contracts, goldens, providers."""
+"""Deterministic visual-QA tooling: capture, contracts, goldens, providers.
 
-from __future__ import annotations
-
-__all__ = [
-    "capture_models",
-    "capture_runner",
-    "errors",
-]
+Submodules are imported explicitly by callers (``from tooling.visual_qa.errors
+import CaptureFailed``); this package intentionally re-exports nothing so the
+import graph stays acyclic and explicit.
+"""

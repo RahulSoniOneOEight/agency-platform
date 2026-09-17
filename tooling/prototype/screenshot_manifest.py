@@ -213,7 +213,14 @@ def _normalize_v1(data: dict) -> dict:
 
 
 def normalize_manifest(data: object) -> dict:
-    """Return the canonical v2 form of *data* (v1 or v2 input)."""
+    """Return the internal canonical v2 form of *data* (v1 or v2 input).
+
+    The returned mapping is an internal normalized capture-job representation
+    (it repeats ``client_id``/``fixture_version`` per job for self-contained
+    jobs); the *wire* manifest validated by
+    ``client-projects/schema/screenshot-manifest.schema.json`` is the
+    ``build_screenshot_manifest`` shape.
+    """
     manifest = _require_mapping(data, "screenshot manifest")
     version = manifest.get("version", 1)
     if version == 2:
@@ -233,6 +240,14 @@ def manifest_directions(data: object) -> set[str]:
     }
 
 
+def _canonical_scale_factor(value: object) -> int | float:
+    """Canonicalize a scale factor so ``1`` and ``1.0`` share one identity."""
+    number = float(value)  # type: ignore[arg-type]
+    if number.is_integer():
+        return int(number)
+    return number
+
+
 def capture_identity(job: dict, source_commit_sha: str) -> str:
     """Deterministic ``sha256:<hex>`` identity for a normalized capture job."""
     payload = {
@@ -244,10 +259,11 @@ def capture_identity(job: dict, source_commit_sha: str) -> str:
         "direction": job["direction"],
         "mix_ref": job["mix_ref"],
         "viewport": {
+            "name": job["viewport"].get("name"),
             "width": job["viewport"]["width"],
             "height": job["viewport"]["height"],
         },
-        "device_scale_factor": job["device_scale_factor"],
+        "device_scale_factor": _canonical_scale_factor(job["device_scale_factor"]),
         "fixture_version": job["fixture_version"],
         "source_commit_sha": source_commit_sha,
     }
@@ -271,16 +287,20 @@ def _capture_url(job: dict, base_url: str) -> str:
     return f"{base}/?{urlencode(query)}"
 
 
+def _slug(value: str) -> str:
+    return "".join(
+        character if character.isalnum() or character in "-_" else "-"
+        for character in value
+    ).strip("-")
+
+
 def _capture_filename(job: dict, capture_id: str) -> str:
     short = capture_id.split(":", 1)[1][:12]
-    slug_source = job["screen"] or job["story"] or "surface"
-    slug = "".join(
-        character if character.isalnum() or character in "-_" else "-"
-        for character in slug_source
-    ).strip("-")
-    direction = job["direction"] or "na"
+    slug = _slug(job["screen"] or job["story"] or "surface")
+    direction = _slug(job["direction"] or "na")
+    state = _slug(job["state"])
     return (
-        f"{short}-{job['surface']}-{slug}-{job['state']}-{direction}"
+        f"{short}-{job['surface']}-{slug}-{state}-{direction}"
         f"-{job['viewport']['width']}x{job['viewport']['height']}.png"
     )
 

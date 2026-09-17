@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+import os
 import shutil
 import tempfile
 import unittest
@@ -284,6 +285,28 @@ class CaptureIdentityTests(unittest.TestCase):
         self.assertTrue(job["capture_id"].startswith("sha256:"))
         self.assertEqual(64, len(job["capture_id"].split(":", 1)[1]))
 
+    def test_scale_factor_numeric_equivalence(self):
+        integer = build_capture_jobs(
+            v2_manifest(job={"device_scale_factor": 1}), BASE_URL, COMMIT
+        )[0]
+        floating = build_capture_jobs(
+            v2_manifest(job={"device_scale_factor": 1.0}), BASE_URL, COMMIT
+        )[0]
+        self.assertEqual(integer["capture_id"], floating["capture_id"])
+        self.assertEqual(integer["filename"], floating["filename"])
+
+    def test_viewport_name_is_part_of_identity(self):
+        named = build_capture_jobs(
+            v2_manifest(job={"viewport": {"name": "mobile-medium"}}), BASE_URL, COMMIT
+        )[0]
+        explicit = build_capture_jobs(
+            v2_manifest(job={"viewport": {"width": 390, "height": 844}}),
+            BASE_URL,
+            COMMIT,
+        )[0]
+        self.assertNotEqual(named["capture_id"], explicit["capture_id"])
+        self.assertNotEqual(named["filename"], explicit["filename"])
+
     def test_capture_id_does_not_depend_on_wall_clock(self):
         first = build_capture_jobs(v2_manifest(), BASE_URL, COMMIT)
         second = build_capture_jobs(v2_manifest(), BASE_URL, COMMIT)
@@ -315,6 +338,13 @@ class CaptureIdentityTests(unittest.TestCase):
             self.assertNotIn(unsafe, job["filename"])
         self.assertTrue(job["filename"].endswith(".png"))
 
+    def test_hostile_state_is_sanitized_in_the_filename(self):
+        job = build_capture_jobs(
+            v2_manifest(job={"state": "loading/error"}), BASE_URL, COMMIT
+        )[0]
+        for unsafe in ("/", "\\", ":", "?", "*", '"', "<", ">", "|"):
+            self.assertNotIn(unsafe, job["filename"])
+
 
 class CaptureRouteTests(unittest.TestCase):
     def test_route_is_deterministic_and_targets_the_direction(self):
@@ -328,6 +358,16 @@ class CaptureRouteTests(unittest.TestCase):
             v2_manifest(job={"mix_ref": "review-state-v2"}), BASE_URL, COMMIT
         )[0]
         self.assertIn("mix=review-state-v2", job["url"])
+
+    def test_route_carries_a_non_default_state(self):
+        job = build_capture_jobs(
+            v2_manifest(job={"state": "loading"}), BASE_URL, COMMIT
+        )[0]
+        self.assertIn("state=loading", job["url"])
+
+    def test_default_state_is_not_forced_into_the_route(self):
+        job = build_capture_jobs(v2_manifest(), BASE_URL, COMMIT)[0]
+        self.assertNotIn("state=", job["url"])
 
     def test_base_url_trailing_slash_is_normalized(self):
         job = build_capture_jobs(v2_manifest(), "http://localhost:8080/", COMMIT)[0]
@@ -573,6 +613,33 @@ class CaptureRunnerTests(unittest.TestCase):
     def test_empty_capture_is_rejected(self):
         with self.assertRaises(CaptureFailed):
             self.runner(EmptyBackend()).run([sample_job()])
+        self.assertEqual([], list(self.output_dir.glob("*.artifact.json")))
+
+    def test_non_png_capture_is_rejected(self):
+        with self.assertRaises(CaptureFailed):
+            self.runner(FakeBackend(b"not a png at all")).run([sample_job()])
+        self.assertEqual([], list(self.output_dir.glob("*.artifact.json")))
+        self.assertEqual([], list(self.output_dir.glob("*.png")))
+
+    def test_sidecar_failure_does_not_orphan_the_png(self):
+        import unittest.mock as mock
+
+        from tooling.visual_qa import capture_runner
+
+        real_replace = os.replace
+        calls = {"count": 0}
+
+        def flaky_replace(source, destination):
+            calls["count"] += 1
+            if calls["count"] == 2:
+                raise OSError("sidecar publish failed")
+            return real_replace(source, destination)
+
+        runner = self.runner(FakeBackend(png_bytes(390, 844)))
+        with mock.patch.object(capture_runner.os, "replace", side_effect=flaky_replace):
+            with self.assertRaises(OSError):
+                runner.run([sample_job()])
+        self.assertEqual([], list(self.output_dir.glob("*.png")))
         self.assertEqual([], list(self.output_dir.glob("*.artifact.json")))
 
     def test_missing_capture_output_is_rejected(self):
@@ -898,6 +965,63 @@ class CaptureCliTests(unittest.TestCase):
             yaml.safe_dump(v2_manifest(), sort_keys=False), encoding="utf-8"
         )
         return manifest
+
+
+class ClientVisualQaValidatorTests(unittest.TestCase):
+    def test_demo_client_passes(self):
+        from tooling.prototype.validate_visual_qa import validate_client_visual_qa
+
+        root = Path(__file__).resolve().parents[2]
+        errors = validate_client_visual_qa(
+            root / "client-projects" / "examples" / "prototype-demo"
+        )
+        self.assertEqual([], errors)
+
+    def test_invalid_manifest_is_reported(self):
+        from tooling.prototype.validate_visual_qa import validate_client_visual_qa
+
+        client = Path(tempfile.mkdtemp()) / "acme"
+        qa = client / "prototype" / "qa"
+        qa.mkdir(parents=True)
+        (qa / "screenshot-manifest.yaml").write_text(
+            yaml.safe_dump(v2_manifest(job={"direction": "z"}), sort_keys=False),
+            encoding="utf-8",
+        )
+        errors = validate_client_visual_qa(client)
+        self.assertTrue(any("invalid screenshot manifest" in error for error in errors), errors)
+
+    def test_missing_manifest_is_reported(self):
+        from tooling.prototype.validate_visual_qa import validate_client_visual_qa
+
+        client = Path(tempfile.mkdtemp()) / "acme"
+        (client / "prototype").mkdir(parents=True)
+        errors = validate_client_visual_qa(client)
+        self.assertTrue(any("missing screenshot manifest" in error for error in errors), errors)
+
+    def test_legacy_findings_are_still_validated(self):
+        from tooling.prototype.validate_visual_qa import validate_client_visual_qa
+
+        client = Path(tempfile.mkdtemp()) / "acme"
+        qa = client / "prototype" / "qa"
+        qa.mkdir(parents=True)
+        (qa / "screenshot-manifest.yaml").write_text(
+            yaml.safe_dump(v2_manifest(), sort_keys=False), encoding="utf-8"
+        )
+        (qa / "visual-findings.yaml").write_text(
+            "client_id: acme\nfindings:\n- screen: home\n", encoding="utf-8"
+        )
+        errors = validate_client_visual_qa(client)
+        self.assertTrue(any("missing field" in error for error in errors), errors)
+
+    def test_main_returns_nonzero_on_error(self):
+        from tooling.prototype import validate_visual_qa
+
+        client = Path(tempfile.mkdtemp()) / "acme"
+        (client / "prototype").mkdir(parents=True)
+        with contextlib.redirect_stdout(io.StringIO()) as buffer:
+            code = validate_visual_qa.main([str(client)])
+        self.assertEqual(1, code)
+        self.assertIn("Visual QA validation failed", buffer.getvalue())
 
 
 if __name__ == "__main__":

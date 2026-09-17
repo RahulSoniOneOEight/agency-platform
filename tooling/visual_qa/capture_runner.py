@@ -68,13 +68,6 @@ def content_hash(data: bytes) -> str:
     return "sha256:" + hashlib.sha256(data).hexdigest()
 
 
-def _write_atomic(path: Path, contents: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temp = Path(f"{path}.tmp")
-    temp.write_text(contents, encoding="utf-8")
-    os.replace(temp, path)
-
-
 class CaptureRunner:
     """Runs governed capture jobs and publishes identity-rich artifacts."""
 
@@ -137,12 +130,12 @@ class CaptureRunner:
                 raise CaptureFailed("capture backend produced an empty image")
 
             dimensions = png_dimensions(data)
-            width = dimensions[0] if dimensions else None
-            height = dimensions[1] if dimensions else None
+            if dimensions is None:
+                raise CaptureFailed("capture output is not a usable PNG image")
+            width, height = dimensions
             expected = job.get("viewport")
             if (
-                dimensions is not None
-                and isinstance(expected, dict)
+                isinstance(expected, dict)
                 and expected.get("width")
                 and expected.get("height")
                 and (width, height) != (expected["width"], expected["height"])
@@ -161,13 +154,21 @@ class CaptureRunner:
                 captured_at=self._clock().isoformat(),
             )
 
+            # Stage both files, then publish as a unit: if the sidecar cannot be
+            # published, the PNG is rolled back so a capture is never half-recorded.
             published = self._output_dir / filename
-            os.replace(temp, published)
             sidecar = self._output_dir / f"{filename}.artifact.json"
-            _write_atomic(
-                sidecar,
+            staged_sidecar = temp_dir / f"{filename}.artifact.json"
+            staged_sidecar.write_text(
                 json.dumps(artifact.to_json(), indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
             )
+            os.replace(temp, published)
+            try:
+                os.replace(staged_sidecar, sidecar)
+            except OSError:
+                published.unlink(missing_ok=True)
+                raise
             return artifact
         finally:
             if temp.exists():
