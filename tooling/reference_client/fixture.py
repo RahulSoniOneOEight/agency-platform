@@ -195,6 +195,45 @@ def _reference_errors(fixture: dict[str, Any]) -> list[str]:
             account_id = entry.get("account_id")
             if account_id is not None and account_id not in account_ids:
                 errors.append(f"{name}.{index}: unknown account {account_id!r}")
+            for collection_key in ("lines", "items", "line_items"):
+                line_items = entry.get(collection_key)
+                if not isinstance(line_items, list):
+                    continue
+                for position, item in enumerate(line_items):
+                    if not isinstance(item, dict):
+                        continue
+                    product_id = item.get("product_id")
+                    if product_id is not None and product_id not in product_ids:
+                        errors.append(
+                            f"{name}.{index}.{collection_key}.{position}: "
+                            f"unknown product {product_id!r}"
+                        )
+                    variant_id = item.get("variant_id")
+                    if variant_id is not None and variant_id not in variant_ids:
+                        errors.append(
+                            f"{name}.{index}.{collection_key}.{position}: "
+                            f"unknown variant {variant_id!r}"
+                        )
+
+    validation_states = fixture.get("validation_states")
+    if isinstance(validation_states, list):
+        for index, entry in enumerate(validation_states):
+            if not isinstance(entry, dict):
+                continue
+            target = entry.get("target")
+            if not isinstance(target, str) or ":" not in target:
+                continue
+            kind, _, ref = target.partition(":")
+            known = {
+                "product": product_ids,
+                "variant": variant_ids,
+                "account": account_ids,
+                "category": category_ids,
+            }.get(kind)
+            if known is not None and ref not in known:
+                errors.append(
+                    f"validation_states.{index}.target: unknown {kind} {ref!r}"
+                )
 
     return errors
 

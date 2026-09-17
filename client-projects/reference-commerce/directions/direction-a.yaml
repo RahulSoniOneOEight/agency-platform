@@ -10,15 +10,15 @@ rationale: >-
   Search and comparison dominate known-item commerce; a compact, search-led
   composition with explicit price and availability support shortens the path to
   cart for both consumer and trade buyers.
-information_architecture: [search, plp, pdp, cart]
+information_architecture: [search, plp, pdp, cart, order]
 navigation:
   model: search-led
 primary_journey:
-  id: search-to-cart
-  steps: [search, plp, pdp, cart]
+  id: search-to-order
+  steps: [search, plp, pdp, cart, order]
 secondary_journeys:
-  - id: browse-to-cart
-    steps: [plp, pdp, cart]
+  - id: browse-to-order
+    steps: [plp, pdp, cart, order]
 discovery_model: sku-and-facet-search
 search:
   prominence: high
@@ -30,7 +30,7 @@ patterns: [commerce.search, commerce.plp, commerce.pdp, commerce.cart]
 components: [commerce.product-card, commerce.price-display, commerce.search-field]
 component_variants:
   - component: commerce.product-card
-    variant: b2b
+    variant: standard
 required_resources: []
 strengths: [fast known-item discovery, dense decision support]
 tradeoffs: [less inspirational discovery]

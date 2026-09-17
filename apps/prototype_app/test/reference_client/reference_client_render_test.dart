@@ -75,6 +75,19 @@ void main() {
       await pumpReferencePattern(tester, runtime, 'b', 'commerce.pdp');
       expect(tester.takeException(), isNull);
     });
+
+    testWidgets('direction a cart exposes the order-conversion step', (tester) async {
+      // RF13: the platform has no governed checkout pattern, so the B2C
+      // order-conversion step is the cart's checkout call to action.
+      final runtime = loadReferenceRuntime();
+
+      await pumpReferencePattern(tester, runtime, 'a', 'commerce.cart');
+      expect(tester.takeException(), isNull);
+      expect(find.text('Cart'), findsOneWidget);
+      await tester.scrollUntilVisible(find.text('Checkout'), 200);
+      expect(find.text('Checkout'), findsOneWidget);
+      expect(find.text('Total'), findsOneWidget);
+    });
   });
 
   group('reference client · B2B journeys', () {
@@ -94,6 +107,16 @@ void main() {
       expect(find.text('Trade credit'), findsOneWidget);
       expect(find.text('Quick order'), findsOneWidget);
       expect(find.text('New RFQ'), findsOneWidget);
+    });
+
+    testWidgets('direction c cart exposes the B2B order conversion', (tester) async {
+      final runtime = loadReferenceRuntime();
+
+      await pumpReferencePattern(tester, runtime, 'c', 'commerce.cart');
+      expect(tester.takeException(), isNull);
+      expect(find.text('Order basket'), findsOneWidget);
+      await tester.scrollUntilVisible(find.text('Continue order'), 200);
+      expect(find.text('Continue order'), findsOneWidget);
     });
   });
 

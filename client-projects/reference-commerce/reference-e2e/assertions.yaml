@@ -1,8 +1,33 @@
+version: 1
+client_id: reference-commerce
+fixture_version: 1
+assertions:
+- id: fixture-integrity-pinned
+  scenario: normal-happy-path
+  kind: fixture_integrity
+  description: The synthetic fixture validates and its canonical content identity
+    matches the pinned determinism hash, so content tampering cannot pass silently.
+  params:
+    expected_identity: sha256:d52dfd83073cc4b2469932fc5750baea0a62bf0f3755bf547a467bf8f45d6835
+- id: direction-a-order-journey
+  scenario: normal-happy-path
+  kind: journey_contains
+  description: The efficient-commerce direction's journey reaches the order conversion
+    step that stands in for checkout (RF13).
+  params:
+    direction: a
+    step: order
+- id: direction-c-order-journey
+  scenario: normal-happy-path
+  kind: journey_contains
+  description: The trade-first direction's journey reaches B2B order conversion.
+  params:
+    direction: c
+    step: order
 - id: fixture-covers-b2c-and-b2b
   scenario: normal-happy-path
   kind: fixture_coverage
-  description: >-
-    The synthetic reference fixture declares both consumer (B2C) and trade
+  description: The synthetic reference fixture declares both consumer (B2C) and trade
     (B2B) coverage.
   params:
     b2c: true
@@ -10,17 +35,18 @@
 - id: runtime-direction-ids
   scenario: normal-happy-path
   kind: direction_ids
-  description: >-
-    The generated runtime bundle declares exactly the canonical runtime
+  description: The generated runtime bundle declares exactly the canonical runtime
     direction ids a, b, and c.
   params:
-    expected: [a, b, c]
+    expected:
+    - a
+    - b
+    - c
 - id: direction-identity-mapping
   scenario: normal-happy-path
   kind: direction_identity
-  description: >-
-    The named experience identities are metadata over the fixed runtime ids:
-    a=efficient-commerce, b=premium-discovery, c=trade-first.
+  description: 'The named experience identities are metadata over the fixed runtime
+    ids: a=efficient-commerce, b=premium-discovery, c=trade-first.'
   params:
     expected:
       a: efficient-commerce
@@ -131,19 +157,18 @@
 - id: workflow-state-foundation
   scenario: normal-happy-path
   kind: workflow_state
-  description: >-
-    The workflow state records the foundation stages as completed, the skipped
-    resource-research stage with a reason, and is currently in visual-qa.
+  description: The workflow state records the foundation stages as completed, the
+    skipped resource-research stage with a reason, and is currently in visual-qa.
   params:
     current_stage: visual-qa
     status: in_progress
     completed:
-      - client-intake
-      - resolve-intelligence
-      - generate-directions
-      - build-prototype
+    - client-intake
+    - resolve-intelligence
+    - generate-directions
+    - build-prototype
     skipped_stages:
-      - resource-research
+    - resource-research
 - id: bundle-client-id
   scenario: normal-happy-path
   kind: bundle_client_id
@@ -153,15 +178,12 @@
 - id: bundle-byte-fresh
   scenario: normal-happy-path
   kind: bundle_fresh
-  description: >-
-    The committed generated runtime bundle byte-matches a fresh in-memory
+  description: The committed generated runtime bundle byte-matches a fresh in-memory
     composition through the canonical runtime-bundle composer.
   params: {}
 - id: no-duplicated-authority
   scenario: normal-happy-path
   kind: no_duplicate_authority
-  description: >-
-    reference-e2e/ is evidence only and contains no review, feedback,
-    refinement, approval, or QA state records that duplicate canonical
-    authorities.
+  description: reference-e2e/ is evidence only and contains no review, feedback, refinement,
+    approval, or QA state records that duplicate canonical authorities.
   params: {}

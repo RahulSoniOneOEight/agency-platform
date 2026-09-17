@@ -107,7 +107,9 @@ class ReferenceScenarioTests(unittest.TestCase):
 class ReferenceAssertionTests(unittest.TestCase):
     def test_assertions_document_is_a_list(self):
         raw = yaml.safe_load(ASSERTIONS_PATH.read_text(encoding="utf-8"))
-        self.assertIsInstance(raw, list)
+        self.assertIsInstance(raw, dict)
+        self.assertEqual(1, raw["version"])
+        self.assertEqual("reference-commerce", raw["client_id"])
         document = load_assertions(ASSERTIONS_PATH)
         self.assertIsInstance(document["assertions"], list)
         self.assertTrue(document["assertions"])
@@ -122,8 +124,10 @@ class ReferenceAssertionTests(unittest.TestCase):
         self.assertEqual([], failed, [result.detail for result in failed])
         kinds = {
             "fixture_coverage",
+            "fixture_integrity",
             "direction_ids",
             "direction_identity",
+            "journey_contains",
             "artifact_exists",
             "workflow_state",
             "bundle_client_id",

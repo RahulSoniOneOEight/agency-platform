@@ -15,10 +15,10 @@ navigation:
   model: dashboard
 primary_journey:
   id: reorder-to-order
-  steps: [trade-dashboard, reorder, cart]
+  steps: [trade-dashboard, reorder, cart, order]
 secondary_journeys:
   - id: rfq-to-quote
-    steps: [trade-dashboard, rfq, cart]
+    steps: [trade-dashboard, rfq, cart, order]
 discovery_model: account-history-and-catalog
 search:
   prominence: low

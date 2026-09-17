@@ -197,7 +197,7 @@
       "component_variants": [
         {
           "component": "commerce.product-card",
-          "variant": "b2b"
+          "variant": "standard"
         }
       ],
       "components": [
@@ -217,7 +217,7 @@
         "commerce.pdp",
         "commerce.cart"
       ],
-      "primary_journey": "search-to-cart",
+      "primary_journey": "search-to-order",
       "required_resources": [],
       "strategic_goal": "reduce time from intent to transaction for known-item buyers",
       "transaction_model": "direct-checkout"

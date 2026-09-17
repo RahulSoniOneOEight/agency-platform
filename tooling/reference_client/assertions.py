@@ -16,7 +16,11 @@ from typing import Any
 import yaml
 
 from tooling.prototype.build_runtime_bundle import compose_runtime_bundle
-from tooling.reference_client.fixture import load_fixture
+from tooling.reference_client.fixture import (
+    fixture_identity,
+    load_fixture,
+    validate_fixture,
+)
 from tooling.reference_client.scenario import load_scenario, scenario_ids
 
 ASSERTIONS_RELATIVE = Path("reference-e2e") / "assertions.yaml"
@@ -30,17 +34,21 @@ SUPPORTED_ASSERTION_VERSIONS = frozenset({1})
 # Canonical authority record filenames that must never be duplicated as evidence
 # under ``reference-e2e/``.
 FORBIDDEN_AUTHORITY_FILENAMES: tuple[str, ...] = (
-    "review-state.json",
-    "feedback-*.json",
-    "approval-v*.json",
-    "batch-*.json",
-    "qa-*.json",
+    "review-state.*",
+    "feedback-*.*",
+    "approval-v*.*",
+    "approval_snapshot*.*",
+    "batch-*.*",
+    "qa-*.*",
+    "review_index*.*",
 )
 
 _KIND_PARAMS: dict[str, frozenset[str]] = {
     "fixture_coverage": frozenset({"b2c", "b2b"}),
+    "fixture_integrity": frozenset({"expected_identity"}),
     "direction_ids": frozenset({"expected"}),
     "direction_identity": frozenset({"expected"}),
+    "journey_contains": frozenset({"direction", "step"}),
     "artifact_exists": frozenset({"path"}),
     "workflow_state": frozenset(
         {"current_stage", "status", "completed", "skipped_stages"}
@@ -117,6 +125,52 @@ def _evaluate_fixture_coverage(
     if actual == expected:
         return True, None
     return False, f"fixture coverage {actual!r} does not match {expected!r}"
+
+
+def _evaluate_fixture_integrity(
+    root: Path, client_dir: Path, params: dict[str, Any]
+) -> tuple[bool, str | None]:
+    errors = validate_fixture(root, client_dir)
+    if errors:
+        return False, "fixture validation failed: " + "; ".join(errors[:3])
+    fixture = load_fixture(client_dir / FIXTURE_RELATIVE)
+    actual = fixture_identity(fixture)
+    expected = params["expected_identity"]
+    if actual == expected:
+        return True, None
+    return False, (
+        f"fixture identity {actual!r} does not match the pinned {expected!r} "
+        "(fixture content changed without updating the determinism assertion)"
+    )
+
+
+def _evaluate_journey_contains(
+    root: Path, client_dir: Path, params: dict[str, Any]
+) -> tuple[bool, str | None]:
+    direction_id = params["direction"]
+    step = params["step"]
+    path = client_dir / "directions" / f"direction-{direction_id}.yaml"
+    if not path.exists():
+        return False, f"missing direction file {path.name}"
+    document = _load_yaml(path)
+    if not isinstance(document, dict):
+        return False, f"{path.name} is not a mapping"
+
+    steps: list[str] = []
+    primary = document.get("primary_journey")
+    if isinstance(primary, dict) and isinstance(primary.get("steps"), list):
+        steps.extend(str(item) for item in primary["steps"])
+    secondary = document.get("secondary_journeys")
+    if isinstance(secondary, list):
+        for journey in secondary:
+            if isinstance(journey, dict) and isinstance(journey.get("steps"), list):
+                steps.extend(str(item) for item in journey["steps"])
+    if step in steps:
+        return True, None
+    return False, (
+        f"direction {direction_id!r} journey does not contain step {step!r} "
+        f"(found {sorted(set(steps))!r})"
+    )
 
 
 def _evaluate_direction_ids(
@@ -246,6 +300,8 @@ def _evaluate_no_duplicate_authority(
 
 _EVALUATORS = {
     "fixture_coverage": _evaluate_fixture_coverage,
+    "fixture_integrity": _evaluate_fixture_integrity,
+    "journey_contains": _evaluate_journey_contains,
     "direction_ids": _evaluate_direction_ids,
     "direction_identity": _evaluate_direction_identity,
     "artifact_exists": _evaluate_artifact_exists,
@@ -302,12 +358,16 @@ def _evaluate(
 
 
 def evaluate_assertions(root: Path, client_dir: Path) -> list[AssertionResult]:
-    """Evaluate every assertion definition against canonical artifacts."""
+    """Evaluate every assertion definition against canonical artifacts.
+
+    An empty assertion set is a hard error: a scenario with nothing to prove
+    must never report a vacuous pass.
+    """
     document = load_assertions(client_dir / ASSERTIONS_RELATIVE)
-    return [
-        _evaluate(root, client_dir, definition)
-        for definition in _assertion_definitions(document)
-    ]
+    definitions = _assertion_definitions(document)
+    if not definitions:
+        raise ValueError("assertions must contain at least one assertion definition")
+    return [_evaluate(root, client_dir, definition) for definition in definitions]
 
 
 def _params_errors(
