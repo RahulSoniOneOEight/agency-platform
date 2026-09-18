@@ -6,17 +6,25 @@ import 'package:flutter/foundation.dart';
 /// Canonical JSON encoding used for every deterministic release identity in
 /// this package.
 ///
-/// The algorithm is intentionally simple so it can be mirrored exactly by the
-/// Python release tooling:
+/// The byte output matches the repository's Python identity convention,
+/// `json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)`
+/// followed by a UTF-8 SHA-256 (see `tooling/production/report.py`), so a Dart
+/// digest equals a Python digest for the same value:
 ///
 /// 1. object keys are sorted lexicographically (UTF-16 code unit order, which
 ///    equals code-point order for the ASCII keys used by these contracts);
 /// 2. the encoding is compact: no insignificant whitespace is emitted;
-/// 3. strings are escaped using JSON string escaping and emitted as UTF-8;
+/// 3. strings are escaped exactly as Python does with `ensure_ascii=True`: `"`
+///    and `\` are backslash-escaped, the short control escapes (`\b`, `\f`,
+///    `\n`, `\r`, `\t`) are used where they apply, and every other code unit
+///    below `0x20` or at/above `0x80` is emitted as a lowercase `\uXXXX`
+///    escape (a non-BMP character becomes a surrogate pair of escapes);
 /// 4. arrays preserve their declared order.
 ///
-/// Supported values are `null`, `bool`, `num`, `String`, `List` and
-/// `Map<String, Object?>`. Numbers are encoded with `num.toString()`.
+/// Supported values are `null`, `bool`, `String`, `List` and
+/// `Map<String, Object?>`. Numeric values (`num`, `int`, `double`) are
+/// **rejected** with an [ArgumentError]: no identity payload contains numbers,
+/// which eliminates cross-language float-formatting drift.
 String canonicalizeJson(Object? value) {
   if (value == null) {
     return 'null';
@@ -25,10 +33,15 @@ String canonicalizeJson(Object? value) {
     return value ? 'true' : 'false';
   }
   if (value is num) {
-    return value.toString();
+    throw ArgumentError.value(
+      value,
+      'value',
+      'Canonical identity payloads must not contain numbers; numeric values '
+          'are excluded to eliminate cross-language float-formatting drift.',
+    );
   }
   if (value is String) {
-    return jsonEncode(value);
+    return _canonicalString(value);
   }
   if (value is List) {
     return '[${value.map(canonicalizeJson).join(',')}]';
@@ -41,7 +54,7 @@ String canonicalizeJson(Object? value) {
         buffer.write(',');
       }
       buffer
-        ..write(jsonEncode(keys[index]))
+        ..write(_canonicalString(keys[index]))
         ..write(':')
         ..write(canonicalizeJson(value[keys[index]]));
     }
@@ -53,6 +66,35 @@ String canonicalizeJson(Object? value) {
     'value',
     'Unsupported canonical JSON value type ${value.runtimeType}.',
   );
+}
+
+/// Escapes [value] exactly like Python's
+/// `json.dumps(..., ensure_ascii=True)` string encoding.
+String _canonicalString(String value) {
+  final buffer = StringBuffer('"');
+  for (final codeUnit in value.codeUnits) {
+    if (codeUnit == 0x22) {
+      buffer.write(r'\"');
+    } else if (codeUnit == 0x5c) {
+      buffer.write(r'\\');
+    } else if (codeUnit == 0x08) {
+      buffer.write(r'\b');
+    } else if (codeUnit == 0x0c) {
+      buffer.write(r'\f');
+    } else if (codeUnit == 0x0a) {
+      buffer.write(r'\n');
+    } else if (codeUnit == 0x0d) {
+      buffer.write(r'\r');
+    } else if (codeUnit == 0x09) {
+      buffer.write(r'\t');
+    } else if (codeUnit < 0x20 || codeUnit >= 0x80) {
+      buffer.write('\\u${codeUnit.toRadixString(16).padLeft(4, '0')}');
+    } else {
+      buffer.writeCharCode(codeUnit);
+    }
+  }
+  buffer.write('"');
+  return buffer.toString();
 }
 
 /// Deterministic identity of [value]: `sha256:` followed by the lowercase hex
@@ -115,8 +157,12 @@ final class ReleaseCandidate {
   }
 
   /// Rebuilds a candidate from [json], re-validating every field.
+  ///
+  /// When [json] supplies `candidate_identity` or `migration_set_identity`,
+  /// each is verified against the recomputed identity and an [ArgumentError]
+  /// is thrown on mismatch rather than silently discarding the declared value.
   factory ReleaseCandidate.fromJson(Map<String, Object?> json) {
-    return ReleaseCandidate(
+    final candidate = ReleaseCandidate(
       clientId: json['client_id']! as String,
       targetEnvironment: json['target_environment']! as String,
       sourceSha: json['source_sha']! as String,
@@ -127,6 +173,28 @@ final class ReleaseCandidate {
       approvedExperienceRef: json['approved_experience_ref']! as String,
       h1FoundationReportRef: json['h1_foundation_report_ref']! as String,
     );
+
+    final declaredCandidateIdentity = json['candidate_identity'];
+    if (declaredCandidateIdentity != null &&
+        declaredCandidateIdentity != candidate.candidateIdentity) {
+      throw ArgumentError.value(
+        declaredCandidateIdentity,
+        'candidate_identity',
+        'does not match the recomputed candidate identity',
+      );
+    }
+
+    final declaredMigrationSetIdentity = json['migration_set_identity'];
+    if (declaredMigrationSetIdentity != null &&
+        declaredMigrationSetIdentity != candidate.migrationSetIdentity) {
+      throw ArgumentError.value(
+        declaredMigrationSetIdentity,
+        'migration_set_identity',
+        'does not match the recomputed migration set identity',
+      );
+    }
+
+    return candidate;
   }
 
   final String clientId;
@@ -154,7 +222,11 @@ final class ReleaseCandidate {
 
   /// Deterministic identity of the ordered migration set.
   ///
-  /// This is order-sensitive and distinct from [candidateIdentity], so it can
+  /// This is an **H.2-specific derived binding field**: it is not part of the
+  /// base field list in spec §7, but `h2-release-candidate.schema.json`
+  /// requires it, so it is emitted by [toJson] and verified by [fromJson].
+  ///
+  /// It is order-sensitive and distinct from [candidateIdentity], so it can
   /// bind the authorized migration set on its own (spec §9).
   String get migrationSetIdentity =>
       canonicalJsonHash({'migration_set': migrationSet});

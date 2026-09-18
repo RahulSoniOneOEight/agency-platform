@@ -12,6 +12,18 @@ const _configA =
 const _configB =
     'sha256:5555555555555555555555555555555555555555555555555555555555555555';
 
+const _goldenValue = <String, Object?>{
+  'client_id': 'caf\u00e9-commerce',
+  'migration_set': <Object?>[
+    '2026-01-init.sql',
+    '2026-02-nested/\u00e9.sql',
+  ],
+  'nested': <String, Object?>{
+    'labels': <Object?>['d\u00e9j\u00e0 vu', 'na\u00efve'],
+    'flags': <Object?>[true, false, null],
+  },
+};
+
 ReleaseCandidate _candidate({
   String clientId = 'reference-commerce',
   String targetEnvironment = 'production',
@@ -151,6 +163,39 @@ void main() {
       _candidate(migrationSet: const ['a.sql', 'b.sql']).migrationSetIdentity,
       _candidate(migrationSet: const ['a.sql', 'b.sql']).migrationSetIdentity,
     );
+  });
+
+  test('canonical JSON byte-matches the Python identity convention', () {
+    expect(
+      canonicalizeJson(_goldenValue),
+      r'{"client_id":"caf\u00e9-commerce","migration_set":["2026-01-init.sql","2026-02-nested/\u00e9.sql"],"nested":{"flags":[true,false,null],"labels":["d\u00e9j\u00e0 vu","na\u00efve"]}}',
+    );
+  });
+
+  test('canonical hash matches the pinned cross-language golden digest', () {
+    expect(
+      canonicalJsonHash(_goldenValue),
+      'sha256:934f8ac3511500a156959782c6a51225d0f3595bbe10d1f40689546eeda6f20c',
+    );
+  });
+
+  test('canonicalization rejects numeric values', () {
+    expect(() => canonicalizeJson(1), throwsArgumentError);
+    expect(() => canonicalizeJson(1.5), throwsArgumentError);
+    expect(() => canonicalizeJson(<String, Object?>{'n': 0}), throwsArgumentError);
+    expect(() => canonicalizeJson(<Object?>[1]), throwsArgumentError);
+  });
+
+  test('fromJson rejects a tampered candidate identity', () {
+    final json = _candidate().toJson()
+      ..['candidate_identity'] = 'sha256:${'0' * 64}';
+    expect(() => ReleaseCandidate.fromJson(json), throwsArgumentError);
+  });
+
+  test('fromJson rejects a tampered migration set identity', () {
+    final json = _candidate().toJson()
+      ..['migration_set_identity'] = 'sha256:${'0' * 64}';
+    expect(() => ReleaseCandidate.fromJson(json), throwsArgumentError);
   });
 
   test('invalid source SHA is rejected', () {

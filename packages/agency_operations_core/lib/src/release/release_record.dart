@@ -125,8 +125,12 @@ final class ReleaseRecord {
   }
 
   /// Rebuilds a record from [json], re-validating every field.
+  ///
+  /// When [json] supplies `release_identity`, it is verified against the
+  /// recomputed identity and an [ArgumentError] is thrown on mismatch rather
+  /// than silently discarding the declared value.
   factory ReleaseRecord.fromJson(Map<String, Object?> json) {
-    return ReleaseRecord(
+    final record = ReleaseRecord(
       releaseId: json['release_id']! as String,
       clientId: json['client_id']! as String,
       environment: json['environment']! as String,
@@ -153,6 +157,18 @@ final class ReleaseRecord {
       startedAt: DateTime.parse(json['started_at']! as String),
       completedAt: DateTime.parse(json['completed_at']! as String),
     );
+
+    final declaredReleaseIdentity = json['release_identity'];
+    if (declaredReleaseIdentity != null &&
+        declaredReleaseIdentity != record.releaseIdentity) {
+      throw ArgumentError.value(
+        declaredReleaseIdentity,
+        'release_identity',
+        'does not match the recomputed release identity',
+      );
+    }
+
+    return record;
   }
 
   final String releaseId;

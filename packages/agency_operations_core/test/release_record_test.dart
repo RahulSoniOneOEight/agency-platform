@@ -268,6 +268,12 @@ void main() {
     expect(restored.toJson(), original.toJson());
   });
 
+  test('fromJson rejects a tampered release identity', () {
+    final json = _record().toJson()
+      ..['release_identity'] = 'sha256:${'0' * 64}';
+    expect(() => ReleaseRecord.fromJson(json), throwsArgumentError);
+  });
+
   test('toJson/fromJson round-trip preserves a degraded record', () {
     final original = _record(
       releaseStatus: ReleaseOutcome.degraded,
