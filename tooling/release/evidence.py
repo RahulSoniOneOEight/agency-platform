@@ -118,6 +118,8 @@ def is_safe_candidate_ref(ref: Any) -> bool:
         return False
     if ref.startswith("/") or "\\" in ref:
         return False
+    if len(ref) >= 2 and ref[1] == ":" and ref[0].isalpha():
+        return False
     if ".." in ref.split("/"):
         return False
     return True

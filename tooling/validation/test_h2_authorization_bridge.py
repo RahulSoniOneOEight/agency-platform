@@ -255,6 +255,15 @@ class BridgeMismatchTests(BridgeFixtureMixin):
         self.assertTrue(Path(bad["h1_foundation_report_ref"]).is_absolute())
         self._assert_bridge_error(bad, g, auth)
 
+    def test_drive_letter_h1_report_ref_fails(self):
+        from tooling.release.evidence import is_safe_candidate_ref
+
+        h2, _report, _f_report, g, auth = self.fixture()
+        bad = dict(h2)
+        bad["h1_foundation_report_ref"] = "C:/Windows/win.ini"
+        self.assertFalse(is_safe_candidate_ref(bad["h1_foundation_report_ref"]))
+        self._assert_bridge_error(bad, g, auth)
+
     def test_parent_segment_h1_report_ref_fails(self):
         h2, _report, _f_report, g, auth = self.fixture()
         bad = dict(h2)
