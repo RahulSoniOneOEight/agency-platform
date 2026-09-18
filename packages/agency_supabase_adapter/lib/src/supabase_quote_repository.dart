@@ -28,6 +28,11 @@ final class SupabaseQuoteRepository implements QuoteRepository {
     }
 
     final id = _newId();
+    // Ownership is set explicitly here (not by a DB default/trigger) so the
+    // reference write path is self-consistent with the shipped RLS policy
+    // (`rfqs` insert requires `identity_id = auth.uid()`). `account_id` is
+    // already required by the port.
+    final identityId = _query.currentUserId;
     try {
       // Single nested insert: PostgREST writes the RFQ and its line items
       // atomically, so a partial RFQ with no items can never be persisted.
@@ -37,6 +42,7 @@ final class SupabaseQuoteRepository implements QuoteRepository {
           {
             'id': id,
             'account_id': accountId,
+            'identity_id': identityId,
             'status': RfqStatus.submitted.name,
             'message': message,
             'idempotency_key': idempotencyKey.value,

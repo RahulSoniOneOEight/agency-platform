@@ -240,7 +240,7 @@ final class InMemoryCartRepository implements CartRepository {
   Future<Cart?> getCart(String cartId) async => _carts[cartId];
 
   @override
-  Future<Cart> saveCart(Cart cart) async {
+  Future<Cart> saveCart(Cart cart, {String? accountId}) async {
     _carts[cart.id] = cart;
     return cart;
   }
@@ -256,6 +256,7 @@ final class InMemoryOrderRepository implements OrderRepository {
     required Cart cart,
     required IdempotencyKey idempotencyKey,
     int? totalMinor,
+    String? accountId,
   }) async {
     final existing = _ordersByIdempotencyKey[idempotencyKey.value];
     if (existing != null) {

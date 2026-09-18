@@ -63,7 +63,7 @@ _IMPORT_PATTERN = re.compile(
     r"^\s*(?:from|import)\s+tooling\.production_authorization", re.MULTILINE
 )
 
-SUPABASE_IMPORT_PATTERN = re.compile(r"import\s+'package:supabase[a-z_]*/")
+SUPABASE_IMPORT_PATTERN = re.compile(r"import\s+['\"]package:supabase[a-z_]*/")
 
 ALLOWED_SUPABASE_IMPORT_FILES = frozenset(
     {

@@ -25,7 +25,22 @@ final class SupabaseOrderRepository implements OrderRepository {
     required Cart cart,
     required IdempotencyKey idempotencyKey,
     int? totalMinor,
+    String? accountId,
   }) async {
+    // Ownership is set explicitly here (not by a DB default/trigger) so the
+    // reference write path is self-consistent with the shipped RLS policies.
+    // An order must carry an identity (`identity_id = auth.uid()`) and/or an
+    // account; a row with neither would be rejected by the schema CHECK.
+    final identityId = _query.currentUserId;
+    if (identityId == null && accountId == null) {
+      throw const DomainFailure(
+        code: DomainFailureCode.unauthorized,
+        operation: 'createOrder',
+        retryable: false,
+        message: 'An order must be attributed to an identity or an account',
+      );
+    }
+
     final existing = await _loadByIdempotencyKey(idempotencyKey.value);
     if (existing != null) {
       return existing;
@@ -41,6 +56,8 @@ final class SupabaseOrderRepository implements OrderRepository {
         rows: [
           {
             'id': id,
+            'identity_id': identityId,
+            'account_id': accountId,
             'status': OrderStatus.pending.name,
             'total_minor': total,
             'idempotency_key': idempotencyKey.value,

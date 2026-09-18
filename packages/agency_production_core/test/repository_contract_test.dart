@@ -9,6 +9,7 @@ final class MemoryOrderRepository implements OrderRepository {
     required Cart cart,
     required IdempotencyKey idempotencyKey,
     int? totalMinor,
+    String? accountId,
   }) async {
     return orders.putIfAbsent(
       idempotencyKey.value,
@@ -24,7 +25,7 @@ final class MemoryCartRepository implements CartRepository {
   Future<Cart?> getCart(String cartId) async => carts[cartId];
 
   @override
-  Future<Cart> saveCart(Cart cart) async {
+  Future<Cart> saveCart(Cart cart, {String? accountId}) async {
     carts[cart.id] = cart;
     return cart;
   }

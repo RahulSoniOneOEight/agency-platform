@@ -7,6 +7,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 /// fake and normal CI never needs a live Supabase project. This is the only
 /// place where the package couples repositories to PostgREST wire mechanics.
 abstract interface class SupabaseQueryClient {
+  /// The authenticated user id the seam is currently operating as, or `null`
+  /// when there is no authenticated user. Adapters use this to attribute
+  /// ownership columns (`identity_id`) so writes satisfy the shipped RLS
+  /// policies (`identity_id = auth.uid()`); it is never a provider type.
+  String? get currentUserId;
+
   /// Selects rows from [table] applying equality filters in [equals], an
   /// optional `in` filter, ordering and a limit.
   Future<List<Map<String, dynamic>>> select({
@@ -48,6 +54,9 @@ final class SupabasePostgrestQueryClient implements SupabaseQueryClient {
   SupabasePostgrestQueryClient(this._client);
 
   final SupabaseClient _client;
+
+  @override
+  String? get currentUserId => _client.auth.currentUser?.id;
 
   @override
   Future<List<Map<String, dynamic>>> select({

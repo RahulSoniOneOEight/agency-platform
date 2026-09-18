@@ -200,6 +200,7 @@ final class QuoteService {
         cart: cart,
         idempotencyKey: IdempotencyKey('quotation-conversion:$quotationId'),
         totalMinor: quotation.totalMinor,
+        accountId: rfq.accountId,
       );
     } on DomainFailure catch (failure) {
       throw _scope('convert_quotation_to_order', failure);

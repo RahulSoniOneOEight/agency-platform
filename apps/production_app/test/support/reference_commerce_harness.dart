@@ -127,11 +127,13 @@ final class RecordingOrderRepository implements OrderRepository {
     required Cart cart,
     required IdempotencyKey idempotencyKey,
     int? totalMinor,
+    String? accountId,
   }) async {
     final order = await _inner.createOrder(
       cart: cart,
       idempotencyKey: idempotencyKey,
       totalMinor: totalMinor,
+      accountId: accountId,
     );
     if (!_orders.any((existing) => existing.id == order.id)) {
       _orders.add(order);
@@ -184,7 +186,7 @@ final class FailingCartRepository implements CartRepository {
   Future<Cart?> getCart(String cartId) async => throw failure;
 
   @override
-  Future<Cart> saveCart(Cart cart) async => throw failure;
+  Future<Cart> saveCart(Cart cart, {String? accountId}) async => throw failure;
 }
 
 /// An [OrderRepository] whose writes always fail with a normalized failure.
@@ -198,6 +200,7 @@ final class FailingOrderRepository implements OrderRepository {
     required Cart cart,
     required IdempotencyKey idempotencyKey,
     int? totalMinor,
+    String? accountId,
   }) async =>
       throw failure;
 }

@@ -232,6 +232,7 @@ void main() {
     late SupabaseCartRepository repository;
 
     setUp(() {
+      query.currentUserId = 'user-1';
       query.tables['carts'] = [
         {'id': 'cart-1'},
       ];
@@ -299,6 +300,7 @@ void main() {
 
     setUp(() {
       var sequence = 0;
+      query.currentUserId = 'user-1';
       repository = SupabaseOrderRepository(
         query: query,
         newId: () => 'order-${++sequence}',
@@ -378,6 +380,7 @@ void main() {
 
     test('recovers the existing order when a concurrent insert wins', () async {
       final raceQuery = FakeSupabaseQueryClient();
+      raceQuery.currentUserId = 'user-1';
       raceQuery.onInsert = (table) {
         if (table == 'orders') {
           raceQuery.tables['orders'] = [
@@ -433,6 +436,7 @@ void main() {
 
     setUp(() {
       var sequence = 0;
+      query.currentUserId = 'user-1';
       repository = SupabaseQuoteRepository(
         query: query,
         newId: () => 'rfq-${++sequence}',
@@ -500,6 +504,7 @@ void main() {
 
     test('recovers the existing RFQ when a concurrent insert wins', () async {
       final raceQuery = FakeSupabaseQueryClient();
+      raceQuery.currentUserId = 'user-1';
       raceQuery.onInsert = (table) {
         if (table == 'rfqs') {
           raceQuery.tables['rfqs'] = [

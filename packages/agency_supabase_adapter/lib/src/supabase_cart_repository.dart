@@ -34,12 +34,29 @@ final class SupabaseCartRepository implements CartRepository {
   }
 
   @override
-  Future<Cart> saveCart(Cart cart) async {
+  Future<Cart> saveCart(Cart cart, {String? accountId}) async {
+    // Ownership is set explicitly here (not by a DB default/trigger) so the
+    // reference write path is self-consistent with the shipped RLS policies.
+    // A cart must carry an identity (`identity_id = auth.uid()`) and/or an
+    // account; a row with neither would be rejected by the schema CHECK.
+    final identityId = _query.currentUserId;
+    if (identityId == null && accountId == null) {
+      throw const DomainFailure(
+        code: DomainFailureCode.unauthorized,
+        operation: 'saveCart',
+        retryable: false,
+        message: 'A cart must be attributed to an identity or an account',
+      );
+    }
     try {
       await _query.insert(
         table: 'carts',
         rows: [
-          {'id': cart.id},
+          {
+            'id': cart.id,
+            'identity_id': identityId,
+            'account_id': accountId,
+          },
         ],
         onConflict: 'id',
       );

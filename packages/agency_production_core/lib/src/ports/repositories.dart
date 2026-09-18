@@ -70,7 +70,10 @@ abstract interface class AccountRepository {
 abstract interface class CartRepository {
   Future<Cart?> getCart(String cartId);
 
-  Future<Cart> saveCart(Cart cart);
+  /// Persists [cart]. When [accountId] is supplied the cart is attributed to
+  /// that B2B account; otherwise it is a personal (consumer) cart attributed to
+  /// the authenticated identity at the persistence boundary.
+  Future<Cart> saveCart(Cart cart, {String? accountId});
 }
 
 /// Persistence for orders.
@@ -82,10 +85,16 @@ abstract interface class OrderRepository {
   /// example a negotiated quotation total); otherwise the cart subtotal is
   /// used. This keeps the persisted total aligned with whatever amount was
   /// authorized (e.g. a credit check).
+  ///
+  /// When [accountId] is supplied the order is attributed to that B2B account
+  /// (e.g. a quotation conversion); otherwise it is a personal (consumer)
+  /// order attributed to the authenticated identity at the persistence
+  /// boundary.
   Future<Order> createOrder({
     required Cart cart,
     required IdempotencyKey idempotencyKey,
     int? totalMinor,
+    String? accountId,
   });
 }
 

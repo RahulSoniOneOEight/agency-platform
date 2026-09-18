@@ -92,7 +92,7 @@ final class FakeCartRepository implements CartRepository {
   }
 
   @override
-  Future<Cart> saveCart(Cart cart) async {
+  Future<Cart> saveCart(Cart cart, {String? accountId}) async {
     carts[cart.id] = cart;
     return cart;
   }
@@ -105,6 +105,9 @@ final class FakeOrderRepository implements OrderRepository {
   final Map<String, Order> ordersByKey = {};
   int _sequence = 0;
 
+  /// The most recent [createOrder] `accountId`, for asserting B2B attribution.
+  String? lastAccountId;
+
   int get orderCount => ordersByKey.length;
 
   @override
@@ -112,10 +115,12 @@ final class FakeOrderRepository implements OrderRepository {
     required Cart cart,
     required IdempotencyKey idempotencyKey,
     int? totalMinor,
+    String? accountId,
   }) async {
     if (error != null) {
       throw error!;
     }
+    lastAccountId = accountId;
     final existing = ordersByKey[idempotencyKey.value];
     if (existing != null) {
       return existing;
@@ -412,6 +417,7 @@ void main() {
       expect(order.totalMinor, 3000);
       expect(order.items, hasLength(1));
       expect(orders.orderCount, 1);
+      expect(orders.lastAccountId, isNull);
     });
 
     test('returns the same order identity for a duplicate submission', () async {
@@ -638,6 +644,7 @@ void main() {
       expect(order.totalMinor, 3000);
       expect(order.items, hasLength(1));
       expect(orders.orderCount, 1);
+      expect(orders.lastAccountId, _accountId);
     });
 
     test('prices the order at the negotiated quotation total, not the RFQ subtotal',

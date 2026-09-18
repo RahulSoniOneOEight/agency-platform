@@ -52,5 +52,5 @@ jobs:
       - name: Validate production migrations
         run: python -m tooling.production.validate_migrations
 
-      - name: Validate production foundation (H.1 report + app contract evidence)
+      - name: Generate H.1 production foundation report
         run: python -m tooling.production.report client-projects/reference-commerce

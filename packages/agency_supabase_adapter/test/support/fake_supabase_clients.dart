@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:agency_supabase_adapter/agency_supabase_adapter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Records the arguments of a single query-seam invocation.
 final class QueryCall {
@@ -36,6 +37,12 @@ final class QueryCall {
 final class FakeSupabaseQueryClient implements SupabaseQueryClient {
   final Map<String, List<Map<String, dynamic>>> tables = {};
   final List<QueryCall> calls = [];
+
+  /// The authenticated user the seam operates as. Ownership writes
+  /// (`carts`/`orders`/`rfqs`) are validated against it exactly as the shipped
+  /// RLS policies validate `identity_id = auth.uid()`.
+  @override
+  String? currentUserId;
 
   Object? error;
 
@@ -131,6 +138,8 @@ final class FakeSupabaseQueryClient implements SupabaseQueryClient {
         }
       });
 
+      _enforceOwnershipConstraints(table, row);
+
       Map<String, dynamic> stored;
       if (onConflict != null) {
         final keys = onConflict.split(',');
@@ -170,6 +179,40 @@ final class FakeSupabaseQueryClient implements SupabaseQueryClient {
       inserted.add(Map<String, dynamic>.from(stored));
     }
     return inserted;
+  }
+
+  /// Tables whose inserts are ownership-scoped by the shipped schema/RLS.
+  static const Set<String> _ownedTables = {'carts', 'orders', 'rfqs'};
+
+  /// Enforces the shipped ownership rules on [table]'s parent row:
+  ///
+  /// - the schema CHECK `account_id is not null or identity_id is not null`
+  ///   (Postgres `23514`);
+  /// - the RLS identity rule `identity_id = auth.uid()` (Postgres `42501`).
+  ///
+  /// This keeps adapter tests honest: a payload the real reference schema/RLS
+  /// would reject fails here instead of silently passing.
+  void _enforceOwnershipConstraints(
+    String table,
+    Map<String, dynamic> row,
+  ) {
+    if (!_ownedTables.contains(table)) {
+      return;
+    }
+    final identityId = row['identity_id'];
+    final accountId = row['account_id'];
+    if (identityId == null && accountId == null) {
+      throw PostgrestException(
+        message: 'new row for relation "$table" violates check constraint',
+        code: '23514',
+      );
+    }
+    if (identityId != currentUserId) {
+      throw PostgrestException(
+        message: 'new row violates row-level security policy for "$table"',
+        code: '42501',
+      );
+    }
   }
 
   @override
