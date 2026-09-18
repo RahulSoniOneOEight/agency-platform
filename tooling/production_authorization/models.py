@@ -234,7 +234,9 @@ class ReleaseCandidate:
             raw = value.get(key)
             if not isinstance(raw, list):
                 raise InvalidReleaseCandidate(f"{key} must be a list")
-            return tuple(EvidenceRef.from_dict(item) for item in raw if isinstance(item, Mapping))
+            if any(not isinstance(item, Mapping) for item in raw):
+                raise InvalidReleaseCandidate(f"{key} entries must be objects")
+            return tuple(EvidenceRef.from_dict(item) for item in raw)
 
         return cls(
             client_id=str(value.get("client_id", "")),

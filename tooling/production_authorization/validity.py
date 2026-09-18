@@ -91,6 +91,33 @@ def evaluate_authorization(
     if authorization.approval_source_commit_sha != candidate.approval_source_commit_sha:
         reasons.append("approval_source_commit_mismatch")
 
+    candidate_qa_ids = tuple(sorted(item.evidence_id for item in candidate.qa_evidence))
+    candidate_validation_ids = tuple(
+        sorted(item.evidence_id for item in candidate.validation_evidence)
+    )
+    candidate_security_ids = tuple(
+        sorted(item.evidence_id for item in candidate.security_evidence)
+    )
+    if authorization.qa_evidence_ids != candidate_qa_ids:
+        reasons.append("qa_evidence_identity_mismatch")
+    if authorization.validation_evidence_ids != candidate_validation_ids:
+        reasons.append("validation_evidence_identity_mismatch")
+    if authorization.security_evidence_ids != candidate_security_ids:
+        reasons.append("security_evidence_identity_mismatch")
+    if authorization.rollback_plan_ref != candidate.rollback_plan_ref:
+        reasons.append("rollback_plan_mismatch")
+    if authorization.migration_plan_ref != candidate.migration_plan_ref:
+        reasons.append("migration_plan_mismatch")
+    if authorization.release_notes_ref != candidate.release_notes_ref:
+        reasons.append("release_notes_mismatch")
+    if (
+        authorization.acknowledged_non_blocking_item_ids
+        != candidate.acknowledged_non_blocking_item_ids
+    ):
+        reasons.append("non_blocking_acknowledgement_mismatch")
+    if authorization.supporting_evidence_refs != candidate.supporting_evidence_refs:
+        reasons.append("supporting_evidence_identity_mismatch")
+
     eligibility = evaluate_eligibility(candidate)
     reasons.extend(f"eligibility:{item.code}" for item in eligibility.reasons)
 

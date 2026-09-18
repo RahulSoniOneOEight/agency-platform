@@ -56,6 +56,21 @@ class ValidityTests(unittest.TestCase):
         bad=replace(candidate(),qa_evidence=(ev("qa","qa","failed"),))
         self.assertFalse(evaluate_authorization(authorization(),bad).valid)
 
+    def test_evidence_identity_changes_require_reauthorization(self):
+        changed=replace(
+            candidate(),
+            validation_evidence=(ev("repo-v2","validator"),),
+        )
+        result=evaluate_authorization(authorization(),changed)
+        self.assertFalse(result.valid)
+        self.assertIn("validation_evidence_identity_mismatch",result.reasons)
+
+    def test_release_evidence_refs_are_pinned(self):
+        changed=replace(candidate(),release_notes_ref="notes-v2.md")
+        result=evaluate_authorization(authorization(),changed)
+        self.assertFalse(result.valid)
+        self.assertIn("release_notes_mismatch",result.reasons)
+
     def test_event_invalidates_without_mutating_authorization(self):
         auth=authorization()
         before=auth.to_dict()
