@@ -77,9 +77,15 @@ abstract interface class CartRepository {
 abstract interface class OrderRepository {
   /// Creates an order from [cart]. The same [idempotencyKey] must return the
   /// same order instead of creating a duplicate.
+  ///
+  /// When [totalMinor] is supplied it is the authoritative order total (for
+  /// example a negotiated quotation total); otherwise the cart subtotal is
+  /// used. This keeps the persisted total aligned with whatever amount was
+  /// authorized (e.g. a credit check).
   Future<Order> createOrder({
     required Cart cart,
     required IdempotencyKey idempotencyKey,
+    int? totalMinor,
   });
 }
 

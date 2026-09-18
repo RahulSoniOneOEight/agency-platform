@@ -8,10 +8,11 @@ final class MemoryOrderRepository implements OrderRepository {
   Future<Order> createOrder({
     required Cart cart,
     required IdempotencyKey idempotencyKey,
+    int? totalMinor,
   }) async {
     return orders.putIfAbsent(
       idempotencyKey.value,
-      () => Order.fromCart(cart, id: 'order-1'),
+      () => Order.fromCart(cart, id: 'order-1', totalMinor: totalMinor),
     );
   }
 }

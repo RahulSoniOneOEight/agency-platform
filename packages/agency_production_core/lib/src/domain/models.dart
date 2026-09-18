@@ -203,7 +203,12 @@ final class Order {
     _requireNonNegative(this.totalMinor, 'totalMinor');
   }
 
-  factory Order.fromCart(Cart cart, {required String id}) {
+  /// Builds an order from [cart].
+  ///
+  /// When [totalMinor] is supplied (e.g. a negotiated quotation total) it wins
+  /// over the cart subtotal, so the authorized amount and the persisted order
+  /// total cannot diverge.
+  factory Order.fromCart(Cart cart, {required String id, int? totalMinor}) {
     return Order(
       id: id,
       items: cart.items
@@ -217,7 +222,7 @@ final class Order {
           )
           .toList(),
       status: OrderStatus.pending,
-      totalMinor: cart.subtotalMinor,
+      totalMinor: totalMinor ?? cart.subtotalMinor,
     );
   }
 

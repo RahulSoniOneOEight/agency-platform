@@ -111,6 +111,7 @@ final class FakeOrderRepository implements OrderRepository {
   Future<Order> createOrder({
     required Cart cart,
     required IdempotencyKey idempotencyKey,
+    int? totalMinor,
   }) async {
     if (error != null) {
       throw error!;
@@ -119,7 +120,11 @@ final class FakeOrderRepository implements OrderRepository {
     if (existing != null) {
       return existing;
     }
-    final order = Order.fromCart(cart, id: 'order-${++_sequence}');
+    final order = Order.fromCart(
+      cart,
+      id: 'order-${++_sequence}',
+      totalMinor: totalMinor,
+    );
     ordersByKey[idempotencyKey.value] = order;
     return order;
   }
@@ -288,10 +293,11 @@ Future<Quotation> _persistQuotation(
   FakeQuoteRepository quotes, {
   QuotationStatus status = QuotationStatus.sent,
   int totalMinor = 3000,
+  List<CartItem>? items,
 }) async {
   final rfq = await quotes.createRfq(
     accountId: _accountId,
-    items: [_item()],
+    items: items ?? [_item()],
     idempotencyKey: IdempotencyKey('rfq-setup'),
   );
   return quotes.saveQuotation(
@@ -627,7 +633,6 @@ void main() {
       final order = await service.convertQuotationToOrder(
         quotationId: 'quotation-1',
         identityId: _identityId,
-        idempotencyKey: IdempotencyKey('convert-key-1'),
       );
 
       expect(order.totalMinor, 3000);
@@ -635,7 +640,29 @@ void main() {
       expect(orders.orderCount, 1);
     });
 
-    test('dedupes a repeated conversion by idempotency key', () async {
+    test('prices the order at the negotiated quotation total, not the RFQ subtotal',
+        () async {
+      final quotes = FakeQuoteRepository();
+      await _persistQuotation(quotes, totalMinor: 2500);
+      final orders = FakeOrderRepository();
+      final service = QuoteService(
+        quotes: quotes,
+        accounts: _accountRepository(),
+        orders: orders,
+      );
+
+      final order = await service.convertQuotationToOrder(
+        quotationId: 'quotation-1',
+        identityId: _identityId,
+      );
+
+      final rfq = await quotes.getRfq((await quotes.getQuotation('quotation-1'))!.rfqId);
+      final rfqSubtotal = rfq!.items.fold(0, (total, item) => total + item.lineTotalMinor);
+      expect(rfqSubtotal, 3000);
+      expect(order.totalMinor, 2500);
+    });
+
+    test('is intrinsically single-shot per quotation', () async {
       final quotes = FakeQuoteRepository();
       await _persistQuotation(quotes);
       final orders = FakeOrderRepository();
@@ -644,20 +671,18 @@ void main() {
         accounts: _accountRepository(),
         orders: orders,
       );
-      final key = IdempotencyKey('convert-key-1');
 
       final first = await service.convertQuotationToOrder(
         quotationId: 'quotation-1',
         identityId: _identityId,
-        idempotencyKey: key,
       );
       final second = await service.convertQuotationToOrder(
         quotationId: 'quotation-1',
         identityId: _identityId,
-        idempotencyKey: key,
       );
 
       expect(identical(first, second), isTrue);
+      expect(second.id, first.id);
       expect(orders.orderCount, 1);
     });
 
@@ -675,13 +700,75 @@ void main() {
         () => service.convertQuotationToOrder(
           quotationId: 'quotation-1',
           identityId: _identityId,
-          idempotencyKey: IdempotencyKey('convert-key-2'),
         ),
       );
 
       expect(failure.code, DomainFailureCode.conflict);
       expect(failure.retryable, isFalse);
       expect(failure.operation, 'convert_quotation_to_order');
+      expect(orders.orderCount, 0);
+    });
+
+    test(
+      'gates credit on the negotiated total even when the RFQ subtotal fits',
+      () async {
+        final quotes = FakeQuoteRepository();
+        await _persistQuotation(
+          quotes,
+          totalMinor: 3000,
+          items: [_item(quantity: 1, unitPriceMinor: 1000)],
+        );
+        final orders = FakeOrderRepository();
+        final service = QuoteService(
+          quotes: quotes,
+          accounts: _accountRepository(availableCreditMinor: 2000),
+          orders: orders,
+        );
+
+        final failure = await _captureFailure(
+          () => service.convertQuotationToOrder(
+            quotationId: 'quotation-1',
+            identityId: _identityId,
+          ),
+        );
+
+        expect(failure.code, DomainFailureCode.conflict);
+        expect(failure.retryable, isFalse);
+        expect(orders.orderCount, 0);
+      },
+    );
+
+    test('rejects conversion of an RFQ already marked converted', () async {
+      final quotes = FakeQuoteRepository();
+      final rfq = Rfq(
+        id: 'rfq-converted',
+        accountId: _accountId,
+        items: [_item()],
+        status: RfqStatus.converted,
+      );
+      quotes.rfqs[rfq.id] = rfq;
+      quotes.quotations['quotation-1'] = Quotation(
+        id: 'quotation-1',
+        rfqId: rfq.id,
+        totalMinor: 3000,
+        status: QuotationStatus.sent,
+      );
+      final orders = FakeOrderRepository();
+      final service = QuoteService(
+        quotes: quotes,
+        accounts: _accountRepository(),
+        orders: orders,
+      );
+
+      final failure = await _captureFailure(
+        () => service.convertQuotationToOrder(
+          quotationId: 'quotation-1',
+          identityId: _identityId,
+        ),
+      );
+
+      expect(failure.code, DomainFailureCode.conflict);
+      expect(failure.retryable, isFalse);
       expect(orders.orderCount, 0);
     });
 
@@ -699,7 +786,6 @@ void main() {
         () => service.convertQuotationToOrder(
           quotationId: 'quotation-1',
           identityId: _identityId,
-          idempotencyKey: IdempotencyKey('convert-key-3'),
         ),
       );
 
@@ -719,7 +805,6 @@ void main() {
         () => service.convertQuotationToOrder(
           quotationId: 'missing',
           identityId: _identityId,
-          idempotencyKey: IdempotencyKey('convert-key-4'),
         ),
       );
 
@@ -741,7 +826,6 @@ void main() {
         () => service.convertQuotationToOrder(
           quotationId: 'quotation-1',
           identityId: _identityId,
-          idempotencyKey: IdempotencyKey('convert-key-5'),
         ),
       );
 

@@ -117,13 +117,20 @@ final class QuoteService {
 
   /// Converts an accepted/sent quotation into an order for [identityId].
   ///
-  /// Re-submitting with the same [idempotencyKey] returns the same order
-  /// identity. Conversion is denied when the identity has no membership on the
-  /// quotation's account or when available credit cannot cover the quotation.
+  /// Conversion is intrinsically single-shot per quotation: the idempotency key
+  /// is derived deterministically from [quotationId], so repeated conversion
+  /// returns the same order identity rather than creating a second order or
+  /// double-decrementing credit. An RFQ already marked
+  /// [RfqStatus.converted] is rejected defensively.
+  ///
+  /// The order is priced at the negotiated [Quotation.totalMinor] (not the RFQ
+  /// line-item subtotal), so the persisted total always equals the amount the
+  /// credit gate authorized. Conversion is denied when the identity has no
+  /// membership on the quotation's account or when available credit cannot
+  /// cover the quotation.
   Future<Order> convertQuotationToOrder({
     required String quotationId,
     required String identityId,
-    required IdempotencyKey idempotencyKey,
   }) async {
     try {
       final quotation = await _quotes.getQuotation(quotationId);
@@ -152,6 +159,14 @@ final class QuoteService {
           operation: 'convert_quotation_to_order',
           retryable: false,
           message: 'RFQ ${quotation.rfqId} was not found',
+        );
+      }
+      if (rfq.status == RfqStatus.converted) {
+        throw DomainFailure(
+          code: DomainFailureCode.conflict,
+          operation: 'convert_quotation_to_order',
+          retryable: false,
+          message: 'RFQ ${rfq.id} has already been converted',
         );
       }
 
@@ -183,7 +198,8 @@ final class QuoteService {
       final cart = Cart(id: 'quotation-$quotationId', items: rfq.items);
       return await _orders.createOrder(
         cart: cart,
-        idempotencyKey: idempotencyKey,
+        idempotencyKey: IdempotencyKey('quotation-conversion:$quotationId'),
+        totalMinor: quotation.totalMinor,
       );
     } on DomainFailure catch (failure) {
       throw _scope('convert_quotation_to_order', failure);
