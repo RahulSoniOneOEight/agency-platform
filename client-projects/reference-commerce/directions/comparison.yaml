@@ -1,0 +1,71 @@
+recommended: a
+summary: >-
+  The three directions differ in navigation model, primary journey, discovery
+  model, density, and component composition, not merely in colour. Direction a
+  optimises known-item efficiency, direction b optimises considered discovery,
+  and direction c optimises trade procurement.
+comparison:
+  - direction: a
+    name: Efficient Commerce
+    archetype: efficient-commerce
+    navigation_model: search-led
+    primary_journey: search-to-cart
+    discovery_model: sku-and-facet-search
+    merchandising_emphasis: availability-and-price
+    density: compact
+    transaction_model: direct-checkout
+    patterns: [commerce.search, commerce.plp, commerce.pdp, commerce.cart]
+    components: [commerce.product-card, commerce.price-display, commerce.search-field]
+    best_for: fast known-item ordering for consumer and trade buyers
+    tradeoffs: [less inspirational discovery]
+  - direction: b
+    name: Premium Discovery
+    archetype: premium-discovery
+    navigation_model: editorial
+    primary_journey: browse-to-pdp
+    discovery_model: curated-browse
+    merchandising_emphasis: editorial-and-premium
+    density: spacious
+    transaction_model: considered-purchase
+    patterns: [commerce.home, commerce.plp, commerce.pdp]
+    components: [commerce.product-card]
+    best_for: high-consideration consumer discovery and brand storytelling
+    tradeoffs: [slower path to a specific known SKU]
+  - direction: c
+    name: Trade First
+    archetype: trade-first
+    navigation_model: dashboard
+    primary_journey: reorder-to-order
+    discovery_model: account-history-and-catalog
+    merchandising_emphasis: reorder-and-credit
+    density: normal
+    transaction_model: account-ordering
+    patterns: [commerce.trade-dashboard, commerce.rfq, commerce.cart, commerce.reorder]
+    components: [commerce.credit-summary, commerce.quote-card, commerce.product-card]
+    best_for: repeat trade ordering, credit visibility, and negotiated quoting
+    tradeoffs: [weaker first-time catalogue discovery]
+differences:
+  - dimension: navigation_model
+    a: search-led
+    b: editorial
+    c: dashboard
+  - dimension: primary_journey
+    a: search-to-cart
+    b: browse-to-pdp
+    c: reorder-to-order
+  - dimension: discovery_model
+    a: sku-and-facet-search
+    b: curated-browse
+    c: account-history-and-catalog
+  - dimension: merchandising_emphasis
+    a: availability-and-price
+    b: editorial-and-premium
+    c: reorder-and-credit
+  - dimension: transaction_model
+    a: direct-checkout
+    b: considered-purchase
+    c: account-ordering
+  - dimension: component_composition
+    a: product-card + price-display + search-field
+    b: product-card only (spacious)
+    c: credit-summary + quote-card + product-card

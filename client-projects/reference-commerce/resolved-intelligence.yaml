@@ -1,0 +1,9 @@
+client_id: reference-commerce
+generated_from: synthetic-reference
+resolved_at: "2026-09-18"
+active_presets:
+  business_model: b2c-b2b
+  industry: electronics-appliances
+  use_cases: [direct-purchase, request-quote, repeat-order]
+notes:
+  - Synthetic reference client; no external intelligence inputs were consulted.

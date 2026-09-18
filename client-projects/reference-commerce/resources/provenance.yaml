@@ -1,0 +1,16 @@
+version: 1
+resources:
+  pexels-fixture-2001:
+    source: pexels
+    provider_id: fixture-2001
+    source_url: https://www.pexels.com/
+    usage_status: prototype-approved
+  client-brand-logo:
+    source: client
+    usage_status: client-supplied
+  client-home-hero:
+    source: client
+    usage_status: client-supplied
+  iconoir-cart:
+    source: agency
+    usage_status: approved

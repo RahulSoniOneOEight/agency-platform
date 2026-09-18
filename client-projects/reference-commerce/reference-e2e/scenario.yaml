@@ -1,0 +1,28 @@
+version: 1
+client_id: reference-commerce
+fixture_version: 1
+direction_identities:
+  a: efficient-commerce
+  b: premium-discovery
+  c: trade-first
+scenarios:
+  - id: normal-happy-path
+    description: >-
+      Baseline B2C+B2B journey. The three directions compose and render through
+      one shared Flutter runtime; compare/select/mix persists through the
+      canonical review authority; blocking feedback is refined, resolved, and
+      the review round closes; ApprovalSnapshot v1 is created only after
+      ready_for_final_review.
+  - id: contract-change-reapproval
+    description: >-
+      A contract-impacting change after approval v1 opens a new review round and
+      produces a new immutable ApprovalSnapshot v2 while leaving v1 intact.
+  - id: implementation-only-change
+    description: >-
+      An implementation-only change preserves the approved experience contract
+      identity and therefore does not create a new approval version.
+  - id: resume-after-interruption
+    description: >-
+      A state-mutating stage is interrupted after recording at least one
+      checkpoint; a fresh runner with no in-memory state resumes deterministically
+      from repository state and completes only after validators pass.

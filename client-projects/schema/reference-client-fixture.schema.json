@@ -1,0 +1,263 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agency-platform/schema/reference-client-fixture.schema.json",
+  "title": "Reference client synthetic fixture",
+  "description": "Deterministic, fully synthetic B2C+B2B reference-client fixture. No PII.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "client_id",
+    "fixture_version",
+    "seed",
+    "synthetic",
+    "coverage",
+    "categories",
+    "collections",
+    "products",
+    "variants",
+    "promotions",
+    "accounts",
+    "quotations",
+    "rfqs",
+    "carts",
+    "orders",
+    "validation_states"
+  ],
+  "properties": {
+    "version": { "const": 1 },
+    "client_id": { "type": "string", "minLength": 1 },
+    "fixture_version": { "type": "integer" },
+    "seed": { "type": "string", "minLength": 1 },
+    "synthetic": { "const": true },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["b2c", "b2b"],
+      "properties": {
+        "b2c": { "type": "boolean" },
+        "b2b": { "type": "boolean" }
+      }
+    },
+    "categories": {
+      "type": "array",
+      "minItems": 4,
+      "items": { "$ref": "#/$defs/category" }
+    },
+    "collections": {
+      "type": "array",
+      "minItems": 2,
+      "items": { "$ref": "#/$defs/collection" }
+    },
+    "products": {
+      "type": "array",
+      "minItems": 12,
+      "items": { "$ref": "#/$defs/product" }
+    },
+    "variants": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/variant" }
+    },
+    "promotions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/promotion" }
+    },
+    "accounts": {
+      "type": "array",
+      "minItems": 4,
+      "items": { "$ref": "#/$defs/account" }
+    },
+    "quotations": {
+      "type": "array",
+      "minItems": 2,
+      "items": { "$ref": "#/$defs/quotation" }
+    },
+    "rfqs": {
+      "type": "array",
+      "minItems": 2,
+      "items": { "$ref": "#/$defs/rfq" }
+    },
+    "carts": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/cart" }
+    },
+    "orders": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/order" }
+    },
+    "validation_states": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/validationState" }
+    }
+  },
+  "$defs": {
+    "identifier": { "type": "string", "minLength": 1 },
+    "money": { "type": "number", "minimum": 0 },
+    "lineItem": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["product_id", "quantity", "unit_price"],
+      "properties": {
+        "product_id": { "$ref": "#/$defs/identifier" },
+        "quantity": { "type": "integer", "minimum": 1 },
+        "unit_price": { "$ref": "#/$defs/money" }
+      }
+    },
+    "quantityBreak": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["min_quantity", "unit_price"],
+      "properties": {
+        "min_quantity": { "type": "integer", "minimum": 1 },
+        "unit_price": { "$ref": "#/$defs/money" }
+      }
+    },
+    "category": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "name"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "name": { "$ref": "#/$defs/identifier" }
+      }
+    },
+    "collection": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "name", "category_ids"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "name": { "$ref": "#/$defs/identifier" },
+        "category_ids": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/identifier" }
+        }
+      }
+    },
+    "product": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "id",
+        "sku",
+        "name",
+        "category",
+        "variant_ids",
+        "retail_price",
+        "inventory",
+        "b2b_quantity_breaks"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "sku": { "$ref": "#/$defs/identifier" },
+        "name": { "$ref": "#/$defs/identifier" },
+        "category": { "$ref": "#/$defs/identifier" },
+        "variant_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/identifier" }
+        },
+        "retail_price": { "$ref": "#/$defs/money" },
+        "inventory": { "type": "integer", "minimum": 0 },
+        "b2b_quantity_breaks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/quantityBreak" }
+        }
+      }
+    },
+    "variant": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "product_id", "name", "sku"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "product_id": { "$ref": "#/$defs/identifier" },
+        "name": { "$ref": "#/$defs/identifier" },
+        "sku": { "$ref": "#/$defs/identifier" },
+        "attributes": { "type": "object" }
+      }
+    },
+    "promotion": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "name", "type", "value"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "name": { "$ref": "#/$defs/identifier" },
+        "type": { "$ref": "#/$defs/identifier" },
+        "value": { "type": "number" }
+      }
+    },
+    "account": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "type", "name"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "type": { "enum": ["consumer", "trade"] },
+        "name": { "$ref": "#/$defs/identifier" },
+        "email": { "type": "string" },
+        "credit_limit": { "$ref": "#/$defs/money" },
+        "available_credit": { "$ref": "#/$defs/money" }
+      }
+    },
+    "quotation": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "account_id", "status", "lines"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "account_id": { "$ref": "#/$defs/identifier" },
+        "status": { "$ref": "#/$defs/identifier" },
+        "lines": { "type": "array", "items": { "$ref": "#/$defs/lineItem" } }
+      }
+    },
+    "rfq": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "account_id", "status", "items"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "account_id": { "$ref": "#/$defs/identifier" },
+        "status": { "$ref": "#/$defs/identifier" },
+        "items": { "type": "array", "items": { "$ref": "#/$defs/lineItem" } }
+      }
+    },
+    "cart": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "account_id", "lines"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "account_id": { "$ref": "#/$defs/identifier" },
+        "lines": { "type": "array", "items": { "$ref": "#/$defs/lineItem" } }
+      }
+    },
+    "order": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "account_id", "status", "total"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "account_id": { "$ref": "#/$defs/identifier" },
+        "status": { "$ref": "#/$defs/identifier" },
+        "total": { "$ref": "#/$defs/money" },
+        "lines": { "type": "array", "items": { "$ref": "#/$defs/lineItem" } }
+      }
+    },
+    "validationState": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "target", "rule", "severity", "message", "valid"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "target": { "$ref": "#/$defs/identifier" },
+        "rule": { "$ref": "#/$defs/identifier" },
+        "severity": { "enum": ["info", "warning", "error"] },
+        "message": { "$ref": "#/$defs/identifier" },
+        "valid": { "type": "boolean" }
+      }
+    }
+  }
+}

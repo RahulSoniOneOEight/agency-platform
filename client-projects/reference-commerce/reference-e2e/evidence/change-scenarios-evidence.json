@@ -1,0 +1,111 @@
+{
+  "client_id": "reference-commerce",
+  "fixture_version": 1,
+  "scenario_ids": [
+    "contract-change-reapproval",
+    "implementation-only-change"
+  ],
+  "source_commit_sha": "89abcdef0123456789abcdef0123456789abcdef",
+  "contract_change": {
+    "review_rounds": 2,
+    "approval_versions": [
+      1,
+      2
+    ],
+    "v1_immutable": true,
+    "v2_version": 2,
+    "v2_supersedes": 1,
+    "v2_review_round": 2,
+    "v2_hash_differs": true,
+    "v2_source_sha_differs": true,
+    "third_approval_refused": true
+  },
+  "implementation_only": {
+    "approval_versions": [
+      1
+    ],
+    "review_round": 1,
+    "classification": "implementation_only",
+    "approved_hash_unchanged": true,
+    "still_eligible": true,
+    "default_classification": "contract_impacting"
+  },
+  "assertions": [
+    {
+      "id": "contract.review_round_2",
+      "passed": true
+    },
+    {
+      "id": "contract.close_required_before_approval",
+      "passed": true
+    },
+    {
+      "id": "contract.v1_immutable",
+      "passed": true
+    },
+    {
+      "id": "contract.v2_version_2",
+      "passed": true
+    },
+    {
+      "id": "contract.v2_supersedes_1",
+      "passed": true
+    },
+    {
+      "id": "contract.v2_review_round_2",
+      "passed": true
+    },
+    {
+      "id": "contract.v2_review_round_gt_v1",
+      "passed": true
+    },
+    {
+      "id": "contract.v2_hash_sha256",
+      "passed": true
+    },
+    {
+      "id": "contract.v2_hash_differs",
+      "passed": true
+    },
+    {
+      "id": "contract.v2_source_sha_differs",
+      "passed": true
+    },
+    {
+      "id": "contract.list_approvals_two_ascending",
+      "passed": true
+    },
+    {
+      "id": "contract.third_approval_refused",
+      "passed": true
+    },
+    {
+      "id": "contract.no_v1_mutation",
+      "passed": true
+    },
+    {
+      "id": "implementation.approval_count_1",
+      "passed": true
+    },
+    {
+      "id": "implementation.review_round_1",
+      "passed": true
+    },
+    {
+      "id": "implementation.classification_confirmed_implementation_only",
+      "passed": true
+    },
+    {
+      "id": "implementation.approved_hash_unchanged",
+      "passed": true
+    },
+    {
+      "id": "implementation.still_eligible",
+      "passed": true
+    },
+    {
+      "id": "implementation.default_classification_contract_impacting",
+      "passed": true
+    }
+  ]
+}

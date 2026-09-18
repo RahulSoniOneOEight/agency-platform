@@ -1,0 +1,29 @@
+{
+  "component_variants": [
+    {
+      "component": "commerce.product-card",
+      "variant": "b2b"
+    }
+  ],
+  "components": [
+    "commerce.credit-summary",
+    "commerce.quote-card",
+    "commerce.product-card"
+  ],
+  "density": "normal",
+  "discovery_model": "account-history-and-catalog",
+  "id": "c",
+  "merchandising_model": "reorder-and-credit",
+  "name": "Trade First",
+  "navigation_model": "dashboard",
+  "patterns": [
+    "commerce.trade-dashboard",
+    "commerce.rfq",
+    "commerce.cart",
+    "commerce.reorder"
+  ],
+  "primary_journey": "reorder-to-order",
+  "required_resources": [],
+  "strategic_goal": "increase repeat trade ordering and account self-service",
+  "transaction_model": "account-ordering"
+}

@@ -1,0 +1,8 @@
+id: reference-commerce
+business_model: b2c-b2b
+industry: electronics-appliances
+use_cases: [direct-purchase, request-quote, repeat-order]
+objectives: [increase-conversion, reduce-order-time, grow-trade-accounts]
+personas: [consumer-shopper, trade-buyer, procurement-manager]
+jobs: [discover-products, compare-prices, reorder, request-quote]
+platforms: [web, mobile]

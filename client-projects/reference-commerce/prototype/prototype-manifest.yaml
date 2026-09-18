@@ -1,0 +1,39 @@
+version: 1
+client_id: reference-commerce
+runtime: apps/prototype_app
+default_direction: a
+directions:
+  a: prototype/runtime/direction-a.json
+  b: prototype/runtime/direction-b.json
+  c: prototype/runtime/direction-c.json
+fixture_pack: prototype/fixtures/demo.yaml
+theme:
+  preset: premium-modern
+review:
+  query_parameter: direction
+  allowed_values:
+  - a
+  - b
+  - c
+resources:
+  asset.brand.logo:
+    candidate_id: client-brand-logo
+    type: image
+    source: client
+    asset:
+      path: input/brand/brand-assets/logo.svg
+  asset.home.hero:
+    candidate_id: pexels-fixture-2001
+    type: image
+    source: pexels
+    asset:
+      url: https://images.pexels.com/photos/fixture/reference-commerce-hero.jpg
+      width: 2400
+      height: 1350
+  icon.commerce.cart:
+    candidate_id: iconoir-cart
+    type: icon
+    source: agency
+    asset:
+      provider: iconoir
+      name: cart

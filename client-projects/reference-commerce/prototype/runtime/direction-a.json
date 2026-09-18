@@ -1,0 +1,29 @@
+{
+  "component_variants": [
+    {
+      "component": "commerce.product-card",
+      "variant": "standard"
+    }
+  ],
+  "components": [
+    "commerce.product-card",
+    "commerce.price-display",
+    "commerce.search-field"
+  ],
+  "density": "compact",
+  "discovery_model": "sku-and-facet-search",
+  "id": "a",
+  "merchandising_model": "availability-and-price",
+  "name": "Efficient Commerce",
+  "navigation_model": "search-led",
+  "patterns": [
+    "commerce.search",
+    "commerce.plp",
+    "commerce.pdp",
+    "commerce.cart"
+  ],
+  "primary_journey": "search-to-order",
+  "required_resources": [],
+  "strategic_goal": "reduce time from intent to transaction for known-item buyers",
+  "transaction_model": "direct-checkout"
+}

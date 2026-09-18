@@ -1,0 +1,15 @@
+version: 1
+provided: true
+facts:
+  - key: name
+    value: reference-commerce
+  - key: synthetic
+    value: "true"
+files: []
+visual:
+  preset: premium-modern
+  primary_color: '#0F5FA6'
+  secondary_color: '#E8871E'
+  font_family: Inter
+  font_fallback: Roboto
+  visual_character: minimal

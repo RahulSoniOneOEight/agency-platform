@@ -1,0 +1,68 @@
+industry: electronics-appliances
+seed: 108
+products:
+- id: prd-01
+  sku: SKU-ELE-1000
+  name: USB-C Hub
+  price: 674
+  compare_at: 674
+  rating: 4.1
+  stock: 18
+  category: category-1
+- id: prd-02
+  sku: SKU-ELE-1001
+  name: Wireless Mouse
+  price: 1049
+  compare_at: 1299
+  rating: 4.8
+  stock: 57
+  category: category-2
+- id: prd-03
+  sku: SKU-ELE-1002
+  name: Mechanical Keyboard
+  price: 1424
+  compare_at: 1674
+  rating: 4.7
+  stock: 56
+  category: category-3
+- id: prd-04
+  sku: SKU-ELE-1003
+  name: 27-inch Monitor
+  price: 1799
+  compare_at: 1799
+  rating: 4.2
+  stock: 18
+  category: category-4
+- id: prd-05
+  sku: SKU-ELE-1004
+  name: Laptop Stand
+  price: 2174
+  compare_at: 2424
+  rating: 4.3
+  stock: 31
+  category: category-1
+- id: prd-06
+  sku: SKU-ELE-1005
+  name: 65W Charger
+  price: 2549
+  compare_at: 2799
+  rating: 4.2
+  stock: 48
+  category: category-2
+- id: prd-07
+  sku: SKU-ELE-1006
+  name: Noise-Cancel Headphones
+  price: 2924
+  compare_at: 2924
+  rating: 4.2
+  stock: 32
+  category: category-3
+- id: prd-08
+  sku: SKU-ELE-1007
+  name: Portable SSD
+  price: 3299
+  compare_at: 3549
+  rating: 4.1
+  stock: 79
+  category: category-4
+services: []

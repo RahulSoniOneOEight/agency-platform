@@ -1,0 +1,39 @@
+id: c
+name: Trade First
+archetype: trade-first
+strategy_family: trade-first
+thesis: Existing trade accounts should manage credit, quotes, and repeat orders from a single procurement workspace.
+strategic_goal: increase repeat trade ordering and account self-service
+primary_personas: [trade-buyer, procurement-manager]
+primary_jobs: [reorder, request-quote, review-credit]
+rationale: >-
+  Trade accounts buy on credit and negotiated terms; a dashboard-led composition
+  with credit visibility, quoting, and one-step reorder matches that procurement
+  model better than a consumer checkout.
+information_architecture: [trade-dashboard, rfq, cart, reorder]
+navigation:
+  model: dashboard
+primary_journey:
+  id: reorder-to-order
+  steps: [trade-dashboard, reorder, cart, order]
+secondary_journeys:
+  - id: rfq-to-quote
+    steps: [trade-dashboard, rfq, cart, order]
+discovery_model: account-history-and-catalog
+search:
+  prominence: low
+merchandising:
+  emphasis: reorder-and-credit
+density: normal
+transaction_model: account-ordering
+patterns: [commerce.trade-dashboard, commerce.rfq, commerce.cart, commerce.reorder]
+components: [commerce.credit-summary, commerce.quote-card, commerce.product-card]
+component_variants:
+  - component: commerce.product-card
+    variant: b2b
+required_resources: []
+strengths: [strong repeat-order workflow, account and credit visibility]
+tradeoffs: [weaker first-time catalogue discovery]
+risks: [requires purchase history data]
+success_metrics: [repeat-order-rate, quote-to-order-conversion]
+score: 0.85

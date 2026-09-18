@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agency-platform/schema/reference-client-change-evidence.schema.json",
+  "title": "Reference client change-scenario machine evidence",
+  "description": "Machine-readable evidence for the reference-commerce post-approval change boundaries: a contract-impacting change forces a new review round and ApprovalSnapshot v2, while an implementation-only change preserves the approved experience identity and creates no new approval. Evidence only: it records ids, counts, booleans, and statuses, never copied review/approval authority state and never a subjective overall score.",
+  "type": "object",
+  "additionalProperties": false,
+  "propertyNames": { "not": { "enum": ["overall_score", "score", "quality_score"] } },
+  "required": [
+    "client_id",
+    "fixture_version",
+    "scenario_ids",
+    "source_commit_sha",
+    "contract_change",
+    "implementation_only",
+    "assertions"
+  ],
+  "properties": {
+    "client_id": { "type": "string", "minLength": 1 },
+    "fixture_version": { "type": "integer", "minimum": 1 },
+    "scenario_ids": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "source_commit_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "contract_change": {
+      "type": "object",
+      "additionalProperties": false,
+      "propertyNames": { "not": { "enum": ["overall_score", "score", "quality_score"] } },
+      "required": [
+        "review_rounds",
+        "approval_versions",
+        "v1_immutable",
+        "v2_version",
+        "v2_supersedes",
+        "v2_review_round",
+        "v2_hash_differs",
+        "v2_source_sha_differs",
+        "third_approval_refused"
+      ],
+      "properties": {
+        "review_rounds": { "type": "integer", "minimum": 2 },
+        "approval_versions": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "type": "integer", "minimum": 1 }
+        },
+        "v1_immutable": { "type": "boolean" },
+        "v2_version": { "type": "integer", "minimum": 2 },
+        "v2_supersedes": { "type": "integer", "minimum": 1 },
+        "v2_review_round": { "type": "integer", "minimum": 2 },
+        "v2_hash_differs": { "type": "boolean" },
+        "v2_source_sha_differs": { "type": "boolean" },
+        "third_approval_refused": { "type": "boolean" }
+      }
+    },
+    "implementation_only": {
+      "type": "object",
+      "additionalProperties": false,
+      "propertyNames": { "not": { "enum": ["overall_score", "score", "quality_score"] } },
+      "required": [
+        "approval_versions",
+        "review_round",
+        "classification",
+        "approved_hash_unchanged",
+        "still_eligible",
+        "default_classification"
+      ],
+      "properties": {
+        "approval_versions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1,
+          "items": { "type": "integer", "minimum": 1 }
+        },
+        "review_round": { "type": "integer", "minimum": 1 },
+        "classification": { "type": "string", "enum": ["implementation_only"] },
+        "approved_hash_unchanged": { "type": "boolean" },
+        "still_eligible": { "type": "boolean" },
+        "default_classification": { "type": "string", "enum": ["contract_impacting"] }
+      }
+    },
+    "assertions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "propertyNames": { "not": { "enum": ["overall_score", "score", "quality_score"] } },
+        "required": ["id", "passed"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "passed": { "type": "boolean" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "component_variants": [
+    {
+      "component": "commerce.product-card",
+      "variant": "standard"
+    }
+  ],
+  "components": [
+    "commerce.product-card"
+  ],
+  "density": "spacious",
+  "discovery_model": "curated-browse",
+  "id": "b",
+  "merchandising_model": "editorial-and-premium",
+  "name": "Premium Discovery",
+  "navigation_model": "editorial",
+  "patterns": [
+    "commerce.home",
+    "commerce.plp",
+    "commerce.pdp"
+  ],
+  "primary_journey": "browse-to-pdp",
+  "required_resources": [],
+  "strategic_goal": "increase considered-purchase conversion through premium discovery",
+  "transaction_model": "considered-purchase"
+}
