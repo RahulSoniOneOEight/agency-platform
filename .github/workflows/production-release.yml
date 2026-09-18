@@ -1,0 +1,480 @@
+name: H2 Production Release
+
+# Executes an already-authorized, already-built H.2 release candidate. GitHub
+# Actions is the executor only: it never creates or mutates a
+# ProductionAuthorization (that is a human/G authority) and it never rebuilds the
+# artifact. The exact candidate artifact is downloaded verbatim and the existing
+# G release gate is invoked before anything is deployed.
+#
+# The `production` GitHub environment is an *execution safeguard* (required
+# reviewers / environment protection), NOT a replacement for the G
+# authorization: the G release gate is verified independently in its own step.
+#
+# This workflow is manually dispatched only, so normal pull-request CI never
+# invokes a live step. Live secrets are referenced exclusively through GitHub
+# environment secrets; no secret value is ever committed.
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_run_id:
+        description: Candidate-build workflow run id that produced the exact artifact
+        required: true
+      candidate_sha:
+        description: Exact candidate source SHA bound into the G authorization
+        required: true
+      authorization_ref:
+        description: Repo-relative path of the production authorization reference
+        required: true
+        default: client-projects/reference-commerce/production/release/production-authorization-ref.json
+      client:
+        description: Client project id
+        required: true
+        default: reference-commerce
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  CLIENT: ${{ inputs.client }}
+  CLIENT_DIR: client-projects/${{ inputs.client }}
+  CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+  CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+  AUTHORIZATION_REF: ${{ inputs.authorization_ref }}
+
+jobs:
+  production-release:
+    # Dispatch-only: a pull request can never reach a live production step.
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    # Execution safeguard only; the G release gate below remains authoritative.
+    environment: production
+    steps:
+      - name: Checkout exact candidate commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CANDIDATE_SHA }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install validation dependencies
+        run: python -m pip install --disable-pip-version-check pyyaml jsonschema
+
+      - name: Require the production authorization reference
+        run: |
+          set -euo pipefail
+          if [ -z "${AUTHORIZATION_REF:-}" ]; then
+            echo "A production authorization reference is required."
+            exit 1
+          fi
+          if [ ! -f "$AUTHORIZATION_REF" ]; then
+            echo "Production authorization reference not found: $AUTHORIZATION_REF"
+            exit 1
+          fi
+
+      - name: Require the live production release secrets
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_PAGES_PROJECT: ${{ secrets.CLOUDFLARE_PAGES_PROJECT }}
+          PRODUCTION_DEPLOYMENT_URL: ${{ secrets.PRODUCTION_DEPLOYMENT_URL }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          TELEMETRY_HEALTH_URL: ${{ secrets.TELEMETRY_HEALTH_URL }}
+          TELEMETRY_HEALTH_TOKEN: ${{ secrets.TELEMETRY_HEALTH_TOKEN }}
+        run: |
+          set -euo pipefail
+          missing=""
+          for name in \
+            CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_PAGES_PROJECT \
+            PRODUCTION_DEPLOYMENT_URL SUPABASE_DB_URL \
+            TELEMETRY_HEALTH_URL TELEMETRY_HEALTH_TOKEN; do
+            if [ -z "$(printenv "$name" || true)" ]; then
+              missing="$missing $name"
+            fi
+          done
+          if [ -n "$missing" ]; then
+            echo "Missing required production release secrets:$missing"
+            exit 1
+          fi
+
+      # 1. Download the exact candidate artifact. No rebuild of any kind occurs.
+      - name: Download the exact candidate artifact (no rebuild)
+        uses: actions/download-artifact@v4
+        with:
+          name: h2-candidate-${{ env.CANDIDATE_SHA }}
+          path: apps/production_app/build/web
+          run-id: ${{ env.CANDIDATE_RUN_ID }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # 2. Verify the frozen H.2 candidate against the committed manifest.
+      - name: Verify H.2 release candidate
+        run: python -m tooling.hardening.candidate "$CLIENT_DIR"
+
+      # 3. Verify G authorization through the existing release gate. This is a
+      #    read-only gate invocation; no authorization is created or mutated.
+      - name: Verify G production authorization (release gate)
+        run: python -m tooling.production_authorization.validate "$CLIENT_DIR"
+
+      # 4. Verify the artifact digest of the downloaded artifact before deploy.
+      - name: Verify artifact digest
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import pathlib
+          import sys
+
+          from tooling.hardening.candidate import build_artifact_manifest
+
+          root = pathlib.Path.cwd()
+          client_dir = pathlib.Path(os.environ["CLIENT_DIR"])
+          candidate = json.loads(
+              (client_dir / "production/release/candidate.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          committed = json.loads(
+              (client_dir / "production/release/artifact-manifest.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          manifest = build_artifact_manifest(
+              root / "apps/production_app/build/web"
+          )
+          expected = candidate.get("artifact_digest")
+          if manifest["artifact_digest"] != expected:
+              sys.exit(
+                  "artifact digest mismatch: downloaded artifact "
+                  f"{manifest['artifact_digest']} != authorized {expected}"
+              )
+          if committed.get("artifact_digest") != expected:
+              sys.exit(
+                  "committed artifact manifest digest does not match the "
+                  "authorized candidate"
+              )
+          print("artifact digest verified:", expected)
+          PY
+
+      # 5. Verify the candidate-bound migration-set identity.
+      - name: Verify migration-set identity
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import pathlib
+          import sys
+
+          from tooling.hardening.candidate import canonical_identity
+
+          client_dir = pathlib.Path(os.environ["CLIENT_DIR"])
+          candidate = json.loads(
+              (client_dir / "production/release/candidate.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          entries = candidate.get("migration_set_entries")
+          declared = candidate.get("migration_set_identity")
+          if canonical_identity(entries) != declared:
+              sys.exit("migration-set identity does not match the candidate entries")
+          reference = json.loads(
+              pathlib.Path(os.environ["AUTHORIZATION_REF"]).read_text(
+                  encoding="utf-8"
+              )
+          )
+          if reference.get("migration_set_identity") != declared:
+              sys.exit(
+                  "authorization migration-set identity does not match the candidate"
+              )
+          print("migration-set identity verified:", declared)
+          PY
+
+      # 6. Apply only the candidate-bound, authorized migration set.
+      - name: Apply the authorized migration set
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          python - <<'PY' > "$RUNNER_TEMP/authorized-migration-set.txt"
+          import json
+          import os
+          import pathlib
+
+          client_dir = pathlib.Path(os.environ["CLIENT_DIR"])
+          candidate = json.loads(
+              (client_dir / "production/release/candidate.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          for path in candidate.get("migration_set", []):
+              print(path)
+          PY
+          while IFS= read -r migration; do
+            [ -n "$migration" ] || continue
+            echo "Applying authorized migration: $migration"
+            psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f "$migration"
+          done < "$RUNNER_TEMP/authorized-migration-set.txt"
+
+      # 7. Deploy the exact downloaded artifact through the Cloudflare Pages
+      #    reference mechanism. No source is rebuilt.
+      - name: Deploy the exact artifact to production (Cloudflare Pages, no rebuild)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_PAGES_PROJECT: ${{ secrets.CLOUDFLARE_PAGES_PROJECT }}
+          PRODUCTION_DEPLOYMENT_URL: ${{ secrets.PRODUCTION_DEPLOYMENT_URL }}
+        run: |
+          set -euo pipefail
+          export DEPLOY_STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"
+          npx --yes wrangler@3 pages deploy apps/production_app/build/web \
+            --project-name "$CLOUDFLARE_PAGES_PROJECT" \
+            --branch production | tee production-deploy-output.txt
+          export DEPLOY_COMPLETED_AT="$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"
+          python - <<'PY'
+          import json
+          import os
+          import pathlib
+
+          client_dir = pathlib.Path(os.environ["CLIENT_DIR"])
+          candidate = json.loads(
+              (client_dir / "production/release/candidate.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          deployment = {
+              "artifact_digest": candidate["artifact_digest"],
+              "build_version": candidate["build_version"],
+              "candidate_identity": candidate["candidate_identity"],
+              "deployment_id": f"production-{os.environ.get('GITHUB_RUN_ID', '')}",
+              "environment": "production",
+              "provider": "cloudflare-pages",
+              "status": "succeeded",
+              "url": os.environ.get("PRODUCTION_DEPLOYMENT_URL", ""),
+              "started_at": os.environ.get("DEPLOY_STARTED_AT", ""),
+              "completed_at": os.environ.get("DEPLOY_COMPLETED_AT", ""),
+          }
+          output = (
+              client_dir / "production/release/production-deployment.json"
+          )
+          output.write_text(
+              json.dumps(deployment, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+              newline="\n",
+          )
+          PY
+
+      # 8. Production smoke against the exact deployment, after deploy.
+      - name: Run production smoke
+        env:
+          PRODUCTION_DEPLOYMENT_URL: ${{ secrets.PRODUCTION_DEPLOYMENT_URL }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import pathlib
+
+          from tooling.release.smoke import (
+              HttpProductionSmokeRunner,
+              run_production_smoke,
+              write_smoke_report,
+          )
+
+          root = pathlib.Path.cwd()
+          client_dir = pathlib.Path(os.environ["CLIENT_DIR"])
+          deployment = json.loads(
+              (
+                  client_dir
+                  / "production/release/production-deployment.json"
+              ).read_text(encoding="utf-8")
+          )
+          deployment["url"] = (
+              os.environ.get("PRODUCTION_DEPLOYMENT_URL") or deployment.get("url")
+          )
+          report = run_production_smoke(
+              root, client_dir, deployment, http=HttpProductionSmokeRunner()
+          )
+          write_smoke_report(root, client_dir, report)
+          print("production smoke checks:", [c["id"] for c in report["checks"]])
+          failed = [c["id"] for c in report["checks"] if c["status"] != "passed"]
+          if failed:
+              print("production smoke failed checks: " + ", ".join(failed))
+          PY
+
+      # 9. Bounded 5-sample telemetry health window at 60s spacing (4 minutes).
+      - name: Run 5-sample telemetry health window
+        id: telemetry
+        env:
+          PRODUCTION_DEPLOYMENT_URL: ${{ secrets.PRODUCTION_DEPLOYMENT_URL }}
+          TELEMETRY_HEALTH_URL: ${{ secrets.TELEMETRY_HEALTH_URL }}
+          TELEMETRY_HEALTH_TOKEN: ${{ secrets.TELEMETRY_HEALTH_TOKEN }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import pathlib
+          import time
+          import urllib.error
+          import urllib.request
+
+          from tooling.release.smoke import load_production_smoke_report
+          from tooling.release.telemetry_health import (
+              REQUIRED_SAMPLE_COUNT,
+              SAMPLE_SPACING_SECONDS,
+              evaluate_telemetry_health,
+              load_candidate,
+              write_telemetry_report,
+          )
+
+          root = pathlib.Path.cwd()
+          client_dir = pathlib.Path(os.environ["CLIENT_DIR"])
+          candidate = load_candidate(client_dir)
+          base_url = (os.environ.get("PRODUCTION_DEPLOYMENT_URL") or "").rstrip("/")
+          health_url = os.environ.get("TELEMETRY_HEALTH_URL") or ""
+          health_token = os.environ.get("TELEMETRY_HEALTH_TOKEN") or ""
+          smoke = load_production_smoke_report(client_dir)
+          smoke_passed = smoke.get("low_risk") is True and all(
+              check.get("status") == "passed"
+              for check in smoke.get("checks", [])
+              if isinstance(check, dict)
+          )
+
+          def fetch(url):
+              request = urllib.request.Request(url)
+              if health_token:
+                  request.add_header("Authorization", "Bearer " + health_token)
+              try:
+                  with urllib.request.urlopen(request, timeout=15) as response:
+                      return json.loads(response.read().decode("utf-8"))
+              except (urllib.error.URLError, OSError, ValueError):
+                  return None
+
+          samples = []
+          for index in range(REQUIRED_SAMPLE_COUNT):
+              marker = fetch(base_url + "/version.json") if base_url else None
+              telemetry = fetch(health_url) if health_url else None
+              samples.append(
+                  {
+                      "index": index,
+                      "at": time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime()),
+                      "deployment_reachable": marker is not None,
+                      "release_version": (
+                          marker.get("build_version", marker.get("version"))
+                          if isinstance(marker, dict)
+                          else None
+                      ),
+                      "sentry_health_signal": (
+                          telemetry.get("signal")
+                          if isinstance(telemetry, dict)
+                          else "failed"
+                      ),
+                      "critical_unhandled_errors": (
+                          telemetry.get("critical_unhandled_errors", [])
+                          if isinstance(telemetry, dict)
+                          else []
+                      ),
+                      "error_rate": (
+                          telemetry.get("error_rate", 0.0)
+                          if isinstance(telemetry, dict)
+                          else 0.0
+                      ),
+                      "smoke_passed": smoke_passed,
+                  }
+              )
+              if index < REQUIRED_SAMPLE_COUNT - 1:
+                  time.sleep(SAMPLE_SPACING_SECONDS)
+
+          report = evaluate_telemetry_health(root, client_dir, samples, candidate)
+          write_telemetry_report(root, client_dir, report)
+          print("telemetry outcome:", report["outcome"])
+          if report.get("blocking_reasons"):
+              print("telemetry blocking reasons:", report["blocking_reasons"])
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as handle:
+              handle.write("outcome=" + str(report["outcome"]) + "\n")
+          PY
+
+      # 10. Finalize the immutable ReleaseRecord for this production attempt.
+      - name: Finalize ReleaseRecord
+        id: finalize
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import pathlib
+
+          from tooling.release.evidence import (
+              load_h2_authorization_ref,
+              load_hardening_report,
+          )
+          from tooling.release.release_record import (
+              build_release_record,
+              load_staging_smoke_report,
+              write_release_record,
+          )
+          from tooling.release.smoke import (
+              load_candidate,
+              load_production_smoke_report,
+          )
+          from tooling.release.telemetry_health import load_telemetry_report
+
+          root = pathlib.Path.cwd()
+          client_dir = pathlib.Path(os.environ["CLIENT_DIR"])
+          candidate = load_candidate(client_dir)
+          deployment = json.loads(
+              (
+                  client_dir
+                  / "production/release/production-deployment.json"
+              ).read_text(encoding="utf-8")
+          )
+          telemetry = load_telemetry_report(client_dir)
+          outcome = telemetry.get("outcome")
+          if outcome not in ("healthy", "degraded", "failed"):
+              outcome = "failed"
+          if outcome == "failed":
+              deployment["rollback_or_recovery_ref"] = (
+                  client_dir / "production/evidence/recovery-report.json"
+              ).relative_to(root).as_posix()
+          record = build_release_record(
+              root,
+              client_dir,
+              candidate,
+              load_h2_authorization_ref(client_dir),
+              load_hardening_report(client_dir),
+              load_staging_smoke_report(client_dir),
+              load_production_smoke_report(client_dir),
+              telemetry,
+              deployment,
+              outcome,
+          )
+          write_release_record(root, client_dir, record)
+          print("release outcome:", outcome)
+          print("release_identity:", record["release_identity"])
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as handle:
+              handle.write("outcome=" + outcome + "\n")
+          PY
+
+      - name: Upload production release evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: h2-production-release-${{ env.CANDIDATE_SHA }}
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            client-projects/${{ inputs.client }}/production/evidence/release-record.json
+            client-projects/${{ inputs.client }}/production/evidence/production-smoke-report.json
+            client-projects/${{ inputs.client }}/production/evidence/telemetry-health-report.json
+            production-deploy-output.txt
+
+      # 11. Recovery runs only when the release outcome is failed.
+      - name: Invoke governed recovery path (failed outcome only)
+        if: ${{ steps.finalize.outputs.outcome == 'failed' }}
+        run: |
+          set -euo pipefail
+          # Restore the committed previous-known-good ReleaseRecord so the
+          # governed recovery coordinator targets the authorized rollback target.
+          git checkout -- "$CLIENT_DIR/production/evidence/release-record.json"
+          python -m tooling.release.recovery "$CLIENT_DIR" --write
+          python -m tooling.release.recovery "$CLIENT_DIR"
