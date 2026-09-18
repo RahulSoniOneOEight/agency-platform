@@ -21,11 +21,13 @@ Evidence shape (JSON object)::
 
 ``migration_set_identity`` is compared with the candidate's committed
 ``migration_set_identity``; ``migration_set_entries`` (when supplied) must
-match the candidate entries exactly. ``migration_classes`` may override the
-classes parsed from the repository migration headers (useful for staged
-evidence without editing migrations). Missing/invalid identity, staging apply,
-post-apply verification, or recovery treatment is blocking; optimization
-recommendations are advisory.
+match the candidate entries exactly. ``migration_classes`` are *unioned* with
+the classes parsed from the repository migration headers (useful for staged
+evidence without editing migrations), and a declared class can never downgrade
+a ``transformative``/``destructive`` repository header, so a migration that
+requires recovery treatment cannot escape it. Missing/invalid identity,
+staging apply, post-apply verification, or recovery treatment is blocking;
+optimization recommendations are advisory.
 """
 
 from __future__ import annotations
@@ -181,14 +183,19 @@ def evaluate_migrations(
             )
         )
 
+    classes = _repo_migration_classes(root)
     declared_classes = evidence.get("migration_classes")
     if isinstance(declared_classes, Mapping):
-        classes = {
-            str(path): str(value)
-            for path, value in declared_classes.items()
-        }
-    else:
-        classes = _repo_migration_classes(root)
+        for raw_path, raw_value in declared_classes.items():
+            path = str(raw_path)
+            value = str(raw_value)
+            existing = classes.get(path)
+            if (
+                existing in TRANSFORMATIVE_CLASSES
+                and value not in TRANSFORMATIVE_CLASSES
+            ):
+                continue
+            classes[path] = value
 
     treatments = evidence.get("recovery_treatment")
     if not isinstance(treatments, Mapping):

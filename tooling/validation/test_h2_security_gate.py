@@ -96,6 +96,106 @@ class SecurityGateTests(unittest.TestCase):
         )
         self.assertFalse(blocking(findings))
 
+    def test_omitted_release_relevant_critical_blocks(self):
+        findings = evaluate_security(
+            ROOT,
+            CLIENT,
+            {"findings": [{"id": "CVE-OMIT-C", "severity": "critical"}]},
+        )
+        self.assertTrue(blocking(findings))
+        ids = [finding["id"] for finding in findings]
+        self.assertIn("security-scanner-CVE-OMIT-C", ids)
+        self.assertTrue(
+            any(
+                identifier.startswith("security-classification-missing")
+                for identifier in ids
+            ),
+            ids,
+        )
+
+    def test_omitted_release_relevant_high_blocks(self):
+        findings = evaluate_security(
+            ROOT,
+            CLIENT,
+            {"findings": [{"id": "CVE-OMIT-H", "severity": "high"}]},
+        )
+        self.assertTrue(blocking(findings))
+        self.assertTrue(
+            any(
+                finding["id"].startswith("security-classification-missing")
+                for finding in blocking(findings)
+            ),
+            findings,
+        )
+
+    def test_null_release_relevant_critical_blocks(self):
+        findings = evaluate_security(
+            ROOT,
+            CLIENT,
+            {
+                "findings": [
+                    {"id": "CVE-NULL-C", "severity": "critical", "release_relevant": None}
+                ]
+            },
+        )
+        self.assertTrue(blocking(findings))
+        self.assertTrue(
+            any(
+                finding["id"].startswith("security-classification-missing")
+                for finding in blocking(findings)
+            ),
+            findings,
+        )
+
+    def test_omitted_release_relevant_medium_is_advisory(self):
+        findings = evaluate_security(
+            ROOT,
+            CLIENT,
+            {"findings": [{"id": "CVE-OMIT-M", "severity": "medium"}]},
+        )
+        self.assertFalse(blocking(findings))
+        self.assertFalse(
+            any(
+                finding["id"].startswith("security-classification-missing")
+                for finding in findings
+            ),
+            findings,
+        )
+
+    def test_malformed_findings_container_blocks(self):
+        findings = evaluate_security(
+            ROOT, CLIENT, {"findings": {"id": "CVE-1", "severity": "high"}}
+        )
+        self.assertTrue(blocking(findings))
+        self.assertEqual("security-evidence-invalid", findings[0]["id"])
+
+    def test_string_findings_container_blocks(self):
+        findings = evaluate_security(ROOT, CLIENT, {"findings": "not-a-list"})
+        self.assertTrue(blocking(findings))
+        self.assertEqual("security-evidence-invalid", findings[0]["id"])
+
+    def test_null_findings_container_blocks(self):
+        findings = evaluate_security(ROOT, CLIENT, {"findings": None})
+        self.assertTrue(blocking(findings))
+        self.assertEqual("security-evidence-invalid", findings[0]["id"])
+
+    def test_absent_findings_keeps_existing_behavior(self):
+        findings = evaluate_security(
+            ROOT,
+            CLIENT,
+            {"secret_leak": False, "rls_validation": {"ok": True}},
+        )
+        self.assertEqual([], findings)
+
+    def test_severity_with_whitespace_classifies_as_critical(self):
+        findings = evaluate_security(
+            ROOT,
+            CLIENT,
+            {"findings": [scanner_finding("CVE-WS", " critical ")]},
+        )
+        self.assertTrue(blocking(findings))
+        self.assertEqual("critical", findings[0]["severity"])
+
     def test_secret_leak_blocks(self):
         findings = evaluate_security(ROOT, CLIENT, {"secret_leak": True})
         self.assertTrue(blocking(findings))
@@ -173,6 +273,15 @@ class SecurityGateTests(unittest.TestCase):
 
         gate_without_open = aggregate_gate([closed_blocking, advisory])
         self.assertTrue(gate_without_open["eligible"])
+
+    def test_aggregate_gate_waived_blocking_does_not_block(self):
+        waived_blocking = make_finding(
+            "w", "security", "critical", "blocking", "waived", "waived blocker"
+        )
+        gate = aggregate_gate([waived_blocking])
+        self.assertTrue(gate["eligible"])
+        self.assertEqual([], gate["blocking_findings"])
+        self.assertEqual(1, len(gate["findings"]))
 
 
 if __name__ == "__main__":

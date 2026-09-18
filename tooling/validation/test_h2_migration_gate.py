@@ -104,6 +104,47 @@ class MigrationGateTests(unittest.TestCase):
             findings,
         )
 
+    def test_destructive_repo_class_cannot_be_erased_by_declared_classes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            migrations = root / "supabase" / "migrations"
+            migrations.mkdir(parents=True)
+            (migrations / "0001_destructive.sql").write_text(
+                "-- migration-class: destructive\nSELECT 1;\n",
+                encoding="utf-8",
+            )
+            evidence = full_evidence()
+            evidence["migration_classes"] = {}
+            findings = evaluate_migrations(root, CLIENT, evidence)
+            self.assertTrue(
+                any(
+                    finding["id"].startswith("migrations-recovery-")
+                    for finding in blocking(findings)
+                ),
+                findings,
+            )
+
+    def test_declared_additive_cannot_downgrade_repo_destructive(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            migrations = root / "supabase" / "migrations"
+            migrations.mkdir(parents=True)
+            path = "supabase/migrations/0001_destructive.sql"
+            (migrations / "0001_destructive.sql").write_text(
+                "-- migration-class: destructive\nSELECT 1;\n",
+                encoding="utf-8",
+            )
+            evidence = full_evidence()
+            evidence["migration_classes"] = {path: "additive"}
+            findings = evaluate_migrations(root, CLIENT, evidence)
+            self.assertTrue(
+                any(
+                    finding["id"].startswith("migrations-recovery-")
+                    for finding in blocking(findings)
+                ),
+                findings,
+            )
+
     def test_destructive_migration_with_recovery_passes(self):
         evidence = full_evidence()
         path = next(iter(evidence["migration_classes"]))

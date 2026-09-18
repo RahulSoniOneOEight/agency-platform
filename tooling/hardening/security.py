@@ -26,7 +26,13 @@ Evidence shape (JSON object)::
 Rules:
 
 - open ``critical``/``high`` release-relevant finding -> blocking
-- any other open finding (medium/low/info or non-release-relevant) -> advisory
+- an open ``critical``/``high`` finding that omits/``null``s
+  ``release_relevant`` is treated as release-relevant (fail closed) and also
+  emits a deterministic blocking ``security-classification-missing`` finding
+- any other open finding (medium/low/info or explicitly non-release-relevant)
+  -> advisory
+- a ``findings`` key that is present but not a list -> blocking
+  ``security-evidence-invalid``
 - closed/waived findings never block
 - ``secret_leak: true`` -> blocking (critical)
 - ``rls_validation.ok == false`` -> blocking (high)
@@ -61,28 +67,38 @@ def _refs(value: object) -> list[str]:
     return []
 
 
-def _scanner_finding(index: int, raw: object) -> dict[str, Any]:
+def _scanner_findings(index: int, raw: object) -> list[dict[str, Any]]:
     if not isinstance(raw, Mapping):
-        return make_finding(
-            id=f"security-scanner-{index}-invalid",
-            area=AREA,
-            severity="info",
-            disposition="advisory",
-            status="open",
-            summary=f"malformed scanner finding entry at index {index}",
-        )
+        return [
+            make_finding(
+                id=f"security-scanner-{index}-invalid",
+                area=AREA,
+                severity="info",
+                disposition="advisory",
+                status="open",
+                summary=f"malformed scanner finding entry at index {index}",
+            )
+        ]
 
     native_id = raw.get("id")
     if not isinstance(native_id, str) or not native_id:
         native_id = f"entry-{index}"
 
-    native_severity = str(raw.get("severity", "")).lower()
+    native_severity = str(raw.get("severity", "")).strip().lower()
     severity = native_severity if native_severity in SEVERITIES else "info"
 
-    native_status = str(raw.get("status", "open")).lower()
+    native_status = str(raw.get("status", "open")).strip().lower()
     status = native_status if native_status in STATUSES else "open"
 
-    release_relevant = bool(raw.get("release_relevant"))
+    raw_release_relevant = raw.get("release_relevant")
+    classification_missing = (
+        status == "open"
+        and severity in BLOCKING_SEVERITIES
+        and raw_release_relevant is None
+    )
+    release_relevant = (
+        True if classification_missing else bool(raw_release_relevant)
+    )
     blocking = (
         status == "open"
         and release_relevant
@@ -94,15 +110,34 @@ def _scanner_finding(index: int, raw: object) -> dict[str, Any]:
     if not isinstance(summary, str) or not summary:
         summary = f"scanner finding {native_id}"
 
-    return make_finding(
-        id=f"security-scanner-{native_id}",
-        area=AREA,
-        severity=severity,
-        disposition=disposition,
-        status=status,
-        summary=f"{summary} [native severity: {severity}]",
-        evidence_refs=_refs(raw.get("refs")),
-    )
+    refs = _refs(raw.get("refs"))
+    emitted = [
+        make_finding(
+            id=f"security-scanner-{native_id}",
+            area=AREA,
+            severity=severity,
+            disposition=disposition,
+            status=status,
+            summary=f"{summary} [native severity: {severity}]",
+            evidence_refs=refs,
+        )
+    ]
+    if classification_missing:
+        emitted.append(
+            make_finding(
+                id=f"security-classification-missing-{native_id}",
+                area=AREA,
+                severity=severity,
+                disposition="blocking",
+                status="open",
+                summary=(
+                    f"open {severity} scanner finding {native_id} omits "
+                    "release_relevant; treated as release-relevant"
+                ),
+                evidence_refs=refs,
+            )
+        )
+    return emitted
 
 
 def evaluate_security(
@@ -130,12 +165,25 @@ def evaluate_security(
 
     findings: list[dict[str, Any]] = []
 
-    raw_findings = evidence.get("findings")
-    if isinstance(raw_findings, Sequence) and not isinstance(
-        raw_findings, (str, bytes)
-    ):
-        for index, raw in enumerate(raw_findings):
-            findings.append(_scanner_finding(index, raw))
+    if "findings" in evidence:
+        raw_findings = evidence.get("findings")
+        if isinstance(raw_findings, Sequence) and not isinstance(
+            raw_findings, (str, bytes)
+        ):
+            for index, raw in enumerate(raw_findings):
+                findings.extend(_scanner_findings(index, raw))
+        else:
+            findings.append(
+                make_finding(
+                    id="security-evidence-invalid",
+                    area=AREA,
+                    severity="high",
+                    disposition="blocking",
+                    status="open",
+                    summary="security evidence findings must be a list",
+                    evidence_refs=[EVIDENCE_RELATIVE.as_posix()],
+                )
+            )
 
     if evidence.get("secret_leak") is True:
         findings.append(
