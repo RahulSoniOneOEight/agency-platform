@@ -81,6 +81,9 @@ H2_TEST_MODULES: tuple[str, ...] = (
     "test_h2_release_record",
     "test_h2_recovery",
     "test_h2_release_workflow",
+    "test_h2_workflow_integration",
+    "test_h2_authority_boundaries",
+    "test_h2_reference_release",
 )
 
 # H.2 validators that exist today and must run in PR CI.
@@ -90,6 +93,7 @@ H2_VALIDATOR_COMMANDS: tuple[str, ...] = (
     "python -m tooling.hardening.validate",
     "python -m tooling.release.release_record",
     "python -m tooling.release.recovery",
+    "python -m tooling.release.validate",
 )
 
 SECRET_CONTEXT = re.compile(r"\$\{\{\s*secrets\.[A-Za-z0-9_]+\s*\}\}")

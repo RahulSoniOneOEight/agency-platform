@@ -120,6 +120,12 @@ jobs:
       - name: Verify G production authorization (release gate)
         run: python -m tooling.production_authorization.validate "$CLIENT_DIR"
 
+      # 3b. Verify the full H.2 -> G exact-candidate binding chain (candidate,
+      #     hardening evidence, exact G authorization, release record, recovery)
+      #     offline before any digest check or deployment. Read-only.
+      - name: Verify H.2 authorized release chain
+        run: python -m tooling.release.validate "$CLIENT_DIR"
+
       # 4. Verify the artifact digest of the downloaded artifact before deploy.
       - name: Verify artifact digest
         run: |
