@@ -1,0 +1,18 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"production-release-evidence.schema.json",
+  "type":"object",
+  "required":["evidence_id","category","status","source","candidate_sha","build_hash","executed","blocking_count","refs"],
+  "properties":{
+    "evidence_id":{"type":"string","minLength":1},
+    "category":{"enum":["qa","validator","security","supporting"]},
+    "status":{"enum":["passed","failed","missing","stale","declared_only"]},
+    "source":{"type":"string","minLength":1},
+    "candidate_sha":{"type":["string","null"],"pattern":"^[0-9a-f]{40}$"},
+    "build_hash":{"type":["string","null"],"pattern":"^sha256:[0-9a-f]{64}$"},
+    "executed":{"type":"boolean"},
+    "blocking_count":{"type":"integer","minimum":0},
+    "refs":{"type":"array","items":{"type":"string","minLength":1},"uniqueItems":true}
+  },
+  "additionalProperties":false
+}

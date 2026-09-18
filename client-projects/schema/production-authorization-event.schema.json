@@ -1,0 +1,25 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"production-authorization-event.schema.json",
+  "type":"object",
+  "required":["event_id","authorization_id","event_type","reason","actor","occurred_at"],
+  "properties":{
+    "event_id":{"type":"string","minLength":1},
+    "authorization_id":{"type":"string","minLength":1},
+    "event_type":{"enum":["invalidated","revoked"]},
+    "reason":{"type":"string","minLength":1},
+    "actor":{
+      "type":"object",
+      "required":["actor_id","kind","name","role"],
+      "properties":{
+        "actor_id":{"type":"string","minLength":1},
+        "kind":{"enum":["human","agent","ci"]},
+        "name":{"type":"string","minLength":1},
+        "role":{"type":"string","minLength":1}
+      },
+      "additionalProperties":false
+    },
+    "occurred_at":{"type":"string","format":"date-time"}
+  },
+  "additionalProperties":false
+}
