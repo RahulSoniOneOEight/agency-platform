@@ -15,6 +15,7 @@ the fixed workflow runtime without overloading stage 08:
 
 from __future__ import annotations
 
+import json
 import shutil
 import tempfile
 import unittest
@@ -105,6 +106,63 @@ class Stage09ContractTests(unittest.TestCase):
         text = (ROOT / "workflows" / "09-release.md").read_text(encoding="utf-8")
         for section in ("PURPOSE", "READ", "PROCESS", "WRITE", "VALIDATE", "DO NOT", "NEXT"):
             self.assertIn(f"## {section}", text)
+
+
+def _schema_validator(schema_name: str):
+    try:
+        from jsonschema import Draft202012Validator
+    except ImportError:  # pragma: no cover - jsonschema is an expected dependency
+        raise unittest.SkipTest("jsonschema is not available")
+    schema = json.loads((SCHEMA_DIR / schema_name).read_text(encoding="utf-8"))
+    return Draft202012Validator(schema)
+
+
+class StageSchemaCoverageTests(unittest.TestCase):
+    """The stage enums must cover every contract and a ``release`` manifest.
+
+    The stage-09 commit added ``release`` to the runtime but not to these two
+    schemas; these tests validate the whole contract set and a synthetic
+    ``stage: release`` execution manifest so the omission cannot recur.
+    """
+
+    def test_every_stage_contract_validates_against_the_schema(self):
+        validator = _schema_validator("workflow-stage-contract.schema.json")
+        paths = sorted((ROOT / "workflows" / "contracts").glob("*.yaml"))
+        self.assertEqual(9, len(paths), [path.name for path in paths])
+        for path in paths:
+            data = yaml.safe_load(path.read_text(encoding="utf-8"))
+            errors = [
+                f"{error.json_path}: {error.message}"
+                for error in validator.iter_errors(data)
+            ]
+            self.assertEqual([], errors, f"{path.name}: {errors}")
+        stages = {
+            yaml.safe_load(path.read_text(encoding="utf-8"))["stage"] for path in paths
+        }
+        self.assertIn("release", stages)
+
+    def test_release_execution_manifest_validates_against_the_schema(self):
+        from tooling.workflow.manifests import ExecutionManifest, validate_manifest
+
+        manifest = ExecutionManifest.start(
+            run_id="wf-reference-commerce-20260918T000000Z-abcdef12",
+            client_id="reference-commerce",
+            stage="release",
+            attempt=1,
+            source_commit_sha="0" * 40,
+            started_at="2026-09-18T00:00:00Z",
+        )
+        self.assertEqual([], validate_manifest(manifest.to_dict()))
+
+    def test_stage_schema_rejects_an_unknown_stage_reference(self):
+        validator = _schema_validator("workflow-stage-contract.schema.json")
+        data = yaml.safe_load(
+            (ROOT / "workflows" / "contracts" / "09-release.yaml").read_text(
+                encoding="utf-8"
+            )
+        )
+        data["next"] = ["bogus-stage"]
+        self.assertTrue(list(validator.iter_errors(data)))
 
 
 class Stage09EvidenceGateTests(unittest.TestCase):

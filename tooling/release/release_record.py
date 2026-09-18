@@ -46,8 +46,9 @@ from tooling.hardening.report import (
 from tooling.hardening.staging_smoke import smoke_report_identity
 from tooling.hardening.validate import validate_hardening
 from tooling.release.evidence import (
+    h2_authorization_path,
+    is_safe_candidate_ref,
     load_artifact_manifest,
-    load_h2_authorization,
     load_h2_authorization_ref,
 )
 from tooling.release.smoke import (
@@ -116,6 +117,47 @@ def _relative(root: Path, path: Path) -> str:
 
 def _load_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _load_json_object(path: Path | None) -> Mapping[str, Any]:
+    """Return a JSON object at *path*, or ``{}`` when absent/invalid."""
+    if path is None or not Path(path).is_file():
+        return {}
+    try:
+        payload = _load_json(Path(path))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return {}
+    return payload if isinstance(payload, Mapping) else {}
+
+
+def _authorization_body_path(
+    root: Path, client_dir: Path, ref: Mapping[str, Any]
+) -> Path | None:
+    """Resolve the G authorization body from the ref's ``authorization_path``.
+
+    The ref is the authority binding, so the body is read from the path it names
+    (guarded by the existing POSIX-relative path-safety check). Only when the ref
+    carries no path do we fall back to the default reference-proof location; a
+    present-but-unsafe path fails closed (``None``) rather than redirecting.
+    """
+    authorization_path = ref.get("authorization_path")
+    if authorization_path is None:
+        return h2_authorization_path(client_dir)
+    if not is_safe_candidate_ref(authorization_path):
+        return None
+    return Path(root) / authorization_path
+
+
+def load_h2_authorization(
+    root: Path, client_dir: Path, ref: Mapping[str, Any]
+) -> Mapping[str, Any]:
+    """Return the committed G authorization body named by the ref, or ``{}``.
+
+    The body is resolved from the ref's ``authorization_path`` rather than a
+    hardcoded location, so the binding and the body cannot drift apart; the
+    default reference-proof path is used only when the ref names no path.
+    """
+    return _load_json_object(_authorization_body_path(root, client_dir, ref))
 
 
 def _text(value: Any) -> str | None:
@@ -470,7 +512,7 @@ def _authorization_errors(
             f"{relative}: production_authorization_id does not match the "
             "committed G authorization"
         )
-    body = load_h2_authorization(client_dir)
+    body = load_h2_authorization(root, client_dir, ref)
     if not body:
         errors.append(
             f"{relative}: committed G authorization body is missing or invalid"

@@ -59,7 +59,8 @@
         "build-prototype",
         "visual-qa",
         "client-review",
-        "productionize"
+        "productionize",
+        "release"
       ]
     },
     "path": { "type": "string", "minLength": 1 },

@@ -20,6 +20,7 @@ import ast
 import json
 import re
 import unittest
+from collections.abc import Mapping
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -86,6 +87,27 @@ ALLOWED_STATE_WRITERS = {
 }
 
 AUTHORIZATION_BODY_MARKERS = ("authorized_by", "authorized_at", "build", "status", "supersedes")
+
+
+def _iter_json_keys(value: object):
+    """Yield every mapping key in *value*, recursing into nested containers.
+
+    A top-level-only scan would let a nested authorization body (e.g.
+    ``{"authorization": {"status": "active"}}``) evade the pointer guard.
+    """
+    if isinstance(value, Mapping):
+        for key, item in value.items():
+            yield key
+            yield from _iter_json_keys(item)
+    elif isinstance(value, list):
+        for item in value:
+            yield from _iter_json_keys(item)
+
+
+def _authorization_body_markers_in(value: object) -> list[str]:
+    return sorted(
+        {key for key in _iter_json_keys(value) if key in AUTHORIZATION_BODY_MARKERS}
+    )
 
 
 def _python_files(directory: Path) -> list[Path]:
@@ -213,21 +235,24 @@ class ReleaseAuthorityConsumptionTests(unittest.TestCase):
         )
         self.assertTrue(ref_path.is_file(), ref_path)
         ref = json.loads(ref_path.read_text(encoding="utf-8"))
-        for marker in AUTHORIZATION_BODY_MARKERS:
-            self.assertNotIn(
-                marker,
-                ref,
-                f"stage 09 must consume authorization by ref, not carry a {marker!r} body",
-            )
+        self.assertEqual(
+            [],
+            _authorization_body_markers_in(ref),
+            "stage 09 must consume authorization by ref, not carry a body field "
+            "at any nesting level",
+        )
         self.assertIn("authorization_path", ref)
         body_path = ROOT / ref["authorization_path"]
         self.assertFalse(body_path.is_relative_to(CLIENT / "production"))
-        # The release evidence resolves the id from the ref, never from a creator.
-        from tooling.release.evidence import load_h2_authorization_ref
-
+        self.assertTrue(body_path.is_file(), body_path)
+        # Non-tautological: compare the ref to the body actually loaded from the
+        # path the ref resolves to, not to the ref itself.
+        body = json.loads(body_path.read_text(encoding="utf-8"))
+        self.assertEqual(ref["authorization_id"], body.get("authorization_id"))
         self.assertEqual(
-            ref["authorization_id"], load_h2_authorization_ref(CLIENT)["authorization_id"]
+            ref["authorization_version"], body.get("authorization_version")
         )
+        self.assertEqual(ref["authorization_path"], _relative(body_path))
 
 
 if __name__ == "__main__":

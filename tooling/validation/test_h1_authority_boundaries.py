@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import re
 import unittest
+from collections.abc import Mapping
 from pathlib import Path
 
 from tooling.production.report import build_h1_report
@@ -94,6 +95,23 @@ ALLOWED_SUPABASE_IMPORT_FILES = frozenset(
 
 def _relative(path: Path) -> str:
     return path.relative_to(ROOT).as_posix()
+
+
+def _iter_json_keys(value: object):
+    """Yield every mapping key in *value*, recursing into nested containers."""
+    if isinstance(value, Mapping):
+        for key, item in value.items():
+            yield key
+            yield from _iter_json_keys(item)
+    elif isinstance(value, list):
+        for item in value:
+            yield from _iter_json_keys(item)
+
+
+def _authorization_body_markers_in(value: object) -> list[str]:
+    return sorted(
+        {key for key in _iter_json_keys(value) if key in AUTHORIZATION_BODY_MARKERS}
+    )
 
 
 def _python_files(directory: Path):
@@ -180,12 +198,12 @@ class H1AuthorityBoundaryTests(unittest.TestCase):
     def test_production_authorization_ref_is_a_pointer_not_a_body(self):
         self.assertTrue(H2_AUTHORIZATION_REF.is_file(), H2_AUTHORIZATION_REF)
         payload = json.loads(H2_AUTHORIZATION_REF.read_text(encoding="utf-8"))
-        for marker in AUTHORIZATION_BODY_MARKERS:
-            self.assertNotIn(
-                marker,
-                payload,
-                f"pointer ref must not carry an authorization-body field {marker!r}",
-            )
+        self.assertEqual(
+            [],
+            _authorization_body_markers_in(payload),
+            "pointer ref must not carry an authorization-body field at any "
+            "nesting level",
+        )
         self.assertIn("authorization_path", payload)
         body_path = ROOT / payload["authorization_path"]
         self.assertFalse(
