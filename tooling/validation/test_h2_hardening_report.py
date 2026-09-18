@@ -10,10 +10,12 @@ deploy the production environment.
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from tooling.hardening.findings import make_finding
 from tooling.hardening.report import (
@@ -28,7 +30,10 @@ from tooling.hardening.staging_smoke import (
     smoke_report_path,
 )
 from tooling.hardening.validate import (
+    _load_live_deployment,
+    build_live_deployment,
     evaluate_fixture_gates,
+    regenerate_live_reports,
     validate_hardening,
 )
 
@@ -144,6 +149,22 @@ class EligibilityTests(unittest.TestCase):
             set(areas),
         )
 
+    def test_missing_gate_area_becomes_blocking_evidence_finding(self):
+        candidate = load_candidate(CLIENT)
+        smoke = run_staging_smoke(ROOT, CLIENT, _load(DEPLOYMENT))
+        gates = evaluate_fixture_gates(ROOT, CLIENT)
+        del gates["performance"]
+        report = build_hardening_report(ROOT, CLIENT, candidate, gates, smoke)
+        self.assertIn(
+            "performance-evidence-missing",
+            [finding["id"] for finding in report["blocking_findings"]],
+        )
+        self.assertFalse(report["eligible_for_authorization"])
+        performance = next(
+            gate for gate in report["gate_results"] if gate["area"] == "performance"
+        )
+        self.assertFalse(performance["passed"])
+
 
 class ValidationTests(unittest.TestCase):
     def test_reference_reports_validate_cleanly(self):
@@ -231,6 +252,194 @@ class ValidationTests(unittest.TestCase):
             any("report_identity does not verify" in error for error in errors),
             errors,
         )
+
+    def test_dropped_advisory_union_fails_validation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            client = _materialize_client(root)
+            path = hardening_report_path(client)
+            report = _load(path)
+            report["advisory_findings"] = []
+            report["report_identity"] = hardening_report_identity(report)
+            _write(path, report)
+            errors = validate_hardening(root, client)
+        self.assertTrue(
+            any(
+                "advisory_findings does not equal the sorted union" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_hidden_gate_blocking_finding_fails_validation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            client = _materialize_client(root)
+            path = hardening_report_path(client)
+            report = _load(path)
+            hidden = make_finding(
+                "security-hidden-blocker",
+                "security",
+                "high",
+                "blocking",
+                "open",
+                "hidden blocking finding",
+            )
+            security = next(
+                gate for gate in report["gate_results"] if gate["area"] == "security"
+            )
+            security["findings"] = sorted(
+                security["findings"] + [hidden],
+                key=lambda finding: (finding["area"], finding["id"]),
+            )
+            security["blocking_findings"] = [hidden]
+            security["passed"] = False
+            report["report_identity"] = hardening_report_identity(report)
+            _write(path, report)
+            errors = validate_hardening(root, client)
+        self.assertTrue(
+            any(
+                "blocking_findings does not equal the sorted union" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_gate_area_set_is_exact(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            client = _materialize_client(root)
+            path = hardening_report_path(client)
+            report = _load(path)
+            report["gate_results"] = report["gate_results"] + [
+                dict(report["gate_results"][0])
+            ]
+            report["report_identity"] = hardening_report_identity(report)
+            _write(path, report)
+            errors = validate_hardening(root, client)
+        self.assertTrue(
+            any(
+                "gate_results must contain exactly each gate area once" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_tampered_staging_smoke_ref_fails_validation(self):
+        for field, value in (
+            ("report_identity", "sha256:" + "0" * 64),
+            ("deployment_id", "staging-deploy-9999"),
+            ("artifact_digest", "sha256:" + "0" * 64),
+            ("candidate_identity", "sha256:" + "0" * 64),
+            ("critical_journeys_passed", False),
+        ):
+            with self.subTest(field=field):
+                with tempfile.TemporaryDirectory() as tmp:
+                    root = Path(tmp)
+                    client = _materialize_client(root)
+                    path = hardening_report_path(client)
+                    report = _load(path)
+                    report["staging_smoke_ref"][field] = value
+                    report["report_identity"] = hardening_report_identity(report)
+                    _write(path, report)
+                    errors = validate_hardening(root, client)
+                self.assertTrue(
+                    any("staging_smoke_ref" in error for error in errors), errors
+                )
+
+    def test_report_candidate_field_mismatches_fail_validation(self):
+        for field in (
+            "artifact_digest",
+            "migration_set_identity",
+            "release_config_identity",
+        ):
+            with self.subTest(field=field):
+                with tempfile.TemporaryDirectory() as tmp:
+                    root = Path(tmp)
+                    client = _materialize_client(root)
+                    path = hardening_report_path(client)
+                    report = _load(path)
+                    report[field] = "sha256:" + "0" * 64
+                    report["report_identity"] = hardening_report_identity(report)
+                    _write(path, report)
+                    errors = validate_hardening(root, client)
+                self.assertTrue(
+                    any(
+                        f"{field} does not match the committed release candidate"
+                        in error
+                        for error in errors
+                    ),
+                    errors,
+                )
+
+
+class LiveDeploymentTests(unittest.TestCase):
+    def test_build_live_deployment_uses_real_url_and_candidate_binding(self):
+        candidate = load_candidate(CLIENT)
+        deployment = build_live_deployment(
+            candidate, url="https://real.staging.example"
+        )
+        self.assertEqual("https://real.staging.example", deployment["url"])
+        self.assertEqual("staging", deployment["environment"])
+        self.assertEqual("succeeded", deployment["status"])
+        self.assertEqual(candidate["artifact_digest"], deployment["artifact_digest"])
+        self.assertEqual(
+            candidate["candidate_identity"], deployment["candidate_identity"]
+        )
+        self.assertTrue(deployment["deployment_id"])
+
+    def test_live_deployment_artifact_overrides_placeholder(self):
+        candidate = load_candidate(CLIENT)
+        deployment = build_live_deployment(
+            candidate,
+            url="https://real.staging.example",
+            deployment={
+                "deployment_id": "staging-deploy-4242",
+                "url": "https://placeholder.example",
+            },
+        )
+        self.assertEqual("staging-deploy-4242", deployment["deployment_id"])
+        self.assertEqual("https://real.staging.example", deployment["url"])
+
+    def test_load_live_deployment_reads_environment_url(self):
+        candidate = load_candidate(CLIENT)
+        with mock.patch.dict(
+            os.environ, {"STAGING_DEPLOYMENT_URL": "https://env.staging.example"}
+        ):
+            deployment = _load_live_deployment(ROOT, CLIENT, candidate, None, None)
+        self.assertEqual("https://env.staging.example", deployment["url"])
+
+    def test_load_live_deployment_requires_a_source(self):
+        candidate = load_candidate(CLIENT)
+        with mock.patch.dict(os.environ, {}, clear=True):
+            with self.assertRaises(SystemExit):
+                _load_live_deployment(ROOT, CLIENT, candidate, None, None)
+
+    def test_regenerate_live_reports_probes_the_real_url(self):
+        candidate = load_candidate(CLIENT)
+        with mock.patch.dict(os.environ, {}, clear=True):
+            deployment = build_live_deployment(
+                candidate, url="https://real.staging.example"
+            )
+        probed: list[str] = []
+
+        def runner(journey, context):
+            probed.append(context.get("base_url"))
+            return {"passed": True, "error_class": None}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            client = _materialize_client(root)
+            regenerate_live_reports(
+                root, client, deployment=deployment, runner=runner
+            )
+            smoke = _load(smoke_report_path(client))
+        self.assertTrue(probed)
+        self.assertTrue(
+            all(url == "https://real.staging.example" for url in probed), probed
+        )
+        self.assertNotIn("placeholder", str(probed))
+        self.assertEqual("staging-0.1.0+h2rc1", smoke["deployment_id"])
 
 
 class WorkflowTests(unittest.TestCase):

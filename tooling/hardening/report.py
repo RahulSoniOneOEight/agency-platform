@@ -22,12 +22,17 @@ from pathlib import Path
 from typing import Any
 
 from tooling.hardening.candidate import TARGET_ENVIRONMENT, canonical_identity
-from tooling.hardening.findings import AREAS, aggregate_gate
+from tooling.hardening.findings import (
+    AREAS,
+    aggregate_gate,
+    missing_evidence_finding,
+)
 from tooling.hardening.staging_smoke import smoke_report_path
 
 REPORT_VERSION = 1
 HARDENING_REPORT_NAME = "h2-hardening-report.json"
 EVIDENCE_RELATIVE = Path("production") / "evidence"
+GATE_EVIDENCE_RELATIVE = Path("production") / "hardening" / "gate-evidence.json"
 
 
 def _relative(root: Path, path: Path) -> str:
@@ -57,7 +62,9 @@ def hardening_report_identity(report: Mapping[str, Any]) -> str:
 
 
 def _gate_result(area: str, findings: Any) -> dict[str, Any]:
-    aggregate = aggregate_gate(findings if isinstance(findings, list) else [])
+    if not isinstance(findings, list):
+        findings = [missing_evidence_finding(area, GATE_EVIDENCE_RELATIVE)]
+    aggregate = aggregate_gate(findings)
     return {
         "area": area,
         "findings": aggregate["findings"],
@@ -112,6 +119,7 @@ def build_hardening_report(
             "report_identity": smoke_report.get("report_identity"),
             "deployment_id": smoke_report.get("deployment_id"),
             "artifact_digest": smoke_report.get("artifact_digest"),
+            "candidate_identity": smoke_report.get("candidate_identity"),
             "critical_journeys_passed": bool(
                 smoke_report.get("critical_journeys_passed")
             ),

@@ -54,9 +54,11 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     environment: staging
+    env:
+      STAGING_DEPLOYMENT_URL: ${{ secrets.STAGING_DEPLOYMENT_URL }}
     steps:
-      - name: Require staging deployment secret
-        if: ${{ secrets.STAGING_DEPLOYMENT_URL == '' }}
+      - name: Require staging deployment URL
+        if: ${{ env.STAGING_DEPLOYMENT_URL == '' }}
         run: |
           echo "STAGING_DEPLOYMENT_URL is not configured; live hardening cannot run."
           exit 1

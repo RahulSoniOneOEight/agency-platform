@@ -30,12 +30,13 @@
     "advisory_findings": {"type":"array","items":{"$ref":"#/$defs/finding"}},
     "staging_smoke_ref": {
       "type": "object",
-      "required": ["ref","report_identity","deployment_id","artifact_digest","critical_journeys_passed"],
+      "required": ["ref","report_identity","deployment_id","artifact_digest","candidate_identity","critical_journeys_passed"],
       "properties": {
         "ref": {"type":"string","minLength":1},
         "report_identity": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
         "deployment_id": {"type":"string","minLength":1},
         "artifact_digest": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+        "candidate_identity": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
         "critical_journeys_passed": {"type":"boolean"}
       },
       "additionalProperties": false

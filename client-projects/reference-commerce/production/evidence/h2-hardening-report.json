@@ -263,10 +263,11 @@
   ],
   "migration_set_identity": "sha256:f37830c5d1f64588127bc2a1b8c9311650e3db255e2c079821fd3d0d784455e5",
   "release_config_identity": "sha256:43b6737e3c7922c81e8620d113a2f4bd8c2e518578b160fc50c949f35b1659d0",
-  "report_identity": "sha256:33bc72613e224ae17415ab266baafd725df4806e22b716360acfd418980992e0",
+  "report_identity": "sha256:5225ca70bd62b4c4e052f2b73483072a5cebf4c20ce2b51a7eef28d9466502b9",
   "report_version": 1,
   "staging_smoke_ref": {
     "artifact_digest": "sha256:a477522873976ac4b6f816460a1915ca67e6043918b20c84a56c898f9eb3a989",
+    "candidate_identity": "sha256:be27d17be2be37bf05778fefb983b1116fa5e45e029a7e06b180e68fcfbc98da",
     "critical_journeys_passed": true,
     "deployment_id": "staging-deploy-0001",
     "ref": "client-projects/reference-commerce/production/evidence/staging-smoke-report.json",

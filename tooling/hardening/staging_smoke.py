@@ -159,18 +159,47 @@ class HttpJourneyRunner:
     def __init__(self, timeout: float = 15.0) -> None:
         self.timeout = timeout
 
-    def _fetch(self, url: str) -> tuple[bool, str]:
+    def _fetch(self, url: str) -> tuple[bool, str, str]:
         import urllib.error
         import urllib.request
 
         try:
             with urllib.request.urlopen(url, timeout=self.timeout) as response:
                 status = getattr(response, "status", 200)
-                return 200 <= int(status) < 300, str(status)
+                ok = 200 <= int(status) < 300
+                body = ""
+                if ok:
+                    try:
+                        body = response.read().decode("utf-8", errors="replace")
+                    except (OSError, ValueError):  # pragma: no cover - live only
+                        body = ""
+                return ok, str(status), body
         except urllib.error.HTTPError as exc:  # pragma: no cover - live only
-            return False, f"http-{exc.code}"
+            return False, f"http-{exc.code}", ""
         except (urllib.error.URLError, OSError, ValueError) as exc:  # pragma: no cover
-            return False, type(exc).__name__
+            return False, type(exc).__name__, ""
+
+    def _release_marker(self, context: Mapping[str, Any]) -> Mapping[str, Any]:
+        candidate = context.get("candidate") or {}
+        expected = candidate.get("build_version")
+        if not isinstance(expected, str) or not expected:
+            return {"passed": False, "error_class": "build_version_mismatch"}
+        base_url = context.get("base_url")
+        ok, _detail, body = self._fetch(base_url.rstrip("/") + "/version.json")
+        if not ok:
+            return {"passed": False, "error_class": "deployment_failed"}
+        try:
+            marker = json.loads(body)
+        except (TypeError, ValueError):
+            return {"passed": False, "error_class": "build_version_mismatch"}
+        if not isinstance(marker, Mapping):
+            return {"passed": False, "error_class": "build_version_mismatch"}
+        actual = marker.get("build_version")
+        if actual is None:
+            actual = marker.get("version")
+        if actual != expected:
+            return {"passed": False, "error_class": "build_version_mismatch"}
+        return {"passed": True, "error_class": None, "detail": expected}
 
     def __call__(
         self, journey: Mapping[str, Any], context: Mapping[str, Any]
@@ -182,12 +211,9 @@ class HttpJourneyRunner:
         if journey.get("name") == "release-identity":
             if not _release_identity_ok(context):
                 return {"passed": False, "error_class": "artifact_digest_mismatch"}
-            ok, detail = self._fetch(base_url.rstrip("/") + "/version.json")
-            if not ok:
-                return {"passed": False, "error_class": "deployment_failed"}
-            return {"passed": True, "error_class": None, "detail": detail}
+            return self._release_marker(context)
 
-        ok, _ = self._fetch(base_url)
+        ok, _detail, _body = self._fetch(base_url)
         return {
             "passed": ok,
             "error_class": None if ok else "staging_smoke_failed",

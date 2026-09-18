@@ -14,6 +14,7 @@ from pathlib import Path
 
 from tooling.hardening.staging_smoke import (
     JOURNEY_NAMES,
+    HttpJourneyRunner,
     run_staging_smoke,
     smoke_report_identity,
 )
@@ -149,6 +150,47 @@ class StagingSmokeTests(unittest.TestCase):
         committed = _load(CLIENT / "production" / "evidence" / "staging-smoke-report.json")
         expected = run_staging_smoke(ROOT, CLIENT, _deployment())
         self.assertEqual(committed, expected)
+
+
+class LiveVersionMarkerTests(unittest.TestCase):
+    """The live release-identity journey checks the marker *content*."""
+
+    def _runner(self, body: str, status: int = 200) -> HttpJourneyRunner:
+        class _Stub(HttpJourneyRunner):
+            def _fetch(self, url: str):
+                return (200 <= status < 300, str(status), body)
+
+        return _Stub()
+
+    def _release(self, body: str):
+        report = run_staging_smoke(
+            ROOT, CLIENT, _deployment(), http=self._runner(body)
+        )
+        return report, next(
+            journey
+            for journey in report["journeys"]
+            if journey["name"] == "release-identity"
+        )
+
+    def test_matching_version_marker_passes(self):
+        report, release = self._release(
+            json.dumps({"build_version": "0.1.0+h2rc1"})
+        )
+        self.assertTrue(release["passed"])
+        self.assertTrue(report["critical_journeys_passed"])
+
+    def test_stale_version_marker_fails(self):
+        report, release = self._release(
+            json.dumps({"build_version": "0.0.0-stale"})
+        )
+        self.assertFalse(release["passed"])
+        self.assertEqual("build_version_mismatch", release["error_class"])
+        self.assertFalse(report["critical_journeys_passed"])
+
+    def test_unparseable_version_marker_fails(self):
+        _report, release = self._release("<html>not json</html>")
+        self.assertFalse(release["passed"])
+        self.assertEqual("build_version_mismatch", release["error_class"])
 
 
 if __name__ == "__main__":
