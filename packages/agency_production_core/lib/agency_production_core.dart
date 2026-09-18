@@ -1,5 +1,8 @@
 library;
 
+export 'src/application/commerce_service.dart';
+export 'src/application/order_service.dart';
+export 'src/application/quote_service.dart';
 export 'src/config/environment_config.dart';
 export 'src/domain/domain_failure.dart';
 export 'src/domain/identity.dart';
