@@ -171,6 +171,13 @@ class BridgeHappyPathTests(BridgeFixtureMixin):
         )
         self.assertTrue(h2_authorization_ref_path(CLIENT).is_file())
 
+    def test_committed_authorization_ref_equals_builder_output(self):
+        h2, _report, _f_report, _g, auth = self.fixture()
+        self.assertEqual(
+            build_h2_authorization_ref(auth, h2),
+            load_h2_authorization_ref(CLIENT),
+        )
+
     def test_authorization_is_a_human_release_owner_and_active(self):
         auth = _load_h2_authorization()
         self.assertTrue(auth.authorized_by.is_human_release_owner)
@@ -212,6 +219,12 @@ class BridgeMismatchTests(BridgeFixtureMixin):
         bad["target_environment"] = "staging"
         self._assert_bridge_error(bad, g, auth)
 
+    def test_build_version_mismatch_fails(self):
+        h2, _report, _f_report, g, auth = self.fixture()
+        bad = dict(h2)
+        bad["build_version"] = "9.9.9+tampered"
+        self._assert_bridge_error(bad, g, auth)
+
     def test_migration_set_identity_mismatch_fails(self):
         h2, _report, _f_report, g, auth = self.fixture()
         bad = dict(h2)
@@ -230,6 +243,29 @@ class BridgeMismatchTests(BridgeFixtureMixin):
         bad["h1_foundation_report_ref"] = (
             "client-projects/reference-commerce/production/evidence/"
             "h2-hardening-report.json"
+        )
+        self._assert_bridge_error(bad, g, auth)
+
+    def test_absolute_h1_report_ref_fails(self):
+        h2, _report, _f_report, g, auth = self.fixture()
+        bad = dict(h2)
+        bad["h1_foundation_report_ref"] = str(
+            ROOT / h2["h1_foundation_report_ref"]
+        )
+        self.assertTrue(Path(bad["h1_foundation_report_ref"]).is_absolute())
+        self._assert_bridge_error(bad, g, auth)
+
+    def test_parent_segment_h1_report_ref_fails(self):
+        h2, _report, _f_report, g, auth = self.fixture()
+        bad = dict(h2)
+        bad["h1_foundation_report_ref"] = (
+            "client-projects/reference-commerce/production/evidence/"
+            "nested/../h1-foundation-report.json"
+        )
+        self.assertIn("..", bad["h1_foundation_report_ref"].split("/"))
+        self.assertEqual(
+            (ROOT / bad["h1_foundation_report_ref"]).resolve(),
+            (ROOT / h2["h1_foundation_report_ref"]).resolve(),
         )
         self._assert_bridge_error(bad, g, auth)
 
@@ -307,8 +343,16 @@ class BridgeDelegationTests(BridgeFixtureMixin):
 
 
 class AuthorityBoundaryTests(unittest.TestCase):
+    def _release_modules(self):
+        modules = sorted(RELEASE_DIR.rglob("*.py"))
+        self.assertTrue(
+            modules,
+            f"authority-boundary scan is vacuous: no .py files under {RELEASE_DIR}",
+        )
+        return modules
+
     def test_tooling_release_never_imports_or_constructs_authorization_creation(self):
-        for path in sorted(RELEASE_DIR.rglob("*.py")):
+        for path in self._release_modules():
             source = path.read_text(encoding="utf-8")
             relative = path.relative_to(ROOT).as_posix()
             tree = ast.parse(source)
@@ -336,7 +380,7 @@ class AuthorityBoundaryTests(unittest.TestCase):
             self.assertNotIn(".create(", source, relative)
 
     def test_tooling_release_defines_no_authorize_or_create_function(self):
-        for path in sorted(RELEASE_DIR.rglob("*.py")):
+        for path in self._release_modules():
             tree = ast.parse(path.read_text(encoding="utf-8"))
             for node in ast.walk(tree):
                 if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):

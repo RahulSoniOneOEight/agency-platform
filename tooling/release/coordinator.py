@@ -103,6 +103,14 @@ def _g_binding_errors(
         errors.append(
             "h2 target_environment does not match the authorized G candidate environment"
         )
+    expected_artifact_id = (
+        f"{h2_candidate.get('client_id')}-web-{h2_candidate.get('build_version')}"
+    )
+    if g_candidate.build_artifact_id != expected_artifact_id:
+        errors.append(
+            "h2 build_version does not match the authorized G candidate build "
+            "artifact id"
+        )
     return errors
 
 

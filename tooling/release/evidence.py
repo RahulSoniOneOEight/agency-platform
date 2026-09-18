@@ -107,9 +107,25 @@ def h1_report_path(root: Path, ref: str) -> Path:
     return path if path.is_absolute() else Path(root) / path
 
 
+def is_safe_candidate_ref(ref: Any) -> bool:
+    """Whether a candidate-supplied evidence ref is a POSIX relative path.
+
+    Candidate JSON is untrusted input: an absolute path or a ``..`` segment
+    could point the bridge at evidence outside the repo/expected area and
+    spuriously satisfy a binding, so both are rejected outright.
+    """
+    if not isinstance(ref, str) or not ref:
+        return False
+    if ref.startswith("/") or "\\" in ref:
+        return False
+    if ".." in ref.split("/"):
+        return False
+    return True
+
+
 def load_h1_report(root: Path, ref: str) -> Mapping[str, Any]:
     """Return the H.1 foundation report named by a repo-relative *ref*."""
-    if not isinstance(ref, str) or not ref:
+    if not is_safe_candidate_ref(ref):
         return {}
     return _load_json_object(h1_report_path(root, ref))
 
@@ -204,8 +220,10 @@ def build_h2_g_candidate(
 
     if not client_id or not source_sha or not artifact_digest or not environment:
         raise ValueError("H.2 candidate is missing client_id/source_sha/artifact_digest/environment")
-    if not isinstance(h1_ref, str) or not h1_ref:
-        raise ValueError("H.2 candidate is missing h1_foundation_report_ref")
+    if not is_safe_candidate_ref(h1_ref):
+        raise ValueError(
+            "H.2 candidate h1_foundation_report_ref must be a POSIX relative path"
+        )
 
     approval = latest_f_approval(f_report)
     if not approval:
@@ -322,9 +340,15 @@ def h2_authorization_ref_path(client_dir: Path) -> Path:
 
 def build_h2_authorization_ref(authorization: Any, h2_candidate: Mapping[str, Any]) -> dict[str, Any]:
     """Bind an authorization id/version to the exact H.2 candidate identity."""
+    client_id = str(h2_candidate.get("client_id", ""))
+    authorization_path = _relative(
+        REPO_ROOT,
+        h2_authorization_path(REPO_ROOT / CLIENT_PROJECTS / client_id),
+    )
     return {
         "authorization_id": getattr(authorization, "authorization_id", None),
         "authorization_version": getattr(authorization, "authorization_version", None),
+        "authorization_path": authorization_path,
         "artifact_digest": h2_candidate.get("artifact_digest"),
         "candidate_identity": h2_candidate.get("candidate_identity"),
         "client_id": h2_candidate.get("client_id"),
