@@ -1,0 +1,32 @@
+policy_version: 1
+blocking_severities:
+  - critical
+  - high
+advisory_severities:
+  - medium
+  - low
+  - info
+release_relevant_statuses:
+  - open
+automated_production_authorization: false
+checks:
+  - id: repository-secret-scan
+    release_relevant: true
+  - id: dependency-vulnerability-scan
+    release_relevant: true
+  - id: release-configuration-validation
+    release_relevant: true
+  - id: client-secret-boundary
+    release_relevant: true
+  - id: supabase-rls-policy
+    release_relevant: true
+  - id: auth-permission-paths
+    release_relevant: true
+  - id: csp-security-headers
+    release_relevant: true
+  - id: production-debug-guard
+    release_relevant: true
+  - id: migration-safety-classification
+    release_relevant: true
+  - id: artifact-integrity
+    release_relevant: true

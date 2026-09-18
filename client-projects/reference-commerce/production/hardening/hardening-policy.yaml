@@ -1,0 +1,26 @@
+policy_version: 1
+client_id: reference-commerce
+critical_journeys:
+  - sign-in
+  - catalog
+  - product-detail
+  - cart-order
+  - b2b-account-credit
+  - rfq-quotation-order
+release_outcomes:
+  - healthy
+  - degraded
+  - failed
+gate_model:
+  blocking_disposition: blocking
+  open_status_blocks: true
+  advisory_retained: true
+production_authorization:
+  automated: false
+  authority: milestone-g
+sub_policies:
+  security: security-policy.yaml
+  performance: performance-budget.yaml
+  accessibility: accessibility-policy.yaml
+  analytics: analytics-taxonomy.yaml
+  recovery: recovery-policy.yaml
