@@ -93,10 +93,13 @@ REASON_DATABASE_REVERSE_NOT_AUTHORIZED = (
     "database_reverse_migration_not_authorized"
 )
 REASON_MIGRATION_NOT_REVERSIBLE = "migration_not_reversible"
+REASON_MIGRATION_NOT_IN_RELEASE_SET = "migration_not_in_release_set"
 REASON_FORWARD_RECOVERY_PERMITTED = "forward_recovery_permitted"
 REASON_FORWARD_RECOVERY_NOT_ALLOWED = "forward_recovery_not_allowed"
 REASON_MANUAL_HALT_PERMITTED = "manual_halt_always_permitted"
 REASON_NO_PREVIOUS_KNOWN_GOOD = "no_previous_known_good"
+REASON_PREVIOUS_KNOWN_GOOD_MISMATCH = "previous_known_good_mismatch"
+REASON_UNKNOWN_ACTION = "unknown_recovery_action"
 
 FIXTURE_DEPLOYMENT_ID = "production-deploy-rollback-0001"
 
@@ -121,12 +124,46 @@ class MigrationExecutor(Protocol):
         ...
 
 
+class _ImmutableMapping(dict):
+    """A ``dict`` whose mutating methods raise (used for nested report values)."""
+
+    def _immutable(self, *args: Any, **kwargs: Any) -> None:
+        raise TypeError("RecoveryReport is immutable")
+
+    __setitem__ = _immutable
+    __delitem__ = _immutable
+    __ior__ = _immutable
+    clear = _immutable
+    pop = _immutable
+    popitem = _immutable
+    setdefault = _immutable
+    update = _immutable
+
+
+def _freeze(value: Any) -> Any:
+    """Recursively wrap a value so it cannot be mutated through the report.
+
+    Mappings become immutable mapping subclasses and sequences become tuples.
+    Equality with the original plain structure is preserved, so the report stays
+    comparable and JSON-serializable.
+    """
+    if isinstance(value, Mapping):
+        return _ImmutableMapping(
+            {key: _freeze(item) for key, item in value.items()}
+        )
+    if isinstance(value, (list, tuple)):
+        return tuple(_freeze(item) for item in value)
+    return value
+
+
 class RecoveryReport(dict):
     """An immutable recovery report.
 
     A ``dict`` subclass (so it is JSON-serializable and satisfies the
-    ``-> dict[str, Any]`` interface) whose mutating methods are disabled. The
-    canonical ``report_identity`` makes any tampering detectable regardless.
+    ``-> dict[str, Any]`` interface) whose mutating methods are disabled and
+    whose nested ``decision``/``deployment_result``/``migration_result`` values
+    are deep-frozen. The canonical ``report_identity`` makes any tampering
+    detectable regardless.
     """
 
     def _immutable(self, *args: Any, **kwargs: Any) -> None:
@@ -255,32 +292,25 @@ def _request_view(release_record: Mapping[str, Any]) -> dict[str, Any]:
 def _migration_reversible(
     release_record: Mapping[str, Any], request: Mapping[str, Any]
 ) -> bool:
-    """Whether the *exact* migration metadata explicitly marks reversal safe.
+    """Whether authoritative per-migration metadata marks reversal safe.
 
-    An explicit ``migration_reversible`` boolean wins. Otherwise the
-    ``migration_metadata`` mapping must explicitly mark ``reversible: true``
-    for the named migration, or for every migration in the release set. Missing
-    or ambiguous metadata is *not* reversible — blind rollback is prohibited.
+    Reversibility is never taken from a self-asserted boolean: the exact
+    ``migration_path`` must be a member of the release ``migration_set`` and its
+    authoritative per-migration metadata entry must explicitly declare
+    ``reversible: true``. Missing, unknown, or non-boolean metadata is *not*
+    reversible — blind rollback is prohibited.
     """
-    explicit = request.get("migration_reversible")
-    if isinstance(explicit, bool):
-        return explicit
-
-    metadata = _as_mapping(request.get("migration_metadata"))
-    if not metadata:
-        return False
-
-    def entry_reversible(entry: Any) -> bool:
-        return isinstance(entry, Mapping) and entry.get("reversible") is True
-
     path = _text(request.get("migration_path"))
-    if path:
-        return entry_reversible(metadata.get(path))
+    if path is None:
+        return False
 
     migration_set = _string_list(release_record.get("migration_set"))
-    if not migration_set:
+    if path not in migration_set:
         return False
-    return all(entry_reversible(metadata.get(migration)) for migration in migration_set)
+
+    metadata = _as_mapping(request.get("migration_metadata"))
+    entry = metadata.get(path)
+    return isinstance(entry, Mapping) and entry.get("reversible") is True
 
 
 def _decision(
@@ -332,16 +362,37 @@ def plan_recovery(
 
     failed_release_id = _text(release_record.get("release_id")) or "unknown-release"
     authorized_digest = _text(known_good.get("artifact_digest"))
-    known_good_id = _text(known_good.get("release_id")) or _text(
+    declared_known_good_id = _text(
         release_record.get("previous_known_good_release_id")
+    )
+    provided_known_good_id = _text(known_good.get("release_id"))
+    known_good_id = provided_known_good_id or declared_known_good_id
+    known_good_mismatch = (
+        declared_known_good_id is not None
+        and provided_known_good_id is not None
+        and provided_known_good_id != declared_known_good_id
     )
 
     request = _request_view(release_record)
-    requested = _normalize_action(request.get("action"))
-    if requested is None:
+    raw_action = request.get("action")
+    if raw_action is None or raw_action == "":
         requested = (
             ACTION_APPLICATION_ROLLBACK if known_good else ACTION_MANUAL_HALT
         )
+    else:
+        requested = _normalize_action(raw_action)
+        if requested is None:
+            return _decision(
+                action=ACTION_MANUAL_HALT,
+                outcome="manual_halt_required",
+                reason=REASON_UNKNOWN_ACTION,
+                failed_release_id=failed_release_id,
+                previous_known_good_release_id=known_good_id,
+                target_artifact_digest=_text(
+                    request.get("target_artifact_digest")
+                ),
+                migration_action="none",
+            )
 
     target_digest = _text(request.get("target_artifact_digest"))
     if target_digest is None:
@@ -371,6 +422,8 @@ def plan_recovery(
         )
 
     if requested == ACTION_APPLICATION_ROLLBACK:
+        if known_good_mismatch:
+            return resolve_forward_or_halt(REASON_PREVIOUS_KNOWN_GOOD_MISMATCH)
         if not policy["allow_application_rollback"]:
             return resolve_forward_or_halt(
                 REASON_APPLICATION_ROLLBACK_NOT_AUTHORIZED
@@ -402,6 +455,9 @@ def plan_recovery(
             return resolve_forward_or_halt(
                 REASON_DATABASE_REVERSE_NOT_AUTHORIZED
             )
+        migration_set = _string_list(release_record.get("migration_set"))
+        if migration_path is None or migration_path not in migration_set:
+            return resolve_forward_or_halt(REASON_MIGRATION_NOT_IN_RELEASE_SET)
         if not _migration_reversible(release_record, request):
             return resolve_forward_or_halt(REASON_MIGRATION_NOT_REVERSIBLE)
         return _decision(
@@ -481,6 +537,17 @@ def decision_identity(decision: Mapping[str, Any]) -> str:
     return canonical_identity(body)
 
 
+def _derive_verification_result(
+    deployment_result: Mapping[str, Any], migration_result: Mapping[str, Any]
+) -> str:
+    """Re-derive the verification result from the actual execution results."""
+    if deployment_result.get("attempted") is True:
+        return "passed" if deployment_result.get("ok") is True else "failed"
+    if migration_result.get("attempted") is True:
+        return "passed" if migration_result.get("ok") is True else "failed"
+    return "not_run"
+
+
 def execute_recovery(
     decision: Mapping[str, Any],
     deployment_port: Any,
@@ -492,7 +559,8 @@ def execute_recovery(
     when the decision permits it. Database reversal calls the migration
     executor's reverse path only when the decision permits it — otherwise no
     reverse SQL is ever executed. Forward recovery calls the forward migration
-    executor. Manual halt executes nothing.
+    executor, and only when the decision permits it. Manual halt executes
+    nothing.
     """
     decision = _as_mapping(decision)
     action = decision.get("action")
@@ -524,7 +592,7 @@ def execute_recovery(
         migration_result = _normalize_result(
             raw, direction="reverse", migration=migration
         )
-    elif action == ACTION_FORWARD_RECOVERY:
+    elif action == ACTION_FORWARD_RECOVERY and permitted:
         migration = {
             "path": _text(decision.get("migration_path")),
             "migration_action": "forward",
@@ -534,12 +602,9 @@ def execute_recovery(
             raw, direction="forward", migration=migration
         )
 
-    if deployment_result["attempted"]:
-        verification_result = "passed" if deployment_result["ok"] else "failed"
-    elif migration_result["attempted"]:
-        verification_result = "passed" if migration_result["ok"] else "failed"
-    else:
-        verification_result = "not_run"
+    verification_result = _derive_verification_result(
+        deployment_result, migration_result
+    )
 
     body: dict[str, Any] = {
         "report_version": REPORT_VERSION,
@@ -558,7 +623,7 @@ def execute_recovery(
         "verification_result": verification_result,
     }
     body["report_identity"] = canonical_identity(body)
-    return RecoveryReport(body)
+    return RecoveryReport(_freeze(body))
 
 
 def recovery_report_path(client_dir: Path) -> Path:
@@ -861,6 +926,24 @@ def validate_recovery(root: Path, client_dir: Path) -> list[str]:
             f"{list(VERIFICATION_RESULTS)}"
         )
 
+    deployment_result = report.get("deployment_result")
+    migration_result = report.get("migration_result")
+    if not isinstance(deployment_result, Mapping):
+        errors.append(f"{relative}: deployment_result must be an object")
+        deployment_result = {}
+    if not isinstance(migration_result, Mapping):
+        errors.append(f"{relative}: migration_result must be an object")
+        migration_result = {}
+
+    derived_verification = _derive_verification_result(
+        deployment_result, migration_result
+    )
+    if report.get("verification_result") != derived_verification:
+        errors.append(
+            f"{relative}: verification_result does not match the re-derived "
+            "execution result"
+        )
+
     policy = load_recovery_policy(client_dir)
     if not policy:
         errors.append(
@@ -875,18 +958,44 @@ def validate_recovery(root: Path, client_dir: Path) -> list[str]:
                 f"{relative}: recorded decision does not match the governed "
                 "decision re-derived from the committed recovery policy"
             )
+        else:
+            expected = execute_recovery(
+                rederived,
+                _FixtureDeploymentPort(),
+                _FixtureMigrationExecutor(),
+            )
+            for field in (
+                "deployment_result",
+                "migration_result",
+                "verification_result",
+            ):
+                if report.get(field) != expected.get(field):
+                    errors.append(
+                        f"{relative}: {field} does not match the re-derived "
+                        "execution result"
+                    )
 
-    deployment_result = report.get("deployment_result")
-    migration_result = report.get("migration_result")
-    if not isinstance(deployment_result, Mapping):
-        errors.append(f"{relative}: deployment_result must be an object")
-    if not isinstance(migration_result, Mapping):
-        errors.append(f"{relative}: migration_result must be an object")
     if isinstance(decision, Mapping):
-        reverse_executed = (
-            isinstance(migration_result, Mapping)
-            and migration_result.get("direction") == "reverse"
-        )
+        if (
+            decision.get("action") == ACTION_APPLICATION_ROLLBACK
+            and decision.get("permitted") is True
+            and deployment_result.get("attempted") is not True
+        ):
+            errors.append(
+                f"{relative}: permitted application rollback must be attempted"
+            )
+        if (
+            decision.get("action") == ACTION_DATABASE_REVERSE
+            and decision.get("permitted") is True
+            and not (
+                migration_result.get("attempted") is True
+                and migration_result.get("direction") == "reverse"
+            )
+        ):
+            errors.append(
+                f"{relative}: permitted database reversal must be attempted"
+            )
+        reverse_executed = migration_result.get("direction") == "reverse"
         if reverse_executed and not (
             decision.get("action") == ACTION_DATABASE_REVERSE
             and decision.get("permitted") is True
@@ -897,15 +1006,11 @@ def validate_recovery(root: Path, client_dir: Path) -> list[str]:
                 "prohibited)"
             )
         if decision.get("action") == ACTION_MANUAL_HALT:
-            if isinstance(deployment_result, Mapping) and deployment_result.get(
-                "attempted"
-            ):
+            if deployment_result.get("attempted"):
                 errors.append(
                     f"{relative}: manual halt must not execute a deployment"
                 )
-            if isinstance(migration_result, Mapping) and migration_result.get(
-                "attempted"
-            ):
+            if migration_result.get("attempted"):
                 errors.append(
                     f"{relative}: manual halt must not execute a migration"
                 )

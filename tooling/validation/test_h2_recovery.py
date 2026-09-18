@@ -164,6 +164,27 @@ class PlanApplicationRollbackTests(unittest.TestCase):
         self.assertEqual("manual_halt_required", decision["outcome"])
         self.assertFalse(decision["permitted"])
 
+    def test_mismatched_previous_known_good_is_rejected(self):
+        other = _known_good()
+        other["release_id"] = "rel-some-other-release"
+        other["artifact_digest"] = "sha256:" + "c" * 64
+        decision = plan_recovery(_failed(), _policy(), other)
+        self.assertFalse(decision["permitted"])
+        self.assertEqual("previous_known_good_mismatch", decision["reason"])
+        self.assertIn(
+            decision["outcome"],
+            ("forward_recovery_required", "manual_halt_required"),
+        )
+
+    def test_unknown_action_does_not_default_to_rollback(self):
+        decision = plan_recovery(
+            _failed(action="evil_action"), _policy(), _known_good()
+        )
+        self.assertEqual(ACTION_MANUAL_HALT, decision["action"])
+        self.assertEqual("manual_halt_required", decision["outcome"])
+        self.assertFalse(decision["permitted"])
+        self.assertEqual("unknown_recovery_action", decision["reason"])
+
     def test_decision_identity_self_verifies(self):
         decision = plan_recovery(_failed(), _policy(), _known_good())
         self.assertEqual(
@@ -225,9 +246,42 @@ class PlanDatabaseRecoveryTests(unittest.TestCase):
         self.assertEqual("manual_halt_required", decision["outcome"])
         self.assertEqual(ACTION_MANUAL_HALT, decision["action"])
 
+    def test_reversible_flag_without_metadata_is_not_permitted(self):
+        decision = plan_recovery(
+            _failed(
+                action=ACTION_DATABASE_REVERSE,
+                migration_path=MIGRATION,
+                migration_reversible=True,
+            ),
+            _policy(),
+            _known_good(),
+        )
+        self.assertFalse(decision["permitted"])
+        self.assertEqual("forward_recovery_required", decision["outcome"])
+        self.assertEqual(ACTION_FORWARD_RECOVERY, decision["action"])
+
+    def test_migration_path_not_in_release_set_is_not_permitted(self):
+        forged_path = "supabase/migrations/999999_evil.sql"
+        decision = plan_recovery(
+            _failed(
+                action=ACTION_DATABASE_REVERSE,
+                migration_path=forged_path,
+                migration_metadata={forged_path: {"reversible": True}},
+            ),
+            _policy(),
+            _known_good(),
+        )
+        self.assertFalse(decision["permitted"])
+        self.assertEqual("forward_recovery_required", decision["outcome"])
+        self.assertEqual(ACTION_FORWARD_RECOVERY, decision["action"])
+        self.assertEqual("migration_not_in_release_set", decision["reason"])
+
     def test_blind_rollback_prohibited_gate(self):
+        # A policy that does not prohibit blind rollback is itself unsafe:
+        # database reversal stays disallowed even when the request asserts
+        # reversibility, so a blind rollback can never be permitted.
         policy = _policy()
-        policy["database_reversal"]["blind_rollback_prohibited"] = True
+        policy["database_reversal"]["blind_rollback_prohibited"] = False
         decision = plan_recovery(
             _failed(
                 action=ACTION_DATABASE_REVERSE,
@@ -237,7 +291,27 @@ class PlanDatabaseRecoveryTests(unittest.TestCase):
             policy,
             _known_good(),
         )
-        self.assertTrue(decision["permitted"])
+        self.assertFalse(decision["permitted"])
+        self.assertIn(
+            decision["outcome"],
+            ("forward_recovery_required", "manual_halt_required"),
+        )
+
+    def test_blind_reverse_without_reversible_metadata_is_prohibited(self):
+        decision = plan_recovery(
+            _failed(
+                action=ACTION_DATABASE_REVERSE,
+                migration_path=MIGRATION,
+                migration_metadata={MIGRATION: {"reversible": False}},
+            ),
+            _policy(),
+            _known_good(),
+        )
+        self.assertFalse(decision["permitted"])
+        self.assertIn(
+            decision["outcome"],
+            ("forward_recovery_required", "manual_halt_required"),
+        )
 
 
 class ExecuteRecoveryTests(unittest.TestCase):
@@ -279,11 +353,42 @@ class ExecuteRecoveryTests(unittest.TestCase):
             _policy(),
             _known_good(),
         )
+        self.assertFalse(decision["permitted"])
         port, executor, report = self._report(decision)
         self.assertEqual([], executor.reverse)
+        self.assertEqual([], executor.forward)
+        self.assertEqual("not_run", report["verification_result"])
+
+    def test_permitted_forward_recovery_executes_forward(self):
+        decision = plan_recovery(
+            _failed(action=ACTION_FORWARD_RECOVERY, migration_path=MIGRATION),
+            _policy(),
+            _known_good(),
+        )
+        self.assertTrue(decision["permitted"])
+        port, executor, report = self._report(decision)
+        self.assertEqual([], executor.reverse)
+        self.assertEqual([], port.calls)
         self.assertEqual(1, len(executor.forward))
         self.assertEqual("forward", report["migration_result"]["direction"])
         self.assertEqual("passed", report["verification_result"])
+
+    def test_unpermitted_forward_recovery_executes_nothing(self):
+        decision = plan_recovery(
+            _failed(
+                action=ACTION_DATABASE_REVERSE,
+                migration_path=MIGRATION,
+                migration_metadata={MIGRATION: {"reversible": False}},
+            ),
+            _policy(),
+            _known_good(),
+        )
+        self.assertFalse(decision["permitted"])
+        self.assertEqual(ACTION_FORWARD_RECOVERY, decision["action"])
+        port, executor, report = self._report(decision)
+        self.assertEqual([], executor.forward)
+        self.assertEqual([], executor.reverse)
+        self.assertEqual("not_run", report["verification_result"])
 
     def test_reversible_migration_executes_reverse(self):
         decision = plan_recovery(
@@ -323,6 +428,12 @@ class ExecuteRecoveryTests(unittest.TestCase):
             report["action"] = "tampered"
         with self.assertRaises(TypeError):
             report.update({"action": "tampered"})
+        with self.assertRaises(TypeError):
+            report["decision"]["action"] = "tampered"
+        with self.assertRaises(TypeError):
+            report["deployment_result"]["ok"] = False
+        with self.assertRaises(TypeError):
+            report["migration_result"]["attempted"] = True
 
     def test_report_is_deterministic(self):
         decision = plan_recovery(_failed(), _policy(), _known_good())
@@ -416,6 +527,40 @@ class ValidateRecoveryTests(unittest.TestCase):
         errors = self._validate(report)
         self.assertTrue(
             any("release_status must be 'failed'" in e for e in errors), errors
+        )
+
+    def test_flipped_verification_result_is_rejected(self):
+        report = copy.deepcopy(_load(REPORT))
+        report["verification_result"] = "failed"
+        report["report_identity"] = recovery_report_identity(report)
+        errors = self._validate(report)
+        self.assertTrue(any("re-derived" in e for e in errors), errors)
+
+    def test_flipped_deployment_result_ok_is_rejected(self):
+        report = copy.deepcopy(_load(REPORT))
+        report["deployment_result"]["ok"] = False
+        report["report_identity"] = recovery_report_identity(report)
+        errors = self._validate(report)
+        self.assertTrue(any("re-derived" in e for e in errors), errors)
+
+    def test_permitted_rollback_without_attempt_is_rejected(self):
+        report = copy.deepcopy(_load(REPORT))
+        report["deployment_result"] = {"attempted": False, "ok": False}
+        report["verification_result"] = "not_run"
+        report["report_identity"] = recovery_report_identity(report)
+        errors = self._validate(report)
+        self.assertTrue(any("must be attempted" in e for e in errors), errors)
+
+    def test_altered_deployment_id_is_rejected(self):
+        report = copy.deepcopy(_load(REPORT))
+        report["deployment_result"]["deployment_id"] = "evil-deploy"
+        report["report_identity"] = recovery_report_identity(report)
+        errors = self._validate(report)
+        self.assertTrue(
+            any(
+                "deployment_result" in e and "re-derived" in e for e in errors
+            ),
+            errors,
         )
 
     def test_forged_blind_reverse_is_rejected(self):
