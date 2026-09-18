@@ -154,6 +154,19 @@ committed Dart review records cannot be byte-reproduced. Determinism must be ass
   Regeneration command: from `apps/prototype_app`,
   `flutter test test/reference_client/reference_client_review_approval_test.dart --dart-define=REFERENCE_EVIDENCE_PATH=<repo-root-relative path>`.
   The synthetic `source_commit_sha` (`0123...4567`) is a determinism fixture value, not a real commit.
+- **RF18 — The fresh-session resume proof reuses the workflow-owner identity.** The E runtime's
+  `runner._resume_existing` checks the lease owner *before* expiry and raises `RecoveryRequired`
+  for a foreign actor even when the lease has expired; the audited reclaim path is for the same
+  owner reconnecting (matching the authoritative `test_workflow_runner`
+  `test_resume_stage_after_an_expired_lease_keeps_the_same_attempt`). F must not modify the E
+  authority, so the resume scenario discards all in-memory state and resumes as
+  `opencode:reference-session-a`, and it *additionally* asserts that a foreign actor
+  (`opencode:reference-session-b`) is refused. This is a genuine constraint of the E authority,
+  not a weakening of the proof.
+- **RF19 — Byte-compared evidence and reports are pinned to LF.** `.gitattributes` now pins
+  `client-projects/**/reference-e2e/evidence/*.json` and `.../report/*.json` to `text eol=lf`, so
+  the deterministic byte-freshness checks hold on any platform (the committed blobs were already
+  LF; this prevents a CRLF worktree checkout from breaking them).
 - **RF16 — Assertion integrity.** `evaluate_assertions` fails loudly on an empty assertion set, and
   `fixture_integrity` pins the fixture's canonical content hash plus re-runs `validate_fixture`, so
   content tampering cannot pass silently. `no_duplicate_authority` matches `.json`/`.yaml`/`.yml`
@@ -165,9 +178,63 @@ committed Dart review records cannot be byte-reproduced. Determinism must be ass
 |-------|-------|--------|---------|
 | F.1 | Reference client foundation (Tasks 1–4) | ACCEPTED | `1c1a23b` `514e120` `fb9f67b` `8e43be3` |
 | F.2 | Review → Approval v1 → Visual QA (Tasks 5–7) | ACCEPTED | `2a84fed` `b464274` `8391ff3` `843d7f1` `48bf496` |
-| F.3 | Change boundaries + resume + reports/CI (Tasks 8–10) | PENDING | — |
+| F.3 | Change boundaries + resume + reports/CI (Tasks 8–10) | ACCEPTED | `19af278` `55a4656` `68677b5` `…` |
 
 ## Progress log
+
+- 2026-09-18 — **Cycle F.3 implemented (Tasks 8–10).**
+  - **Task 8** (`19af278`) — change boundaries proven in Dart
+    (`apps/prototype_app/test/reference_client/reference_client_change_scenarios_test.dart`) plus
+    Flutter-free policy/validation in `tooling/reference_client/change_scenarios.py`
+    (`classify_change` with the uncertainty default, `validate_change_evidence`) and
+    `client-projects/schema/reference-client-change-evidence.schema.json`. Contract-impacting:
+    approval v1 → new blocking feedback + a contract-impacting `RefinementBatch` → round 2 →
+    explicit close → **ApprovalSnapshot v2** (version 2, `supersedes` 1, its own `sha256:` hash and
+    source SHA) with v1 byte-immutable and a third approval refused via
+    `ContractImpactRequiresNewRound`. Implementation-only: **no new approval** (approvals `[1]`,
+    round 1, `reviewStateHash` unchanged, still eligible) and `createDraftBatch` defaults to
+    `contractImpacting`. Committed evidence `reference-e2e/evidence/change-scenarios-evidence.json`
+    (19 assertions, regeneration byte-identical).
+  - **Task 9** (`55a4656`) — interruption / fresh-session resume proven on the E runtime only
+    (`tooling/validation/test_reference_client_resume_e2e.py` + resume helpers in `scenario.py`):
+    attempt 1 → `capture-complete` checkpoint → in-memory context discarded + lease expired → fresh
+    `inspect_client` reports `resume` → `resume_stage` reclaims the expired lease through the
+    audited path (one `recovery` record), keeps the same run/attempt and exactly one manifest, and
+    does not advance `current_stage` before the gate → `complete_stage` advances legally to
+    `client-review` with the manifest frozen and the lease released. A retry path (no checkpoint)
+    creates attempt 2 with the prior manifest byte-unchanged. Committed evidence
+    `reference-e2e/evidence/resume-evidence.json` (38 assertions). **RF18** records the owner-identity
+    constraint.
+  - **Task 10** (`68677b5`) — `tooling/reference_client/report.py`
+    (`build_machine_report`/`render_human_report`), `validate_reference_client.py`,
+    `client-projects/schema/reference-client-machine-report.schema.json`, the committed machine +
+    human reports under `reference-e2e/report/`, and wiring into `validate_repo.py` (150 required
+    paths + a `reference_client_errors` group) and `.github/workflows/validate.yml` (6 new test
+    modules + a `Validate reference client` step; no approval/state/golden/credential steps). The
+    machine report aggregates 126/126 assertions (canonical 31, review/approval/QA 38, change 19,
+    resume 38) and carries a self-verifying `report_identity`; no subjective score anywhere.
+  - Tests: repo suite **797 tests OK**; `test_reference_client_report` 26; Flutter unchanged
+    (`test/reference_client` 12, `test/review` 586, `test/qa` 129, `flutter test` 789,
+    `flutter analyze` clean). `validate_repo` 150 paths, knowledge/workflow/prototype/visual-QA
+    validators and both `--check` freshness commands pass; the reference bundle regenerates
+    byte-identically.
+  - Independent reviews: **Task 8 ACCEPT-WITH-MINORS (0/0)**; **Task 9 ACCEPT-WITH-MINORS (0/0)**.
+    Reviewer-recommended minors fixed in `68677b5`: **RF19** (`.gitattributes` LF pin for
+    byte-compared evidence/reports) and the strengthened `validate_resume_evidence` (now also
+    checks `interruption.lease_expired`, `interruption.recovery_action`,
+    `resume.recovery_action`, `resume.lease_reclaimed`, `resume.audit_records`,
+    `resume.manifest_count_for_stage`, `completion.last_transition_from`,
+    `completion.lease_released`).
+  - **Accepted minors (recorded, non-gating):** the "no new approval" guarantee for an
+    implementation-only change is honoured by scenario behaviour rather than an approval-rule guard
+    (an explicit `createApproval` on an unchanged identity would still mint a version — a C.4 rule,
+    not an F concern); the plan-named `apply_*_change` Python interfaces are superseded by the
+    Dart-proven journey + Python classification/validation (RF17); `no_chat_memory_required` is a
+    self-attested flag whose substantive proof is `final.state_rederived_from_disk`; the "fresh
+    session" is a new object graph in the same process (the E runtime has no module-level run
+    state); the machine report's per-approval `review_state_hash` is a tamper-evident reference
+    identity over the recorded evidence slice, not a copied authority hash (RF6).
+
 
 - 2026-09-18 — **Cycle F.2 implemented** (`2a84fed`). The real C/D authorities are exercised on
   the reference client in a temp workspace (RF4/RF9): Compare/Select/Mix (overall `b`, screen
