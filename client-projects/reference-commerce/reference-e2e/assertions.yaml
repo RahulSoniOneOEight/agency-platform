@@ -208,3 +208,10 @@ assertions:
     emitted by the reference change-boundary journey exists under reference-e2e/evidence/.
   params:
     path: reference-e2e/evidence/change-scenarios-evidence.json
+- id: artifact-resume-evidence
+  scenario: resume-after-interruption
+  kind: artifact_exists
+  description: The machine-readable interruption/resume evidence report emitted by the
+    reference resume-after-interruption journey exists under reference-e2e/evidence/.
+  params:
+    path: reference-e2e/evidence/resume-evidence.json
