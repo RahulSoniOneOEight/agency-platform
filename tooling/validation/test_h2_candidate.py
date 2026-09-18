@@ -23,6 +23,7 @@ from contextlib import redirect_stdout
 from pathlib import Path
 
 from tooling.hardening.candidate import (
+    APPROVAL_EVIDENCE_RELATIVE,
     CANONICAL_FIELDS,
     CANDIDATE_NAME,
     FIXTURE_BUILD_VERSION,
@@ -44,6 +45,11 @@ FIXTURE_ARTIFACT = RELEASE_DIR / "artifact-fixture"
 CANDIDATE_PATH = RELEASE_DIR / CANDIDATE_NAME
 MANIFEST_PATH = RELEASE_DIR / MANIFEST_NAME
 H1_REPORT = CLIENT / "production" / "evidence" / "h1-foundation-report.json"
+APPROVAL_EVIDENCE = CLIENT / APPROVAL_EVIDENCE_RELATIVE
+APPROVAL_EVIDENCE_REF = (
+    "client-projects/reference-commerce/reference-e2e/evidence/"
+    "review-approval-evidence.json"
+)
 WORKFLOW = ROOT / ".github" / "workflows" / "candidate-build.yml"
 
 GOLDEN_DIGEST = (
@@ -74,6 +80,29 @@ def _load(path: Path) -> object:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _materialize_client(root: Path) -> Path:
+    """Copy the reference client config/evidence/release tree under *root*.
+
+    Returns the copied client directory so a test can tamper with it without
+    touching the committed repository state.
+    """
+    client = root / "client-projects" / "reference-commerce"
+    (client / "production").mkdir(parents=True)
+    shutil.copytree(CLIENT / "production" / "config", client / "production" / "config")
+    shutil.copytree(
+        CLIENT / "production" / "evidence", client / "production" / "evidence"
+    )
+    shutil.copytree(RELEASE_DIR, client / "production" / "release")
+    migrations = root / "supabase" / "migrations"
+    migrations.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(ROOT / "supabase" / "migrations", migrations)
+    return client
+
+
+def _write_candidate(path: Path, candidate: dict[str, object]) -> None:
+    path.write_text(json.dumps(candidate), encoding="utf-8")
+
+
 def _base_fields(**overrides: object) -> dict[str, object]:
     fields: dict[str, object] = {
         "client_id": "reference-commerce",
@@ -83,7 +112,7 @@ def _base_fields(**overrides: object) -> dict[str, object]:
         "build_version": FIXTURE_BUILD_VERSION,
         "migration_set": ["supabase/migrations/202609180001_x.sql"],
         "release_config_identity": "sha256:" + "b" * 64,
-        "approved_experience_ref": "client-projects/reference-commerce/approved-experience.yaml",
+        "approved_experience_ref": APPROVAL_EVIDENCE_REF,
         "h1_foundation_report_ref": (
             "client-projects/reference-commerce/production/evidence/"
             "h1-foundation-report.json"
@@ -191,6 +220,19 @@ class CandidateIdentityTests(unittest.TestCase):
             first["migration_set_identity"], second["migration_set_identity"]
         )
 
+    def test_migration_set_identity_recomputable_from_embedded_entries(self):
+        candidate = build_candidate(
+            ROOT, CLIENT, FIXTURE_ARTIFACT, FIXTURE_SOURCE_SHA, FIXTURE_BUILD_VERSION
+        )
+        entries = candidate["migration_set_entries"]
+        self.assertTrue(entries)
+        self.assertEqual(
+            [entry["path"] for entry in entries], candidate["migration_set"]
+        )
+        self.assertEqual(
+            canonical_identity(entries), candidate["migration_set_identity"]
+        )
+
 
 class ArtifactIntegrityTests(unittest.TestCase):
     def test_build_artifact_manifest_is_sorted_and_self_verifying(self):
@@ -247,6 +289,99 @@ class ArtifactIntegrityTests(unittest.TestCase):
         _assert_stable(self, errors)
         self.assertEqual(errors, verify_candidate_artifact(candidate, {"entries": []}))
 
+    def test_verify_rejects_tampered_migration_entries(self):
+        candidate = _load(CANDIDATE_PATH)
+        manifest = _load(MANIFEST_PATH)
+        candidate["migration_set_entries"][0]["sha256"] = "sha256:" + "0" * 64
+        errors = verify_candidate_artifact(candidate, manifest)
+        _assert_stable(self, errors)
+        self.assertTrue(
+            any(
+                "does not match the recomputed migration set identity" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_verify_rejects_tampered_migration_set_identity(self):
+        candidate = _load(CANDIDATE_PATH)
+        manifest = _load(MANIFEST_PATH)
+        candidate["migration_set_identity"] = "sha256:" + "0" * 64
+        errors = verify_candidate_artifact(candidate, manifest)
+        _assert_stable(self, errors)
+        self.assertTrue(
+            any(
+                "does not match the recomputed migration set identity" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_verify_rejects_migration_entries_not_matching_migration_set(self):
+        candidate = _load(CANDIDATE_PATH)
+        manifest = _load(MANIFEST_PATH)
+        candidate["migration_set_entries"][0]["path"] = (
+            "supabase/migrations/other.sql"
+        )
+        errors = verify_candidate_artifact(candidate, manifest)
+        _assert_stable(self, errors)
+        self.assertTrue(
+            any(
+                "paths must match candidate.migration_set" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_verify_rejects_unknown_top_level_field(self):
+        candidate = _load(CANDIDATE_PATH)
+        manifest = _load(MANIFEST_PATH)
+        candidate["unexpected_field"] = "x"
+        errors = verify_candidate_artifact(candidate, manifest)
+        _assert_stable(self, errors)
+        self.assertTrue(
+            any("unknown top-level candidate field" in error for error in errors),
+            errors,
+        )
+
+    def test_verify_rejects_empty_required_field(self):
+        candidate = _load(CANDIDATE_PATH)
+        manifest = _load(MANIFEST_PATH)
+        candidate["client_id"] = ""
+        errors = verify_candidate_artifact(candidate, manifest)
+        _assert_stable(self, errors)
+        self.assertTrue(
+            any(
+                "candidate.client_id: must be a non-empty string" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_verify_rejects_non_relative_manifest_paths(self):
+        candidate = _load(CANDIDATE_PATH)
+        for bad_path in ("/absolute/index.html", "../escape.html", "dir\\file.html"):
+            manifest = _load(MANIFEST_PATH)
+            manifest["entries"][0]["path"] = bad_path
+            errors = verify_candidate_artifact(candidate, manifest)
+            _assert_stable(self, errors)
+            self.assertTrue(
+                any("POSIX relative path" in error for error in errors),
+                (bad_path, errors),
+            )
+
+    def test_verify_rejects_non_relative_migration_paths(self):
+        manifest = _load(MANIFEST_PATH)
+        for bad_path in ("/absolute/x.sql", "../escape.sql", "dir\\x.sql"):
+            candidate = _load(CANDIDATE_PATH)
+            candidate["migration_set_entries"][0]["path"] = bad_path
+            errors = verify_candidate_artifact(candidate, manifest)
+            _assert_stable(self, errors)
+            self.assertTrue(
+                any("POSIX relative path" in error for error in errors),
+                (bad_path, errors),
+            )
+
 
 class ReferenceCandidateTests(unittest.TestCase):
     def test_fixture_candidate_is_reproducible(self):
@@ -271,29 +406,94 @@ class ReferenceCandidateTests(unittest.TestCase):
             production["config_identity"], candidate["release_config_identity"]
         )
 
+    def test_approved_experience_ref_points_to_existing_approval_evidence(self):
+        candidate = _load(CANDIDATE_PATH)
+        self.assertEqual(APPROVAL_EVIDENCE_REF, candidate["approved_experience_ref"])
+        self.assertTrue(APPROVAL_EVIDENCE.is_file())
+        self.assertTrue(
+            (ROOT / candidate["approved_experience_ref"]).is_file(),
+            candidate["approved_experience_ref"],
+        )
+        self.assertFalse(
+            (CLIENT / "approved-experience.yaml").exists(),
+            "H.2 must not create approval authority (R13)",
+        )
+
     def test_validate_candidate_reference_is_clean(self):
         self.assertEqual([], validate_candidate(ROOT, CLIENT))
 
     def test_validate_candidate_detects_tampered_release_config_identity(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            client = root / "client-projects" / "reference-commerce"
-            (client / "production").mkdir(parents=True)
-            shutil.copytree(
-                CLIENT / "production" / "config", client / "production" / "config"
-            )
-            shutil.copytree(
-                CLIENT / "production" / "evidence", client / "production" / "evidence"
-            )
-            shutil.copytree(RELEASE_DIR, client / "production" / "release")
+            client = _materialize_client(root)
             candidate_path = client / "production" / "release" / CANDIDATE_NAME
             candidate = json.loads(candidate_path.read_text(encoding="utf-8"))
             candidate["release_config_identity"] = "sha256:" + "0" * 64
-            candidate_path.write_text(json.dumps(candidate), encoding="utf-8")
+            _write_candidate(candidate_path, candidate)
             errors = validate_candidate(root, client)
         _assert_stable(self, errors)
         self.assertTrue(
             any("release_config_identity" in error for error in errors), errors
+        )
+
+    def test_validate_candidate_rejects_tampered_pinned_source_sha(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            client = _materialize_client(root)
+            candidate_path = client / "production" / "release" / CANDIDATE_NAME
+            candidate = json.loads(candidate_path.read_text(encoding="utf-8"))
+            candidate["source_sha"] = "a" * 40
+            candidate["candidate_identity"] = canonical_identity(
+                {field: candidate[field] for field in CANONICAL_FIELDS}
+            )
+            _write_candidate(candidate_path, candidate)
+            errors = validate_candidate(root, client)
+        _assert_stable(self, errors)
+        self.assertTrue(
+            any(
+                "source_sha does not match the pinned fixture" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_validate_candidate_rejects_tampered_pinned_build_version(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            client = _materialize_client(root)
+            candidate_path = client / "production" / "release" / CANDIDATE_NAME
+            candidate = json.loads(candidate_path.read_text(encoding="utf-8"))
+            candidate["build_version"] = "9.9.9+tampered"
+            candidate["candidate_identity"] = canonical_identity(
+                {field: candidate[field] for field in CANONICAL_FIELDS}
+            )
+            _write_candidate(candidate_path, candidate)
+            errors = validate_candidate(root, client)
+        _assert_stable(self, errors)
+        self.assertTrue(
+            any(
+                "build_version does not match the pinned fixture" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_validate_candidate_rejects_tampered_migration_identity(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            client = _materialize_client(root)
+            candidate_path = client / "production" / "release" / CANDIDATE_NAME
+            candidate = json.loads(candidate_path.read_text(encoding="utf-8"))
+            candidate["migration_set_entries"][0]["sha256"] = "sha256:" + "0" * 64
+            _write_candidate(candidate_path, candidate)
+            errors = validate_candidate(root, client)
+        _assert_stable(self, errors)
+        self.assertTrue(
+            any(
+                "does not match the recomputed migration set identity" in error
+                for error in errors
+            ),
+            errors,
         )
 
     def test_main_validates_reference_cleanly(self):

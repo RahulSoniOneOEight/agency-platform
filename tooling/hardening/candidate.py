@@ -18,9 +18,11 @@ vectors in ``tooling/validation/test_h2_candidate.py``).
 
 - **candidate identity** — over exactly the nine canonical candidate fields
   (snake_case), matching Dart.
-- **migration-set identity** — over the ordered list of
+- **migration-set identity** — over the ordered ``migration_set_entries`` list of
   ``{"path", "sha256"}`` pairs for the CRLF-normalized ``supabase/migrations/*.sql``
-  files (the plan's ordered ``(path, normalized content hash)`` convention).
+  files (the plan's ordered ``(path, normalized content hash)`` convention). The
+  pairs are embedded in the candidate so ``verify_candidate_artifact`` — which has
+  no filesystem access — can recompute the identity instead of trusting it.
 - **release-config identity** — over the canonical production client-safe
   config; it must equal the production ``config_identity`` recorded in the H.1
   foundation report.
@@ -56,7 +58,13 @@ CONFIG_RELATIVE = Path("production") / "config"
 PRODUCTION_CONFIG_NAME = "production.json"
 H1_REPORT_RELATIVE = Path("production") / "evidence" / "h1-foundation-report.json"
 MIGRATIONS_RELATIVE = Path("supabase") / "migrations"
-APPROVED_EXPERIENCE_NAME = "approved-experience.yaml"
+# R13: H.2 binds the *existing* F review/approval evidence as the approved
+# experience authority. reference-commerce has no ``approved-experience.yaml``;
+# H.2 must never create one (that would create approval authority it does not
+# own). The authoritative artifact is the F review/approval evidence.
+APPROVAL_EVIDENCE_RELATIVE = (
+    Path("reference-e2e") / "evidence" / "review-approval-evidence.json"
+)
 
 TARGET_ENVIRONMENT = "production"
 
@@ -74,6 +82,29 @@ CANONICAL_FIELDS: tuple[str, ...] = (
     "build_version",
     "migration_set",
     "release_config_identity",
+    "approved_experience_ref",
+    "h1_foundation_report_ref",
+)
+
+# Derived binding fields emitted alongside the nine canonical fields. They are
+# not part of the canonical candidate identity (which must stay byte-equal to
+# the Dart ``candidateIdentity``) but the schema requires them and
+# ``verify_candidate_artifact`` validates them.
+DERIVED_FIELDS: tuple[str, ...] = (
+    "candidate_identity",
+    "migration_set_identity",
+    "migration_set_entries",
+)
+
+CANDIDATE_KEYS: frozenset[str] = frozenset(CANONICAL_FIELDS) | frozenset(
+    DERIVED_FIELDS
+)
+
+# Top-level fields the schema constrains with ``minLength: 1``.
+_NON_EMPTY_FIELDS: tuple[str, ...] = (
+    "client_id",
+    "target_environment",
+    "build_version",
     "approved_experience_ref",
     "h1_foundation_report_ref",
 )
@@ -176,8 +207,10 @@ def build_candidate(
     """Build the canonical release candidate for an artifact.
 
     Returns the nine canonical candidate fields plus ``candidate_identity``
-    (over the nine fields, matching Dart) and ``migration_set_identity`` (over
-    the ordered migration ``(path, normalized content hash)`` pairs).
+    (over the nine fields, matching Dart), ``migration_set_entries`` (the
+    ordered ``{path, sha256}`` pairs embedded so the identity is recomputable
+    without filesystem access), and ``migration_set_identity`` (over
+    ``migration_set_entries``).
     """
     root = Path(root)
     client_dir = Path(client_dir)
@@ -195,19 +228,50 @@ def build_candidate(
         "migration_set": [entry["path"] for entry in migration_entries],
         "release_config_identity": _release_config_identity(client_dir),
         "approved_experience_ref": _relative(
-            root, client_dir / APPROVED_EXPERIENCE_NAME
+            root, client_dir / APPROVAL_EVIDENCE_RELATIVE
         ),
         "h1_foundation_report_ref": _relative(root, client_dir / H1_REPORT_RELATIVE),
     }
 
     candidate: dict[str, Any] = dict(fields)
     candidate["candidate_identity"] = canonical_identity(fields)
+    candidate["migration_set_entries"] = migration_entries
     candidate["migration_set_identity"] = canonical_identity(migration_entries)
     return candidate
 
 
 def _candidate_fields(candidate: Mapping[str, Any]) -> dict[str, Any]:
     return {field: candidate.get(field) for field in CANONICAL_FIELDS}
+
+
+def _validate_relative_path(
+    value: Any, label: str, errors: list[str]
+) -> str | None:
+    """Validate a POSIX relative path, appending stable errors on failure.
+
+    Returns the path when valid, else ``None``. Rejects empty/non-string,
+    absolute paths, backslashes, and ``..`` segments (the schema and every
+    manifest docstring claim POSIX relative paths).
+    """
+    if not isinstance(value, str) or not value:
+        errors.append(f"{label}: must be a non-empty POSIX relative path")
+        return None
+    if value.startswith("/"):
+        errors.append(
+            f"{label}: must be a POSIX relative path (absolute paths are not allowed)"
+        )
+        return None
+    if "\\" in value:
+        errors.append(
+            f"{label}: must be a POSIX relative path (backslashes are not allowed)"
+        )
+        return None
+    if ".." in value.split("/"):
+        errors.append(
+            f"{label}: must be a POSIX relative path ('..' segments are not allowed)"
+        )
+        return None
+    return value
 
 
 def _entry_errors(entries: Any, errors: list[str]) -> None:
@@ -222,15 +286,12 @@ def _entry_errors(entries: Any, errors: list[str]) -> None:
         if not isinstance(entry, Mapping):
             errors.append(f"artifact_manifest.entries[{index}]: must be an object")
             continue
-        path = entry.get("path")
-        digest = entry.get("sha256")
-        if not isinstance(path, str) or not path:
-            errors.append(
-                f"artifact_manifest.entries[{index}].path: must be a non-empty "
-                "POSIX relative path"
-            )
-        else:
+        path = _validate_relative_path(
+            entry.get("path"), f"artifact_manifest.entries[{index}].path", errors
+        )
+        if path is not None:
             paths.append(path)
+        digest = entry.get("sha256")
         if not isinstance(digest, str) or not _SHA256_RE.match(digest):
             errors.append(
                 f"artifact_manifest.entries[{index}].sha256: invalid sha256 digest"
@@ -240,6 +301,33 @@ def _entry_errors(entries: Any, errors: list[str]) -> None:
         errors.append("artifact_manifest.entries: paths must be sorted")
     if len(paths) != len(set(paths)):
         errors.append("artifact_manifest.entries: paths must be unique")
+
+
+def _migration_entry_errors(entries: Any, errors: list[str]) -> None:
+    """Validate ``candidate.migration_set_entries`` ordering and shape."""
+    if not isinstance(entries, list) or not entries:
+        errors.append(
+            "candidate.migration_set_entries: must be a non-empty list of entries"
+        )
+        return
+
+    paths: list[str] = []
+    for index, entry in enumerate(entries):
+        label = f"candidate.migration_set_entries[{index}]"
+        if not isinstance(entry, Mapping):
+            errors.append(f"{label}: must be an object")
+            continue
+        path = _validate_relative_path(entry.get("path"), f"{label}.path", errors)
+        if path is not None:
+            paths.append(path)
+        digest = entry.get("sha256")
+        if not isinstance(digest, str) or not _SHA256_RE.match(digest):
+            errors.append(f"{label}.sha256: invalid sha256 digest")
+
+    if len(paths) == len(entries) and paths != sorted(paths):
+        errors.append("candidate.migration_set_entries: paths must be sorted")
+    if len(paths) != len(set(paths)):
+        errors.append("candidate.migration_set_entries: paths must be unique")
 
 
 def verify_candidate_artifact(
@@ -261,6 +349,14 @@ def verify_candidate_artifact(
         if field not in candidate:
             errors.append(f"candidate.{field}: missing required candidate field")
 
+    for field in sorted(set(candidate) - CANDIDATE_KEYS):
+        errors.append(f"candidate.{field}: unknown top-level candidate field")
+
+    for field in _NON_EMPTY_FIELDS:
+        value = candidate.get(field)
+        if not isinstance(value, str) or not value:
+            errors.append(f"candidate.{field}: must be a non-empty string")
+
     source_sha = candidate.get("source_sha")
     if not isinstance(source_sha, str) or not _SOURCE_SHA_RE.match(source_sha):
         errors.append("candidate.source_sha: must be 40 lowercase hex characters")
@@ -276,6 +372,51 @@ def verify_candidate_artifact(
         errors.append(
             "candidate.release_config_identity: must match ^sha256:[0-9a-f]{64}$"
         )
+
+    migration_set = candidate.get("migration_set")
+    if not isinstance(migration_set, list) or not migration_set:
+        errors.append("candidate.migration_set: must be a non-empty list of paths")
+    else:
+        valid_paths: list[str] = []
+        for index, path in enumerate(migration_set):
+            checked = _validate_relative_path(
+                path, f"candidate.migration_set[{index}]", errors
+            )
+            if checked is not None:
+                valid_paths.append(checked)
+        if len(valid_paths) == len(migration_set) and valid_paths != sorted(valid_paths):
+            errors.append("candidate.migration_set: paths must be sorted")
+        if len(valid_paths) != len(set(valid_paths)):
+            errors.append("candidate.migration_set: paths must be unique")
+
+    migration_entries = candidate.get("migration_set_entries")
+    _migration_entry_errors(migration_entries, errors)
+
+    declared_migration_identity = candidate.get("migration_set_identity")
+    if not isinstance(declared_migration_identity, str) or not _SHA256_RE.match(
+        declared_migration_identity
+    ):
+        errors.append(
+            "candidate.migration_set_identity: must match ^sha256:[0-9a-f]{64}$"
+        )
+    elif isinstance(migration_entries, list):
+        if declared_migration_identity != canonical_identity(migration_entries):
+            errors.append(
+                "candidate.migration_set_identity: does not match the "
+                "recomputed migration set identity"
+            )
+
+    if isinstance(migration_set, list) and isinstance(migration_entries, list):
+        entry_paths = [
+            entry.get("path")
+            for entry in migration_entries
+            if isinstance(entry, Mapping)
+        ]
+        if entry_paths != migration_set:
+            errors.append(
+                "candidate.migration_set_entries: paths must match "
+                "candidate.migration_set"
+            )
 
     declared_identity = candidate.get("candidate_identity")
     if not isinstance(declared_identity, str) or not _SHA256_RE.match(
@@ -388,6 +529,17 @@ def validate_candidate(root: Path, client_dir: Path) -> list[str]:
         return [f"{manifest_rel}: artifact manifest must be a JSON object"]
 
     errors.extend(verify_candidate_artifact(candidate, manifest))
+
+    if candidate.get("source_sha") != FIXTURE_SOURCE_SHA:
+        errors.append(
+            f"{candidate_rel}: source_sha does not match the pinned fixture "
+            "source SHA"
+        )
+    if candidate.get("build_version") != FIXTURE_BUILD_VERSION:
+        errors.append(
+            f"{candidate_rel}: build_version does not match the pinned fixture "
+            "build version"
+        )
 
     try:
         fresh_manifest = build_artifact_manifest(fixture_path)

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "h2-release-candidate.schema.json",
   "type": "object",
-  "required": ["client_id","target_environment","source_sha","artifact_digest","build_version","migration_set","release_config_identity","approved_experience_ref","h1_foundation_report_ref","candidate_identity","migration_set_identity"],
+  "required": ["client_id","target_environment","source_sha","artifact_digest","build_version","migration_set","release_config_identity","approved_experience_ref","h1_foundation_report_ref","candidate_identity","migration_set_identity","migration_set_entries"],
   "properties": {
     "client_id": {"type":"string","minLength":1},
     "target_environment": {"type":"string","minLength":1},
@@ -14,7 +14,19 @@
     "approved_experience_ref": {"type":"string","minLength":1},
     "h1_foundation_report_ref": {"type":"string","minLength":1},
     "candidate_identity": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
-    "migration_set_identity": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$"}
+    "migration_set_identity": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "migration_set_entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "sha256"],
+        "properties": {
+          "path": {"type":"string","minLength":1},
+          "sha256": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$"}
+        },
+        "additionalProperties": false
+      }
+    }
   },
   "additionalProperties": false
 }
