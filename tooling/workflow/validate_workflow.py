@@ -50,6 +50,7 @@ WORKFLOW_FILES = [
     "06-visual-qa.md",
     "07-client-review.md",
     "08-productionize.md",
+    "09-release.md",
 ]
 TEMPLATE_FILES = [
     "client-profile.yaml",

@@ -51,7 +51,7 @@ The stage-08 gate is named `production-foundation`. It verifies:
 - Do not commit privileged secrets (service-role key, vendor/webhook secrets, ERP/payment/WhatsApp credentials) to the app or its config.
 
 ## NEXT
-Release / reusable-learning promotion workflow defined by later delivery milestones.
+`09-release.md`
 
 ## RUNTIME
 Execute through `tooling.workflow.runner`; the machine-readable contract is `workflows/contracts/08-productionize.yaml`.

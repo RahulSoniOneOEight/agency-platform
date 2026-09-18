@@ -108,7 +108,7 @@
   "authority_checks": {
     "f_machine_report": {
       "ref": "client-projects/reference-commerce/reference-e2e/report/reference-report.json",
-      "report_identity": "sha256:b1f9234cb24db40ca1463022fabd0527a434283a1ddd0de89e9409f020037c23"
+      "report_identity": "sha256:70e66f7c8028505109448b0b407f00a2670d88f57ddda094394ee723549d85a6"
     },
     "g_production_authorization": {
       "identity": "sha256:74c9e507e78d87da5250baa907dab7019fe39c089c5320773baa38ad2230e0e5",
@@ -352,6 +352,6 @@
       "ref": "packages/agency_production_core/lib/src/ports/integrations.dart"
     }
   ],
-  "report_identity": "sha256:f9a40ab4bea212f9c6a35022df4765739d91f80a1bd871142ce96487e3adbd8c",
+  "report_identity": "sha256:0dbc75ff4069cd8903435f5d29174b05e3195586a68efa4eb990934be9ad8741",
   "report_version": 1
 }

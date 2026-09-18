@@ -1,0 +1,19 @@
+stage: release
+version: 1
+requires:
+  stages:
+    - productionize
+  artifacts:
+    - production/evidence/h1-foundation-report.json
+    - production/evidence/h2-hardening-report.json
+produces:
+  - production/evidence/release-record.json
+validators:
+  - h2-hardening
+  - production-authorization
+  - h2-release-record
+checkpoints:
+  - staging-validated
+  - candidate-authorized
+  - production-released
+next: []

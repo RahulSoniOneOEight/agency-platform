@@ -26,6 +26,7 @@ STAGES = [
     "visual-qa",
     "client-review",
     "productionize",
+    "release",
 ]
 
 STATUSES = {"not_started", "in_progress", "blocked", "complete"}

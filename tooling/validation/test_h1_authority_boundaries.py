@@ -59,6 +59,26 @@ AUTHORITY_NAME_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+# H.2 legitimately adds the hardening/release evidence areas under ``production/``
+# (spec §24) plus the plan-mandated *pointer* ref
+# ``production/release/production-authorization-ref.json``. The pointer binds the
+# exact H.2 candidate to the G authorization id/path; it is not an authorization
+# body (the body lives outside ``production/`` under ``release/reference-proof/``).
+# These guards therefore allow the H.2 layout while still forbidding an actual
+# authorization body, duplicated review/approval/QA authority, and any production
+# deployment artifact under ``production/``.
+H2_PRODUCTION_DIRS = frozenset({"hardening", "release"})
+H2_AUTHORIZATION_REF = (
+    PRODUCTION_DIR / "release" / "production-authorization-ref.json"
+)
+AUTHORIZATION_BODY_MARKERS = (
+    "authorized_by",
+    "authorized_at",
+    "build",
+    "status",
+    "supersedes",
+)
+
 _IMPORT_PATTERN = re.compile(
     r"^\s*(?:from|import)\s+tooling\.production_authorization", re.MULTILINE
 )
@@ -130,18 +150,47 @@ class H1AuthorityBoundaryTests(unittest.TestCase):
         self.assertTrue(PRODUCTION_DIR.is_dir(), PRODUCTION_DIR)
         offenders = []
         for path in sorted(PRODUCTION_DIR.rglob("*")):
+            if path == H2_AUTHORIZATION_REF:
+                # The H.2 pointer ref is a candidate->authorization binding, not
+                # a duplicated authority; it is asserted to be a pointer (not a
+                # body) by test_production_authorization_ref_is_a_pointer_not_a_body.
+                continue
             if AUTHORITY_NAME_PATTERN.search(path.name):
                 offenders.append(_relative(path))
         self.assertEqual([], offenders, offenders)
 
-    def test_production_contains_only_implementation_artifacts(self):
+    def test_production_contains_only_implementation_and_h2_evidence_artifacts(self):
         entries = {path.name for path in PRODUCTION_DIR.iterdir()}
-        self.assertEqual({"config", "fixtures", "evidence"}, entries)
+        self.assertEqual(
+            {"config", "fixtures", "evidence"} | set(H2_PRODUCTION_DIRS), entries
+        )
 
-    def test_no_production_authorization_file_exists_under_production(self):
+    def test_no_production_authorization_body_exists_under_production(self):
+        offenders = [
+            _relative(path)
+            for path in sorted(PRODUCTION_DIR.rglob("*authorization*"))
+            if path != H2_AUTHORIZATION_REF
+        ]
+        self.assertEqual(
+            [],
+            offenders,
+            "H.1/H.2 must never write an authorization body under production/",
+        )
+
+    def test_production_authorization_ref_is_a_pointer_not_a_body(self):
+        self.assertTrue(H2_AUTHORIZATION_REF.is_file(), H2_AUTHORIZATION_REF)
+        payload = json.loads(H2_AUTHORIZATION_REF.read_text(encoding="utf-8"))
+        for marker in AUTHORIZATION_BODY_MARKERS:
+            self.assertNotIn(
+                marker,
+                payload,
+                f"pointer ref must not carry an authorization-body field {marker!r}",
+            )
+        self.assertIn("authorization_path", payload)
+        body_path = ROOT / payload["authorization_path"]
         self.assertFalse(
-            list(PRODUCTION_DIR.rglob("*authorization*")),
-            "H.1 must never write an authorization artifact under production/",
+            body_path.is_relative_to(PRODUCTION_DIR),
+            f"the H.2 authorization body must live outside production/: {body_path}",
         )
 
     def test_flutter_configs_contain_no_forbidden_secret_key(self):

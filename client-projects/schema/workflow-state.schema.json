@@ -34,7 +34,8 @@
         "build-prototype",
         "visual-qa",
         "client-review",
-        "productionize"
+        "productionize",
+        "release"
       ]
     },
     "status": {
@@ -80,7 +81,8 @@
         "build-prototype",
         "visual-qa",
         "client-review",
-        "productionize"
+        "productionize",
+        "release"
       ]
     },
     "stage": { "$ref": "#/$defs/stageName" },

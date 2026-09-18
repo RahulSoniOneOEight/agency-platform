@@ -193,6 +193,14 @@ python -m tooling.production.validate_migrations
 python -m tooling.production.report client-projects/reference-commerce
 ```
 
+H.2 hardening/release changes additionally run:
+
+```text
+python -m unittest tooling.validation.test_h2_workflow_integration tooling.validation.test_h2_authority_boundaries -v
+python -m tooling.hardening.validate client-projects/reference-commerce
+python -m tooling.release.release_record client-projects/reference-commerce
+```
+
 Flutter CI must additionally analyze/test initialized packages/apps and build `apps/prototype_app` and `apps/production_app` for web.
 
 ## Visual completion rule
@@ -201,7 +209,9 @@ Meaningful UI work is not complete based on Dart analysis or unit tests alone. F
 
 ## Current scope guardrail
 
-Milestone B includes the shared Flutter prototype system, deterministic fixtures, Widgetbook, prototype composition, screenshot/visual-QA contracts, and client approval workflow. Milestone H.1 adds the production foundation only: provider-neutral production ports, a reference Supabase/Postgres + Supabase Auth adapter, deterministic fake ERP/payment/shipping/CRM/WhatsApp adapters, validated dev/staging/production configuration, and versioned migrations. Real vendor integrations, n8n, production deployment pipelines, and app-store release automation remain later milestones unless explicitly authorized.
+Milestone B includes the shared Flutter prototype system, deterministic fixtures, Widgetbook, prototype composition, screenshot/visual-QA contracts, and client approval workflow. Milestone H.1 adds the production foundation only: provider-neutral production ports, a reference Supabase/Postgres + Supabase Auth adapter, deterministic fake ERP/payment/shipping/CRM/WhatsApp adapters, validated dev/staging/production configuration, and versioned migrations.
+
+H.2 is the current milestone. It is one model with two halves: **H.2A operational hardening** (provider-neutral observability/analytics/deployment, performance, accessibility, security, migration readiness, recovery, and the no-rebuild rule) and **H.2B authorized release** (staging-first exact-candidate promotion, production smoke, telemetry health, and an immutable `ReleaseRecord`). Real client-specific vendor integrations, n8n, Android/iOS store release automation, and multi-client production operations remain later extensions unless explicitly authorized.
 
 ## Production foundation (H.1) operating model
 
@@ -209,6 +219,15 @@ Milestone B includes the shared Flutter prototype system, deterministic fixtures
 - H.1 performs no production deployment and cannot create or rewrite a `ProductionAuthorization`; existing C/D/E/F/G authorities remain unchanged.
 - The deterministic evidence report is `client-projects/reference-commerce/production/evidence/h1-foundation-report.json`; its identity is SHA-256 over canonical report content excluding `report_identity`, and it references F/G authorities by identity/ref only.
 - Normal CI requires no production credentials and no live Supabase project; Supabase imports stay in `packages/agency_supabase_adapter/` and the app composition boundary.
+
+## Production hardening and release (H.2) operating model
+
+- Stage 08 `productionize` remains H.1 production foundation: completion is **production-capable**, it never deploys or authorizes, and its `next` is `release`.
+- Stage 09 `release` is H.2B: it consumes the immutable H.1 foundation evidence, the H.2A hardening/staging evidence, and the exact Milestone-G `ProductionAuthorization`, then produces the immutable `client-projects/reference-commerce/production/evidence/release-record.json`.
+- H.2A creates hardening/staging evidence only. H.2B executes the authorized, no-rebuild promotion of the exact staging-tested artifact. Neither half creates, grants, or mutates a `ProductionAuthorization`.
+- Authorization remains human/Milestone-G authority. The H.2 reference proof uses a synthetic human authorization fixture bound to the exact candidate; it is a permission artifact under `release/reference-proof/`, never a production implementation artifact.
+- Workflow-state authority remains with `tooling.workflow.runner`; stage 09 completes only after the `h2-hardening`, `production-authorization`, and `h2-release-record` validators pass, with checkpoints `staging-validated`, `candidate-authorized`, and `production-released`.
+- Normal CI requires no production credentials; privileged provider credentials remain CI/server secrets.
 
 ## OpenCode model routing
 

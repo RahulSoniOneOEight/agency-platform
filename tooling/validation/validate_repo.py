@@ -42,6 +42,8 @@ from tooling.production_authorization.validate import (  # noqa: E402
 from tooling.production.report import (  # noqa: E402
     validate_production_foundation,
 )
+from tooling.hardening.validate import validate_hardening  # noqa: E402
+from tooling.release.release_record import validate_release_record  # noqa: E402
 
 REFERENCE_CLIENT_RELATIVE = "client-projects/reference-commerce"
 
@@ -240,6 +242,39 @@ REQUIRED_PATHS = (
     "tooling/validation/test_h1_reference_report.py",
     "tooling/validation/test_h1_authority_boundaries.py",
     "workflows/08-productionize.md",
+    "workflows",
+    "workflows/09-release.md",
+    "workflows/contracts/09-release.yaml",
+    "tooling/hardening",
+    "tooling/hardening/validate.py",
+    "tooling/hardening/report.py",
+    "tooling/release",
+    "tooling/release/release_record.py",
+    "client-projects/schema/h2-release-candidate.schema.json",
+    "client-projects/schema/h2-hardening-report.schema.json",
+    "client-projects/schema/h2-smoke-report.schema.json",
+    "client-projects/schema/h2-release-record.schema.json",
+    "client-projects/schema/h2-telemetry-health-report.schema.json",
+    "client-projects/reference-commerce/production/hardening",
+    "client-projects/reference-commerce/production/hardening/fixture-gate-evidence.json",
+    "client-projects/reference-commerce/production/hardening/hardening-policy.yaml",
+    "client-projects/reference-commerce/production/hardening/recovery-policy.yaml",
+    "client-projects/reference-commerce/production/release/candidate.json",
+    "client-projects/reference-commerce/production/release/artifact-manifest.json",
+    "client-projects/reference-commerce/production/release/staging-deployment.json",
+    "client-projects/reference-commerce/production/release/production-authorization-ref.json",
+    "client-projects/reference-commerce/production/evidence/h2-hardening-report.json",
+    "client-projects/reference-commerce/production/evidence/staging-smoke-report.json",
+    "client-projects/reference-commerce/production/evidence/production-smoke-report.json",
+    "client-projects/reference-commerce/production/evidence/telemetry-health-report.json",
+    "client-projects/reference-commerce/production/evidence/release-record.json",
+    "client-projects/reference-commerce/release/reference-proof/production-authorization-v0001.json",
+    "packages/agency_operations_core",
+    "packages/agency_sentry_adapter",
+    "packages/agency_ga4_adapter",
+    "packages/agency_cloudflare_adapter",
+    "tooling/validation/test_h2_workflow_integration.py",
+    "tooling/validation/test_h2_authority_boundaries.py",
 )
 
 
@@ -414,6 +449,28 @@ def production_foundation_errors(root: Path) -> list[str]:
     return validate_production_foundation(root, client_dir)
 
 
+def h2_hardening_errors(root: Path) -> list[str]:
+    """Return H.2A hardening-evidence validation errors.
+
+    Re-validates the committed staging smoke and hardening reports against the
+    frozen candidate, the staging deployment, and the committed fixture gate
+    evidence. It never creates authorization and never deploys.
+    """
+    client_dir = root / REFERENCE_CLIENT_RELATIVE
+    return validate_hardening(root, client_dir)
+
+
+def h2_release_record_errors(root: Path) -> list[str]:
+    """Return H.2B immutable ReleaseRecord validation errors.
+
+    Verifies the committed release record and every evidence binding (candidate,
+    G authorization, hardening, staging smoke, production smoke, telemetry
+    health). It consumes the authorization by reference and never creates it.
+    """
+    client_dir = root / REFERENCE_CLIENT_RELATIVE
+    return validate_release_record(root, client_dir)
+
+
 def main(root: Path | None = None) -> int:
     root = root if root is not None else _ROOT
     missing = missing_required_paths(root)
@@ -424,6 +481,8 @@ def main(root: Path | None = None) -> int:
     reference_errors = reference_client_errors(root)
     authorization_errors = production_authorization_errors(root)
     production_errors = production_foundation_errors(root)
+    hardening_errors = h2_hardening_errors(root)
+    release_record_errors = h2_release_record_errors(root)
     if (
         missing
         or bundle_errors
@@ -433,6 +492,8 @@ def main(root: Path | None = None) -> int:
         or reference_errors
         or authorization_errors
         or production_errors
+        or hardening_errors
+        or release_record_errors
     ):
         print("Repository validation failed.")
         if missing:
@@ -467,14 +528,23 @@ def main(root: Path | None = None) -> int:
             print("Production foundation validation errors:")
             for error in production_errors:
                 print(f"- {error}")
+        if hardening_errors:
+            print("H.2 hardening validation errors:")
+            for error in hardening_errors:
+                print(f"- {error}")
+        if release_record_errors:
+            print("H.2 release-record validation errors:")
+            for error in release_record_errors:
+                print(f"- {error}")
         return 1
 
     print(
         f"Repository validation passed: {len(REQUIRED_PATHS)} required paths present, "
         "generated runtime bundles are fresh, Flutter design bindings are valid, "
         "token/theme contracts are valid, refinement notes are valid, the "
-        "reference client is valid, production authorization is valid, and the "
-        "production foundation is valid."
+        "reference client is valid, production authorization is valid, the "
+        "production foundation is valid, H.2 hardening evidence is valid, and the "
+        "H.2 release record is valid."
     )
     return 0
 

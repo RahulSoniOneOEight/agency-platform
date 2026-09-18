@@ -310,6 +310,44 @@ class ValidatorContractTests(unittest.TestCase):
         ):
             self.assertIn(path, validator.REQUIRED_PATHS)
 
+    def test_milestone_h2_production_paths_are_required(self):
+        validator = self.load_validator()
+        for path in (
+            "workflows",
+            "workflows/09-release.md",
+            "workflows/contracts/09-release.yaml",
+            "tooling/hardening",
+            "tooling/hardening/validate.py",
+            "tooling/release",
+            "tooling/release/release_record.py",
+            "client-projects/schema/h2-release-candidate.schema.json",
+            "client-projects/schema/h2-hardening-report.schema.json",
+            "client-projects/schema/h2-smoke-report.schema.json",
+            "client-projects/schema/h2-release-record.schema.json",
+            "client-projects/schema/h2-telemetry-health-report.schema.json",
+            "client-projects/reference-commerce/production/hardening",
+            "client-projects/reference-commerce/production/release/candidate.json",
+            "client-projects/reference-commerce/production/release/production-authorization-ref.json",
+            "client-projects/reference-commerce/production/evidence/h2-hardening-report.json",
+            "client-projects/reference-commerce/production/evidence/release-record.json",
+            "client-projects/reference-commerce/release/reference-proof/production-authorization-v0001.json",
+            "packages/agency_operations_core",
+            "packages/agency_sentry_adapter",
+            "packages/agency_ga4_adapter",
+            "packages/agency_cloudflare_adapter",
+            "tooling/validation/test_h2_workflow_integration.py",
+            "tooling/validation/test_h2_authority_boundaries.py",
+        ):
+            self.assertIn(path, validator.REQUIRED_PATHS)
+
+    def test_current_repository_h2_hardening_is_valid(self):
+        validator = self.load_validator()
+        self.assertEqual([], validator.h2_hardening_errors(ROOT))
+
+    def test_current_repository_h2_release_record_is_valid(self):
+        validator = self.load_validator()
+        self.assertEqual([], validator.h2_release_record_errors(ROOT))
+
     def test_current_repository_production_foundation_is_valid(self):
         validator = self.load_validator()
         self.assertEqual([], validator.production_foundation_errors(ROOT))

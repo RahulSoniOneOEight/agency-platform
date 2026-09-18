@@ -11,4 +11,5 @@ validators:
   - production-foundation
 checkpoints:
   - production-capable
-next: []
+next:
+  - release
