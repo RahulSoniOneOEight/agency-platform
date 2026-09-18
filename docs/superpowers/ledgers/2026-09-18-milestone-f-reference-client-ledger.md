@@ -182,6 +182,32 @@ committed Dart review records cannot be byte-reproduced. Determinism must be ass
 
 ## Progress log
 
+- 2026-09-18 — **Final whole-branch review: ACCEPT-WITH-MINORS — 0 blockers / 0 majors met.**
+  All 39 checklist items PASS; adversarial probes confirmed bundle and report regeneration are
+  byte-identical, each committed evidence file is rejected when tampered, no subjective score
+  exists, no `ProductionAuthorization` appears, no B–E authority file changed, and no lockfile is
+  tracked. Reviewer-recommended minors fixed in the final commit:
+  - **m1 (guard gap)** — `no_duplicate_authority` matched only a narrow filename set; it now also
+    rejects `review-index.*`/`review_index.*`/`review_state.*`/`approvals*.*`/`feedback*.*`/
+    `batch*.*`/`qa_finding*.*`/`findings*.*`/`runs*.*`. Verified: injecting those files under
+    `reference-e2e/` now fails the assertion.
+  - **m2 (spec §9.1)** — the machine report now surfaces executed validator **outcomes** via
+    `workflow.validator_outcomes` (per stage: declared validators, `executed`, `status`, `source`),
+    derived from the resume evidence's completed stages (the E runtime advances only after the
+    declared validators pass). Schema extended; reports regenerated.
+  - **m9** — the worktree copy of `change-scenarios-evidence.json` was renormalized to LF.
+  - **Accepted minors (adjudicated, non-gating):** `no_duplicate_authority` remains a filename
+    heuristic (defense-in-depth; the committed tree is clean); “Compare” is proven by the
+    comparison artifact + the report + the existing C.2 comparison suite rather than a new F.3
+    assertion; direction `b` render coverage, the behavioural implementation-only guarantee, the
+    same-process “fresh session”, and the synthetic per-approval `review_state_hash` reference
+    identity are already ruled in this ledger; two synthetic resource candidates reference
+    placeholder asset paths that are not committed (they affect neither the runtime bundle nor any
+    validator, and the canonical provenance fields are present).
+  - Post-fix counts: repo suite **797 tests OK**; `validate_repo` 150 paths; the reference-client
+    validator passes (byte-fresh); all other validators and freshness checks pass.
+
+
 - 2026-09-18 — **Cycle F.3 implemented (Tasks 8–10).**
   - **Task 8** (`19af278`) — change boundaries proven in Dart
     (`apps/prototype_app/test/reference_client/reference_client_change_scenarios_test.dart`) plus

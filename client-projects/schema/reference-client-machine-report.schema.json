@@ -5,7 +5,15 @@
   "description": "Aggregated machine-readable evidence for the reference-commerce end-to-end journey. Evidence only (RF6): it records ids, versions, counts, statuses, hashes, and references, never a copied review/approval/QA authority body and never a subjective overall score (RF5).",
   "type": "object",
   "additionalProperties": false,
-  "propertyNames": { "not": { "enum": ["overall_score", "score", "quality_score"] } },
+  "propertyNames": {
+    "not": {
+      "enum": [
+        "overall_score",
+        "score",
+        "quality_score"
+      ]
+    }
+  },
   "required": [
     "report_version",
     "client_id",
@@ -31,55 +39,114 @@
     "report_identity"
   ],
   "properties": {
-    "report_version": { "const": 1 },
-    "client_id": { "type": "string", "minLength": 1 },
-    "client_name": { "type": "string", "minLength": 1 },
-    "fixture_version": { "type": "integer", "minimum": 1 },
-    "fixture_identity": { "$ref": "#/$defs/identity" },
+    "report_version": {
+      "const": 1
+    },
+    "client_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "client_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fixture_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "fixture_identity": {
+      "$ref": "#/$defs/identity"
+    },
     "scenario_ids": {
       "type": "array",
       "minItems": 1,
-      "items": { "type": "string", "minLength": 1 }
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
     },
-    "source_commit_sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
-    "client_profile": { "$ref": "#/$defs/clientProfile" },
+    "source_commit_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "client_profile": {
+      "$ref": "#/$defs/clientProfile"
+    },
     "directions": {
       "type": "array",
       "minItems": 1,
-      "items": { "$ref": "#/$defs/direction" }
+      "items": {
+        "$ref": "#/$defs/direction"
+      }
     },
-    "selected_experience": { "$ref": "#/$defs/selectedExperience" },
-    "workflow": { "$ref": "#/$defs/workflow" },
+    "selected_experience": {
+      "$ref": "#/$defs/selectedExperience"
+    },
+    "workflow": {
+      "$ref": "#/$defs/workflow"
+    },
     "evidence_refs": {
       "type": "array",
       "minItems": 1,
-      "items": { "type": "string", "minLength": 1 }
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
     },
-    "review": { "$ref": "#/$defs/review" },
+    "review": {
+      "$ref": "#/$defs/review"
+    },
     "approvals": {
       "type": "array",
       "minItems": 1,
-      "items": { "$ref": "#/$defs/approval" }
+      "items": {
+        "$ref": "#/$defs/approval"
+      }
     },
-    "feedback": { "$ref": "#/$defs/feedback" },
+    "feedback": {
+      "$ref": "#/$defs/feedback"
+    },
     "refinement_batches": {
       "type": "array",
-      "items": { "$ref": "#/$defs/refinementBatch" }
+      "items": {
+        "$ref": "#/$defs/refinementBatch"
+      }
     },
-    "qa": { "$ref": "#/$defs/qa" },
-    "change_boundaries": { "$ref": "#/$defs/changeBoundaries" },
-    "resume": { "$ref": "#/$defs/resume" },
-    "assertions": { "$ref": "#/$defs/assertions" },
+    "qa": {
+      "$ref": "#/$defs/qa"
+    },
+    "change_boundaries": {
+      "$ref": "#/$defs/changeBoundaries"
+    },
+    "resume": {
+      "$ref": "#/$defs/resume"
+    },
+    "assertions": {
+      "$ref": "#/$defs/assertions"
+    },
     "known_limitations": {
       "type": "array",
       "minItems": 1,
-      "items": { "type": "string", "minLength": 1 }
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
     },
-    "report_identity": { "$ref": "#/$defs/identity" }
+    "report_identity": {
+      "$ref": "#/$defs/identity"
+    }
   },
   "$defs": {
     "scoreSafe": {
-      "propertyNames": { "not": { "enum": ["overall_score", "score", "quality_score"] } }
+      "propertyNames": {
+        "not": {
+          "enum": [
+            "overall_score",
+            "score",
+            "quality_score"
+          ]
+        }
+      }
     },
     "identity": {
       "type": "string",
@@ -87,12 +154,23 @@
     },
     "stringList": {
       "type": "array",
-      "items": { "type": "string", "minLength": 1 }
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
     },
     "clientProfile": {
       "type": "object",
       "additionalProperties": false,
-      "propertyNames": { "not": { "enum": ["overall_score", "score", "quality_score"] } },
+      "propertyNames": {
+        "not": {
+          "enum": [
+            "overall_score",
+            "score",
+            "quality_score"
+          ]
+        }
+      },
       "required": [
         "id",
         "display_name",
@@ -105,21 +183,51 @@
         "platforms"
       ],
       "properties": {
-        "id": { "type": "string", "minLength": 1 },
-        "display_name": { "type": "string", "minLength": 1 },
-        "business_model": { "type": "string", "minLength": 1 },
-        "industry": { "type": "string", "minLength": 1 },
-        "use_cases": { "$ref": "#/$defs/stringList" },
-        "objectives": { "$ref": "#/$defs/stringList" },
-        "personas": { "$ref": "#/$defs/stringList" },
-        "jobs": { "$ref": "#/$defs/stringList" },
-        "platforms": { "$ref": "#/$defs/stringList" }
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "display_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "business_model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "industry": {
+          "type": "string",
+          "minLength": 1
+        },
+        "use_cases": {
+          "$ref": "#/$defs/stringList"
+        },
+        "objectives": {
+          "$ref": "#/$defs/stringList"
+        },
+        "personas": {
+          "$ref": "#/$defs/stringList"
+        },
+        "jobs": {
+          "$ref": "#/$defs/stringList"
+        },
+        "platforms": {
+          "$ref": "#/$defs/stringList"
+        }
       }
     },
     "direction": {
       "type": "object",
       "additionalProperties": false,
-      "propertyNames": { "not": { "enum": ["overall_score", "score", "quality_score"] } },
+      "propertyNames": {
+        "not": {
+          "enum": [
+            "overall_score",
+            "score",
+            "quality_score"
+          ]
+        }
+      },
       "required": [
         "id",
         "name",
@@ -131,29 +239,72 @@
         "components"
       ],
       "properties": {
-        "id": { "type": "string", "minLength": 1 },
-        "name": { "type": "string", "minLength": 1 },
-        "archetype": { "type": "string", "minLength": 1 },
-        "thesis": { "type": "string", "minLength": 1 },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "archetype": {
+          "type": "string",
+          "minLength": 1
+        },
+        "thesis": {
+          "type": "string",
+          "minLength": 1
+        },
         "primary_journey": {
           "type": "object",
           "additionalProperties": false,
-          "propertyNames": { "not": { "enum": ["overall_score", "score", "quality_score"] } },
-          "required": ["id", "steps"],
+          "propertyNames": {
+            "not": {
+              "enum": [
+                "overall_score",
+                "score",
+                "quality_score"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "steps"
+          ],
           "properties": {
-            "id": { "type": "string", "minLength": 1 },
-            "steps": { "$ref": "#/$defs/stringList" }
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "steps": {
+              "$ref": "#/$defs/stringList"
+            }
           }
         },
-        "density": { "type": "string", "minLength": 1 },
-        "patterns": { "$ref": "#/$defs/stringList" },
-        "components": { "$ref": "#/$defs/stringList" }
+        "density": {
+          "type": "string",
+          "minLength": 1
+        },
+        "patterns": {
+          "$ref": "#/$defs/stringList"
+        },
+        "components": {
+          "$ref": "#/$defs/stringList"
+        }
       }
     },
     "selectedExperience": {
       "type": "object",
       "additionalProperties": false,
-      "propertyNames": { "not": { "enum": ["overall_score", "score", "quality_score"] } },
+      "propertyNames": {
+        "not": {
+          "enum": [
+            "overall_score",
+            "score",
+            "quality_score"
+          ]
+        }
+      },
       "required": [
         "selected_direction",
         "screen_overrides",
@@ -161,89 +312,278 @@
         "direction_identities"
       ],
       "properties": {
-        "selected_direction": { "type": "string", "minLength": 1 },
+        "selected_direction": {
+          "type": "string",
+          "minLength": 1
+        },
         "screen_overrides": {
           "type": "object",
-          "propertyNames": { "not": { "enum": ["overall_score", "score", "quality_score"] } },
-          "additionalProperties": { "type": "string", "minLength": 1 }
+          "propertyNames": {
+            "not": {
+              "enum": [
+                "overall_score",
+                "score",
+                "quality_score"
+              ]
+            }
+          },
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "section_overrides": {
           "type": "object",
-          "propertyNames": { "not": { "enum": ["overall_score", "score", "quality_score"] } },
+          "propertyNames": {
+            "not": {
+              "enum": [
+                "overall_score",
+                "score",
+                "quality_score"
+              ]
+            }
+          },
           "additionalProperties": {
             "type": "object",
-            "propertyNames": { "not": { "enum": ["overall_score", "score", "quality_score"] } },
-            "additionalProperties": { "type": "string", "minLength": 1 }
+            "propertyNames": {
+              "not": {
+                "enum": [
+                  "overall_score",
+                  "score",
+                  "quality_score"
+                ]
+              }
+            },
+            "additionalProperties": {
+              "type": "string",
+              "minLength": 1
+            }
           }
         },
         "direction_identities": {
           "type": "object",
-          "propertyNames": { "not": { "enum": ["overall_score", "score", "quality_score"] } },
-          "additionalProperties": { "type": "string", "minLength": 1 }
+          "propertyNames": {
+            "not": {
+              "enum": [
+                "overall_score",
+                "score",
+                "quality_score"
+              ]
+            }
+          },
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       }
     },
     "attemptId": {
       "type": "object",
       "additionalProperties": false,
-      "propertyNames": { "not": { "enum": ["overall_score", "score", "quality_score"] } },
-      "required": ["stage", "run_id", "attempt"],
+      "propertyNames": {
+        "not": {
+          "enum": [
+            "overall_score",
+            "score",
+            "quality_score"
+          ]
+        }
+      },
+      "required": [
+        "stage",
+        "run_id",
+        "attempt"
+      ],
       "properties": {
-        "stage": { "type": "string", "minLength": 1 },
-        "run_id": { "type": "string", "minLength": 1 },
-        "attempt": { "type": "integer", "minimum": 1 }
+        "stage": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "attempt": {
+          "type": "integer",
+          "minimum": 1
+        }
       }
     },
     "workflow": {
       "type": "object",
       "additionalProperties": false,
-      "propertyNames": { "not": { "enum": ["overall_score", "score", "quality_score"] } },
-      "required": ["attempt_ids", "current_stage", "completed", "skipped", "validators"],
+      "propertyNames": {
+        "not": {
+          "enum": [
+            "overall_score",
+            "score",
+            "quality_score"
+          ]
+        }
+      },
+      "required": [
+        "attempt_ids",
+        "current_stage",
+        "completed",
+        "skipped",
+        "validators"
+      ],
       "properties": {
         "attempt_ids": {
           "type": "array",
-          "items": { "$ref": "#/$defs/attemptId" }
+          "items": {
+            "$ref": "#/$defs/attemptId"
+          }
         },
-        "current_stage": { "type": "string", "minLength": 1 },
-        "completed": { "$ref": "#/$defs/stringList" },
-        "skipped": { "$ref": "#/$defs/stringList" },
+        "current_stage": {
+          "type": "string",
+          "minLength": 1
+        },
+        "completed": {
+          "$ref": "#/$defs/stringList"
+        },
+        "skipped": {
+          "$ref": "#/$defs/stringList"
+        },
         "validators": {
           "type": "object",
-          "propertyNames": { "not": { "enum": ["overall_score", "score", "quality_score"] } },
-          "additionalProperties": { "$ref": "#/$defs/stringList" }
+          "propertyNames": {
+            "not": {
+              "enum": [
+                "overall_score",
+                "score",
+                "quality_score"
+              ]
+            }
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/stringList"
+          }
+        },
+        "validator_outcomes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "stage",
+              "validators",
+              "executed",
+              "status",
+              "source"
+            ],
+            "properties": {
+              "stage": {
+                "type": "string",
+                "minLength": 1
+              },
+              "validators": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "executed": {
+                "type": "boolean"
+              },
+              "status": {
+                "enum": [
+                  "passed",
+                  "declared_only"
+                ]
+              },
+              "source": {
+                "enum": [
+                  "resume-evidence",
+                  "stage-contract"
+                ]
+              }
+            }
+          }
         }
       }
     },
     "review": {
       "type": "object",
       "additionalProperties": false,
-      "propertyNames": { "not": { "enum": ["overall_score", "score", "quality_score"] } },
-      "required": ["rounds", "approval_versions"],
+      "propertyNames": {
+        "not": {
+          "enum": [
+            "overall_score",
+            "score",
+            "quality_score"
+          ]
+        }
+      },
+      "required": [
+        "rounds",
+        "approval_versions"
+      ],
       "properties": {
-        "rounds": { "type": "integer", "minimum": 1 },
+        "rounds": {
+          "type": "integer",
+          "minimum": 1
+        },
         "approval_versions": {
           "type": "array",
           "minItems": 1,
-          "items": { "type": "integer", "minimum": 1 }
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
         }
       }
     },
     "approval": {
       "type": "object",
       "additionalProperties": false,
-      "propertyNames": { "not": { "enum": ["overall_score", "score", "quality_score"] } },
-      "required": ["version", "review_round", "review_state_hash", "source_commit_sha"],
+      "propertyNames": {
+        "not": {
+          "enum": [
+            "overall_score",
+            "score",
+            "quality_score"
+          ]
+        }
+      },
+      "required": [
+        "version",
+        "review_round",
+        "review_state_hash",
+        "source_commit_sha"
+      ],
       "properties": {
-        "version": { "type": "integer", "minimum": 1 },
-        "review_round": { "type": "integer", "minimum": 1 },
-        "review_state_hash": { "$ref": "#/$defs/identity" },
-        "source_commit_sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "review_round": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "review_state_hash": {
+          "$ref": "#/$defs/identity"
+        },
+        "source_commit_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        }
       }
     },
     "feedbackRef": {
       "type": "object",
       "additionalProperties": false,
-      "propertyNames": { "not": { "enum": ["overall_score", "score", "quality_score"] } },
+      "propertyNames": {
+        "not": {
+          "enum": [
+            "overall_score",
+            "score",
+            "quality_score"
+          ]
+        }
+      },
       "required": [
         "id",
         "scope",
@@ -254,23 +594,60 @@
         "history_types"
       ],
       "properties": {
-        "id": { "type": "string", "minLength": 1 },
-        "scope": { "type": "string", "minLength": 1 },
-        "status": { "type": "string", "minLength": 1 },
-        "blocking": { "type": "boolean" },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "minLength": 1
+        },
+        "blocking": {
+          "type": "boolean"
+        },
         "target": {
           "type": "object",
-          "propertyNames": { "not": { "enum": ["overall_score", "score", "quality_score"] } },
-          "additionalProperties": { "type": "string", "minLength": 1 }
+          "propertyNames": {
+            "not": {
+              "enum": [
+                "overall_score",
+                "score",
+                "quality_score"
+              ]
+            }
+          },
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          }
         },
-        "origin_qa_finding_id": { "type": ["string", "null"] },
-        "history_types": { "$ref": "#/$defs/stringList" }
+        "origin_qa_finding_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "history_types": {
+          "$ref": "#/$defs/stringList"
+        }
       }
     },
     "visualRef": {
       "type": "object",
       "additionalProperties": false,
-      "propertyNames": { "not": { "enum": ["overall_score", "score", "quality_score"] } },
+      "propertyNames": {
+        "not": {
+          "enum": [
+            "overall_score",
+            "score",
+            "quality_score"
+          ]
+        }
+      },
       "required": [
         "id",
         "status",
@@ -280,50 +657,122 @@
         "effective_direction"
       ],
       "properties": {
-        "id": { "type": "string", "minLength": 1 },
-        "status": { "type": "string", "minLength": 1 },
-        "screenshot_ref": { "type": "string", "minLength": 1 },
-        "screen": { "type": "string", "minLength": 1 },
-        "section": { "type": ["string", "null"] },
-        "effective_direction": { "type": "string", "minLength": 1 }
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "minLength": 1
+        },
+        "screenshot_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "screen": {
+          "type": "string",
+          "minLength": 1
+        },
+        "section": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "effective_direction": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "feedback": {
       "type": "object",
       "additionalProperties": false,
-      "propertyNames": { "not": { "enum": ["overall_score", "score", "quality_score"] } },
-      "required": ["blocking", "non_blocking", "visual_annotations"],
+      "propertyNames": {
+        "not": {
+          "enum": [
+            "overall_score",
+            "score",
+            "quality_score"
+          ]
+        }
+      },
+      "required": [
+        "blocking",
+        "non_blocking",
+        "visual_annotations"
+      ],
       "properties": {
         "blocking": {
           "type": "array",
-          "items": { "$ref": "#/$defs/feedbackRef" }
+          "items": {
+            "$ref": "#/$defs/feedbackRef"
+          }
         },
         "non_blocking": {
           "type": "array",
-          "items": { "$ref": "#/$defs/feedbackRef" }
+          "items": {
+            "$ref": "#/$defs/feedbackRef"
+          }
         },
         "visual_annotations": {
           "type": "array",
-          "items": { "$ref": "#/$defs/visualRef" }
+          "items": {
+            "$ref": "#/$defs/visualRef"
+          }
         }
       }
     },
     "refinementBatch": {
       "type": "object",
       "additionalProperties": false,
-      "propertyNames": { "not": { "enum": ["overall_score", "score", "quality_score"] } },
-      "required": ["id", "status", "feedback_ids", "classification"],
+      "propertyNames": {
+        "not": {
+          "enum": [
+            "overall_score",
+            "score",
+            "quality_score"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "status",
+        "feedback_ids",
+        "classification"
+      ],
       "properties": {
-        "id": { "type": "string", "minLength": 1 },
-        "status": { "type": "string", "minLength": 1 },
-        "feedback_ids": { "$ref": "#/$defs/stringList" },
-        "classification": { "type": ["string", "null"] }
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "minLength": 1
+        },
+        "feedback_ids": {
+          "$ref": "#/$defs/stringList"
+        },
+        "classification": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
       }
     },
     "qaFinding": {
       "type": "object",
       "additionalProperties": false,
-      "propertyNames": { "not": { "enum": ["overall_score", "score", "quality_score"] } },
+      "propertyNames": {
+        "not": {
+          "enum": [
+            "overall_score",
+            "score",
+            "quality_score"
+          ]
+        }
+      },
       "required": [
         "id",
         "status",
@@ -337,74 +786,194 @@
         "source_commit_sha"
       ],
       "properties": {
-        "id": { "type": "string", "minLength": 1 },
-        "status": { "type": "string", "minLength": 1 },
-        "severity": { "type": "string", "minLength": 1 },
-        "category": { "type": "string", "minLength": 1 },
-        "surface": { "type": "string", "minLength": 1 },
-        "screen": { "type": ["string", "null"] },
-        "section": { "type": ["string", "null"] },
-        "rule_source": { "type": "string", "minLength": 1 },
-        "screenshot_ref": { "type": "string", "minLength": 1 },
-        "source_commit_sha": { "type": "string", "minLength": 1 }
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "minLength": 1
+        },
+        "severity": {
+          "type": "string",
+          "minLength": 1
+        },
+        "category": {
+          "type": "string",
+          "minLength": 1
+        },
+        "surface": {
+          "type": "string",
+          "minLength": 1
+        },
+        "screen": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "section": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rule_source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "screenshot_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_commit_sha": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "qaPromotion": {
       "type": "object",
       "additionalProperties": false,
-      "propertyNames": { "not": { "enum": ["overall_score", "score", "quality_score"] } },
-      "required": ["finding_id", "feedback_id", "blocking"],
+      "propertyNames": {
+        "not": {
+          "enum": [
+            "overall_score",
+            "score",
+            "quality_score"
+          ]
+        }
+      },
+      "required": [
+        "finding_id",
+        "feedback_id",
+        "blocking"
+      ],
       "properties": {
-        "finding_id": { "type": "string", "minLength": 1 },
-        "feedback_id": { "type": "string", "minLength": 1 },
-        "blocking": { "type": "boolean" }
+        "finding_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "feedback_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "blocking": {
+          "type": "boolean"
+        }
       }
     },
     "qaOutcome": {
       "type": "object",
       "additionalProperties": false,
-      "propertyNames": { "not": { "enum": ["overall_score", "score", "quality_score"] } },
-      "required": ["finding_id", "status", "promoted_feedback_id", "blocking"],
+      "propertyNames": {
+        "not": {
+          "enum": [
+            "overall_score",
+            "score",
+            "quality_score"
+          ]
+        }
+      },
+      "required": [
+        "finding_id",
+        "status",
+        "promoted_feedback_id",
+        "blocking"
+      ],
       "properties": {
-        "finding_id": { "type": "string", "minLength": 1 },
-        "status": { "type": "string", "minLength": 1 },
-        "promoted_feedback_id": { "type": ["string", "null"] },
-        "blocking": { "type": ["boolean", "null"] }
+        "finding_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "minLength": 1
+        },
+        "promoted_feedback_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "blocking": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
       }
     },
     "qa": {
       "type": "object",
       "additionalProperties": false,
-      "propertyNames": { "not": { "enum": ["overall_score", "score", "quality_score"] } },
-      "required": ["findings", "promotions", "outcomes"],
+      "propertyNames": {
+        "not": {
+          "enum": [
+            "overall_score",
+            "score",
+            "quality_score"
+          ]
+        }
+      },
+      "required": [
+        "findings",
+        "promotions",
+        "outcomes"
+      ],
       "properties": {
         "findings": {
           "type": "array",
           "minItems": 1,
-          "items": { "$ref": "#/$defs/qaFinding" }
+          "items": {
+            "$ref": "#/$defs/qaFinding"
+          }
         },
         "promotions": {
           "type": "array",
           "minItems": 1,
-          "items": { "$ref": "#/$defs/qaPromotion" }
+          "items": {
+            "$ref": "#/$defs/qaPromotion"
+          }
         },
         "outcomes": {
           "type": "array",
           "minItems": 1,
-          "items": { "$ref": "#/$defs/qaOutcome" }
+          "items": {
+            "$ref": "#/$defs/qaOutcome"
+          }
         }
       }
     },
     "changeBoundaries": {
       "type": "object",
       "additionalProperties": false,
-      "propertyNames": { "not": { "enum": ["overall_score", "score", "quality_score"] } },
-      "required": ["contract_impacting", "implementation_only"],
+      "propertyNames": {
+        "not": {
+          "enum": [
+            "overall_score",
+            "score",
+            "quality_score"
+          ]
+        }
+      },
+      "required": [
+        "contract_impacting",
+        "implementation_only"
+      ],
       "properties": {
         "contract_impacting": {
           "type": "object",
           "additionalProperties": false,
-          "propertyNames": { "not": { "enum": ["overall_score", "score", "quality_score"] } },
+          "propertyNames": {
+            "not": {
+              "enum": [
+                "overall_score",
+                "score",
+                "quality_score"
+              ]
+            }
+          },
           "required": [
             "review_rounds",
             "approval_versions",
@@ -417,25 +986,56 @@
             "third_approval_refused"
           ],
           "properties": {
-            "review_rounds": { "type": "integer", "minimum": 2 },
+            "review_rounds": {
+              "type": "integer",
+              "minimum": 2
+            },
             "approval_versions": {
               "type": "array",
               "minItems": 2,
-              "items": { "type": "integer", "minimum": 1 }
+              "items": {
+                "type": "integer",
+                "minimum": 1
+              }
             },
-            "v1_immutable": { "type": "boolean" },
-            "v2_version": { "type": "integer", "minimum": 2 },
-            "v2_supersedes": { "type": "integer", "minimum": 1 },
-            "v2_review_round": { "type": "integer", "minimum": 2 },
-            "v2_hash_differs": { "type": "boolean" },
-            "v2_source_sha_differs": { "type": "boolean" },
-            "third_approval_refused": { "type": "boolean" }
+            "v1_immutable": {
+              "type": "boolean"
+            },
+            "v2_version": {
+              "type": "integer",
+              "minimum": 2
+            },
+            "v2_supersedes": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "v2_review_round": {
+              "type": "integer",
+              "minimum": 2
+            },
+            "v2_hash_differs": {
+              "type": "boolean"
+            },
+            "v2_source_sha_differs": {
+              "type": "boolean"
+            },
+            "third_approval_refused": {
+              "type": "boolean"
+            }
           }
         },
         "implementation_only": {
           "type": "object",
           "additionalProperties": false,
-          "propertyNames": { "not": { "enum": ["overall_score", "score", "quality_score"] } },
+          "propertyNames": {
+            "not": {
+              "enum": [
+                "overall_score",
+                "score",
+                "quality_score"
+              ]
+            }
+          },
           "required": [
             "approval_versions",
             "review_round",
@@ -449,13 +1049,33 @@
               "type": "array",
               "minItems": 1,
               "maxItems": 1,
-              "items": { "type": "integer", "minimum": 1 }
+              "items": {
+                "type": "integer",
+                "minimum": 1
+              }
             },
-            "review_round": { "type": "integer", "minimum": 1 },
-            "classification": { "type": "string", "enum": ["implementation_only"] },
-            "approved_hash_unchanged": { "type": "boolean" },
-            "still_eligible": { "type": "boolean" },
-            "default_classification": { "type": "string", "enum": ["contract_impacting"] }
+            "review_round": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "classification": {
+              "type": "string",
+              "enum": [
+                "implementation_only"
+              ]
+            },
+            "approved_hash_unchanged": {
+              "type": "boolean"
+            },
+            "still_eligible": {
+              "type": "boolean"
+            },
+            "default_classification": {
+              "type": "string",
+              "enum": [
+                "contract_impacting"
+              ]
+            }
           }
         }
       }
@@ -463,17 +1083,42 @@
     "checkpoint": {
       "type": "object",
       "additionalProperties": false,
-      "propertyNames": { "not": { "enum": ["overall_score", "score", "quality_score"] } },
-      "required": ["name", "at"],
+      "propertyNames": {
+        "not": {
+          "enum": [
+            "overall_score",
+            "score",
+            "quality_score"
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "at"
+      ],
       "properties": {
-        "name": { "type": "string", "minLength": 1 },
-        "at": { "type": "string", "minLength": 1 }
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "at": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "resume": {
       "type": "object",
       "additionalProperties": false,
-      "propertyNames": { "not": { "enum": ["overall_score", "score", "quality_score"] } },
+      "propertyNames": {
+        "not": {
+          "enum": [
+            "overall_score",
+            "score",
+            "quality_score"
+          ]
+        }
+      },
       "required": [
         "stage",
         "attempt_ids",
@@ -484,30 +1129,61 @@
         "no_chat_memory_required"
       ],
       "properties": {
-        "stage": { "type": "string", "minLength": 1 },
+        "stage": {
+          "type": "string",
+          "minLength": 1
+        },
         "attempt_ids": {
           "type": "array",
           "minItems": 1,
-          "items": { "$ref": "#/$defs/attemptId" }
+          "items": {
+            "$ref": "#/$defs/attemptId"
+          }
         },
         "checkpoints": {
           "type": "array",
-          "items": { "$ref": "#/$defs/checkpoint" }
+          "items": {
+            "$ref": "#/$defs/checkpoint"
+          }
         },
         "interruption": {
           "type": "object",
           "additionalProperties": false,
-          "propertyNames": { "not": { "enum": ["overall_score", "score", "quality_score"] } },
-          "required": ["lease_expired", "recovery_action"],
+          "propertyNames": {
+            "not": {
+              "enum": [
+                "overall_score",
+                "score",
+                "quality_score"
+              ]
+            }
+          },
+          "required": [
+            "lease_expired",
+            "recovery_action"
+          ],
           "properties": {
-            "lease_expired": { "type": "boolean" },
-            "recovery_action": { "type": "string", "minLength": 1 }
+            "lease_expired": {
+              "type": "boolean"
+            },
+            "recovery_action": {
+              "type": "string",
+              "minLength": 1
+            }
           }
         },
         "completion": {
           "type": "object",
           "additionalProperties": false,
-          "propertyNames": { "not": { "enum": ["overall_score", "score", "quality_score"] } },
+          "propertyNames": {
+            "not": {
+              "enum": [
+                "overall_score",
+                "score",
+                "quality_score"
+              ]
+            }
+          },
           "required": [
             "advanced_to",
             "completed_stages",
@@ -515,50 +1191,131 @@
             "lease_released"
           ],
           "properties": {
-            "advanced_to": { "type": "string", "minLength": 1 },
-            "completed_stages": { "$ref": "#/$defs/stringList" },
-            "last_transition_from": { "type": "string", "minLength": 1 },
-            "lease_released": { "type": "boolean" }
+            "advanced_to": {
+              "type": "string",
+              "minLength": 1
+            },
+            "completed_stages": {
+              "$ref": "#/$defs/stringList"
+            },
+            "last_transition_from": {
+              "type": "string",
+              "minLength": 1
+            },
+            "lease_released": {
+              "type": "boolean"
+            }
           }
         },
         "retry": {
           "type": "object",
           "additionalProperties": false,
-          "propertyNames": { "not": { "enum": ["overall_score", "score", "quality_score"] } },
-          "required": ["recovery_action", "attempt", "prior_manifest_unchanged"],
+          "propertyNames": {
+            "not": {
+              "enum": [
+                "overall_score",
+                "score",
+                "quality_score"
+              ]
+            }
+          },
+          "required": [
+            "recovery_action",
+            "attempt",
+            "prior_manifest_unchanged"
+          ],
           "properties": {
-            "recovery_action": { "type": "string", "minLength": 1 },
-            "attempt": { "type": "integer", "minimum": 1 },
-            "prior_manifest_unchanged": { "type": "boolean" }
+            "recovery_action": {
+              "type": "string",
+              "minLength": 1
+            },
+            "attempt": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "prior_manifest_unchanged": {
+              "type": "boolean"
+            }
           }
         },
-        "no_chat_memory_required": { "type": "boolean" }
+        "no_chat_memory_required": {
+          "type": "boolean"
+        }
       }
     },
     "assertionCount": {
       "type": "object",
       "additionalProperties": false,
-      "propertyNames": { "not": { "enum": ["overall_score", "score", "quality_score"] } },
-      "required": ["total", "passed"],
+      "propertyNames": {
+        "not": {
+          "enum": [
+            "overall_score",
+            "score",
+            "quality_score"
+          ]
+        }
+      },
+      "required": [
+        "total",
+        "passed"
+      ],
       "properties": {
-        "total": { "type": "integer", "minimum": 0 },
-        "passed": { "type": "integer", "minimum": 0 }
+        "total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "passed": {
+          "type": "integer",
+          "minimum": 0
+        }
       }
     },
     "assertions": {
       "type": "object",
       "additionalProperties": false,
-      "propertyNames": { "not": { "enum": ["overall_score", "score", "quality_score"] } },
-      "required": ["total", "passed", "failed", "by_source"],
+      "propertyNames": {
+        "not": {
+          "enum": [
+            "overall_score",
+            "score",
+            "quality_score"
+          ]
+        }
+      },
+      "required": [
+        "total",
+        "passed",
+        "failed",
+        "by_source"
+      ],
       "properties": {
-        "total": { "type": "integer", "minimum": 0 },
-        "passed": { "type": "integer", "minimum": 0 },
-        "failed": { "type": "integer", "minimum": 0 },
+        "total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "passed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failed": {
+          "type": "integer",
+          "minimum": 0
+        },
         "by_source": {
           "type": "object",
           "minProperties": 1,
-          "propertyNames": { "not": { "enum": ["overall_score", "score", "quality_score"] } },
-          "additionalProperties": { "$ref": "#/$defs/assertionCount" }
+          "propertyNames": {
+            "not": {
+              "enum": [
+                "overall_score",
+                "score",
+                "quality_score"
+              ]
+            }
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/assertionCount"
+          }
         }
       }
     }

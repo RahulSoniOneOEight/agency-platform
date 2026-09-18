@@ -35,12 +35,17 @@ SUPPORTED_ASSERTION_VERSIONS = frozenset({1})
 # under ``reference-e2e/``.
 FORBIDDEN_AUTHORITY_FILENAMES: tuple[str, ...] = (
     "review-state.*",
-    "feedback-*.*",
-    "approval-v*.*",
-    "approval_snapshot*.*",
-    "batch-*.*",
+    "review_state.*",
+    "review-index.*",
+    "review_index.*",
+    "feedback*.*",
+    "approval*.*",
+    "batch*.*",
     "qa-*.*",
-    "review_index*.*",
+    "qa_finding*.*",
+    "qa_findings*.*",
+    "findings*.*",
+    "runs*.*",
 )
 
 _KIND_PARAMS: dict[str, frozenset[str]] = {

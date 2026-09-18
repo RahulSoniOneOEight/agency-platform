@@ -340,12 +340,33 @@ def build_machine_report(root: Path, client_dir: Path) -> dict[str, Any]:
     contract_change = change_evidence.get("contract_change")
     contract_change = contract_change if isinstance(contract_change, Mapping) else {}
 
+    # Executed validator outcomes. The Milestone E runtime only advances a stage
+    # after its declared validators pass, so a stage that the resume evidence
+    # records as completed carries an executed, passing outcome; stages that have
+    # not run yet are declared-only.
+    completed_by_resume = set(
+        (resume_evidence.get("completion") or {}).get("completed_stages") or []
+    )
+    validator_outcomes = [
+        {
+            "stage": contract.stage,
+            "validators": list(contract.validators),
+            "executed": contract.stage in completed_by_resume,
+            "status": "passed" if contract.stage in completed_by_resume else "declared_only",
+            "source": (
+                "resume-evidence" if contract.stage in completed_by_resume else "stage-contract"
+            ),
+        }
+        for contract in contracts
+    ]
+
     workflow = {
         "attempt_ids": list(resume_evidence.get("attempt_ids") or []),
         "current_stage": state.get("current_stage"),
         "completed": list(state.get("completed") or []),
         "skipped": skipped,
         "validators": validators,
+        "validator_outcomes": validator_outcomes,
     }
 
     review = {

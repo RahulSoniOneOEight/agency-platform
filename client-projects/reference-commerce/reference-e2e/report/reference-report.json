@@ -272,7 +272,7 @@
       "status": "completed"
     }
   ],
-  "report_identity": "sha256:761a4ce023b30f7b1a06c5c712d2c2d7f31dadc424736e05f1c9292b8eae6e22",
+  "report_identity": "sha256:56f8d5ea75ef18e58226a427d762eb008d03440004399fbd12c2b7e0d960529c",
   "report_version": 1,
   "resume": {
     "attempt_ids": [
@@ -369,6 +369,80 @@
     "current_stage": "visual-qa",
     "skipped": [
       "resource-research"
+    ],
+    "validator_outcomes": [
+      {
+        "executed": true,
+        "source": "resume-evidence",
+        "stage": "client-intake",
+        "status": "passed",
+        "validators": [
+          "client-input-contract"
+        ]
+      },
+      {
+        "executed": true,
+        "source": "resume-evidence",
+        "stage": "resolve-intelligence",
+        "status": "passed",
+        "validators": [
+          "resolved-intelligence-contract"
+        ]
+      },
+      {
+        "executed": false,
+        "source": "stage-contract",
+        "stage": "resource-research",
+        "status": "declared_only",
+        "validators": [
+          "resource-selection-contract"
+        ]
+      },
+      {
+        "executed": true,
+        "source": "resume-evidence",
+        "stage": "generate-directions",
+        "status": "passed",
+        "validators": [
+          "direction-contract"
+        ]
+      },
+      {
+        "executed": true,
+        "source": "resume-evidence",
+        "stage": "build-prototype",
+        "status": "passed",
+        "validators": [
+          "prototype-platform-contract"
+        ]
+      },
+      {
+        "executed": true,
+        "source": "resume-evidence",
+        "stage": "visual-qa",
+        "status": "passed",
+        "validators": [
+          "visual-qa-contract"
+        ]
+      },
+      {
+        "executed": false,
+        "source": "stage-contract",
+        "stage": "client-review",
+        "status": "declared_only",
+        "validators": [
+          "approved-experience-contract"
+        ]
+      },
+      {
+        "executed": false,
+        "source": "stage-contract",
+        "stage": "productionize",
+        "status": "declared_only",
+        "validators": [
+          "productionize-contract"
+        ]
+      }
     ],
     "validators": {
       "build-prototype": [
