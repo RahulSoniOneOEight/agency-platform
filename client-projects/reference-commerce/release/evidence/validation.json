@@ -1,0 +1,56 @@
+{
+  "evidence": [
+    {
+      "blocking_count": 0,
+      "build_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "candidate_sha": "89abcdef0123456789abcdef0123456789abcdef",
+      "category": "validator",
+      "evidence_id": "repository-validation",
+      "executed": true,
+      "refs": [
+        "client-projects/reference-commerce/reference-e2e/report/reference-report.json"
+      ],
+      "source": "g-reference-release-validation",
+      "status": "passed"
+    },
+    {
+      "blocking_count": 0,
+      "build_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "candidate_sha": "89abcdef0123456789abcdef0123456789abcdef",
+      "category": "validator",
+      "evidence_id": "workflow-validation",
+      "executed": true,
+      "refs": [
+        "client-projects/reference-commerce/reference-e2e/report/reference-report.json"
+      ],
+      "source": "g-reference-release-validation",
+      "status": "passed"
+    },
+    {
+      "blocking_count": 0,
+      "build_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "candidate_sha": "89abcdef0123456789abcdef0123456789abcdef",
+      "category": "validator",
+      "evidence_id": "prototype-validation",
+      "executed": true,
+      "refs": [
+        "client-projects/reference-commerce/reference-e2e/report/reference-report.json"
+      ],
+      "source": "g-reference-release-validation",
+      "status": "passed"
+    },
+    {
+      "blocking_count": 0,
+      "build_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "candidate_sha": "89abcdef0123456789abcdef0123456789abcdef",
+      "category": "validator",
+      "evidence_id": "visual-qa-validation",
+      "executed": true,
+      "refs": [
+        "client-projects/reference-commerce/reference-e2e/report/reference-report.json"
+      ],
+      "source": "g-reference-release-validation",
+      "status": "passed"
+    }
+  ]
+}

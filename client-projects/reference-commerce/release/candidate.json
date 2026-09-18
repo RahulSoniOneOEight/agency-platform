@@ -1,0 +1,144 @@
+{
+  "acknowledged_non_blocking_item_ids": [
+    "feedback-non-blocking",
+    "feedback-qa-001",
+    "feedback-visual"
+  ],
+  "approval": {
+    "current": true,
+    "review_state_hash": "sha256:2b4cc537379f8142b1c629cf6c3bd9b87e78d005363658e526b876e950292153",
+    "source_commit_sha": "89abcdef0123456789abcdef0123456789abcdef",
+    "version": 2
+  },
+  "build": {
+    "artifact_id": "reference-commerce-web-rc1",
+    "hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "client_id": "reference-commerce",
+  "environment": "production",
+  "migration": {
+    "plan_ref": "client-projects/reference-commerce/release/evidence/migration.json",
+    "required": false
+  },
+  "qa_evidence": [
+    {
+      "blocking_count": 0,
+      "build_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "candidate_sha": "89abcdef0123456789abcdef0123456789abcdef",
+      "category": "qa",
+      "evidence_id": "qa-release-candidate-v2",
+      "executed": true,
+      "refs": [
+        "client-projects/reference-commerce/reference-e2e/evidence/review-approval-evidence.json",
+        "client-projects/reference-commerce/reference-e2e/report/reference-report.json"
+      ],
+      "source": "g-reference-release-qa",
+      "status": "passed"
+    }
+  ],
+  "release_notes_ref": "client-projects/reference-commerce/release/evidence/release-notes.md",
+  "rollback_plan_ref": "client-projects/reference-commerce/release/evidence/rollback.md",
+  "security_evidence": [
+    {
+      "blocking_count": 0,
+      "build_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "candidate_sha": "89abcdef0123456789abcdef0123456789abcdef",
+      "category": "security",
+      "evidence_id": "dependency-check",
+      "executed": true,
+      "refs": [
+        "client-projects/reference-commerce/release/evidence/security.json"
+      ],
+      "source": "g-reference-security-fixture",
+      "status": "passed"
+    },
+    {
+      "blocking_count": 0,
+      "build_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "candidate_sha": "89abcdef0123456789abcdef0123456789abcdef",
+      "category": "security",
+      "evidence_id": "secret-scan",
+      "executed": true,
+      "refs": [
+        "client-projects/reference-commerce/release/evidence/security.json"
+      ],
+      "source": "g-reference-security-fixture",
+      "status": "passed"
+    },
+    {
+      "blocking_count": 0,
+      "build_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "candidate_sha": "89abcdef0123456789abcdef0123456789abcdef",
+      "category": "security",
+      "evidence_id": "configuration-review",
+      "executed": true,
+      "refs": [
+        "client-projects/reference-commerce/release/evidence/security.json"
+      ],
+      "source": "g-reference-security-fixture",
+      "status": "passed"
+    }
+  ],
+  "source_commit_sha": "89abcdef0123456789abcdef0123456789abcdef",
+  "supporting_evidence_refs": [
+    "client-projects/reference-commerce/reference-e2e/evidence/change-scenarios-evidence.json",
+    "client-projects/reference-commerce/reference-e2e/evidence/resume-evidence.json",
+    "client-projects/reference-commerce/reference-e2e/evidence/review-approval-evidence.json",
+    "client-projects/reference-commerce/reference-e2e/report/reference-report.json"
+  ],
+  "unresolved_blocking_feedback_ids": [],
+  "validation_evidence": [
+    {
+      "blocking_count": 0,
+      "build_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "candidate_sha": "89abcdef0123456789abcdef0123456789abcdef",
+      "category": "validator",
+      "evidence_id": "repository-validation",
+      "executed": true,
+      "refs": [
+        "client-projects/reference-commerce/reference-e2e/report/reference-report.json"
+      ],
+      "source": "g-reference-release-validation",
+      "status": "passed"
+    },
+    {
+      "blocking_count": 0,
+      "build_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "candidate_sha": "89abcdef0123456789abcdef0123456789abcdef",
+      "category": "validator",
+      "evidence_id": "workflow-validation",
+      "executed": true,
+      "refs": [
+        "client-projects/reference-commerce/reference-e2e/report/reference-report.json"
+      ],
+      "source": "g-reference-release-validation",
+      "status": "passed"
+    },
+    {
+      "blocking_count": 0,
+      "build_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "candidate_sha": "89abcdef0123456789abcdef0123456789abcdef",
+      "category": "validator",
+      "evidence_id": "prototype-validation",
+      "executed": true,
+      "refs": [
+        "client-projects/reference-commerce/reference-e2e/report/reference-report.json"
+      ],
+      "source": "g-reference-release-validation",
+      "status": "passed"
+    },
+    {
+      "blocking_count": 0,
+      "build_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "candidate_sha": "89abcdef0123456789abcdef0123456789abcdef",
+      "category": "validator",
+      "evidence_id": "visual-qa-validation",
+      "executed": true,
+      "refs": [
+        "client-projects/reference-commerce/reference-e2e/report/reference-report.json"
+      ],
+      "source": "g-reference-release-validation",
+      "status": "passed"
+    }
+  ]
+}

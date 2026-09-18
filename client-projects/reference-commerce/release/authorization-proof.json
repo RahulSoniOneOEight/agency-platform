@@ -1,0 +1,13 @@
+{
+  "authorization_id": "pa-reference-commerce-production-0001",
+  "authorization_version": 1,
+  "build_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "client_id": "reference-commerce",
+  "environment": "production",
+  "exact_candidate_authorized": true,
+  "f_approval_version": 2,
+  "human_authorizer": "release-owner-reference",
+  "implementation_only_changed_candidate_requires_new_authorization": true,
+  "production_deployment_performed": false,
+  "source_commit_sha": "89abcdef0123456789abcdef0123456789abcdef"
+}

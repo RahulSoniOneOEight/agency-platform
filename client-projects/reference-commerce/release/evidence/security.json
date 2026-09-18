@@ -1,0 +1,43 @@
+{
+  "evidence": [
+    {
+      "blocking_count": 0,
+      "build_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "candidate_sha": "89abcdef0123456789abcdef0123456789abcdef",
+      "category": "security",
+      "evidence_id": "dependency-check",
+      "executed": true,
+      "refs": [
+        "client-projects/reference-commerce/release/evidence/security.json"
+      ],
+      "source": "g-reference-security-fixture",
+      "status": "passed"
+    },
+    {
+      "blocking_count": 0,
+      "build_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "candidate_sha": "89abcdef0123456789abcdef0123456789abcdef",
+      "category": "security",
+      "evidence_id": "secret-scan",
+      "executed": true,
+      "refs": [
+        "client-projects/reference-commerce/release/evidence/security.json"
+      ],
+      "source": "g-reference-security-fixture",
+      "status": "passed"
+    },
+    {
+      "blocking_count": 0,
+      "build_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "candidate_sha": "89abcdef0123456789abcdef0123456789abcdef",
+      "category": "security",
+      "evidence_id": "configuration-review",
+      "executed": true,
+      "refs": [
+        "client-projects/reference-commerce/release/evidence/security.json"
+      ],
+      "source": "g-reference-security-fixture",
+      "status": "passed"
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+{
+  "plan_ref": "client-projects/reference-commerce/release/evidence/migration.json",
+  "required": false,
+  "summary": "Reference candidate requires no persistent schema/data migration."
+}
