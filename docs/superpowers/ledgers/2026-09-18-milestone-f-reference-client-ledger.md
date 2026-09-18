@@ -163,8 +163,8 @@ committed Dart review records cannot be byte-reproduced. Determinism must be ass
 
 | Cycle | Scope | Status | Commits |
 |-------|-------|--------|---------|
-| F.1 | Reference client foundation (Tasks 1–4) | ACCEPTED | `1c1a23b` `514e120` `…` |
-| F.2 | Review → Approval v1 → Visual QA (Tasks 5–7) | PENDING-REVIEW | `2a84fed` |
+| F.1 | Reference client foundation (Tasks 1–4) | ACCEPTED | `1c1a23b` `514e120` `fb9f67b` `8e43be3` |
+| F.2 | Review → Approval v1 → Visual QA (Tasks 5–7) | ACCEPTED | `2a84fed` `b464274` `8391ff3` `843d7f1` `48bf496` |
 | F.3 | Change boundaries + resume + reports/CI (Tasks 8–10) | PENDING | — |
 
 ## Progress log
