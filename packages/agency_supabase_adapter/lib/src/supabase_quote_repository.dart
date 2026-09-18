@@ -56,16 +56,15 @@ final class SupabaseQuoteRepository implements QuoteRepository {
           ],
         );
       }
-    } on DomainFailure catch (failure) {
+    } catch (error) {
+      final failure = mapSupabaseFailure(error, operation: 'createRfq');
       if (failure.code == DomainFailureCode.conflict) {
         final replayed = await _loadRfqByIdempotencyKey(idempotencyKey.value);
         if (replayed != null) {
           return replayed;
         }
       }
-      rethrow;
-    } catch (error) {
-      throw mapSupabaseFailure(error, operation: 'createRfq');
+      throw failure;
     }
 
     return Rfq(

@@ -60,16 +60,15 @@ final class SupabaseOrderRepository implements OrderRepository {
           ],
         );
       }
-    } on DomainFailure catch (failure) {
+    } catch (error) {
+      final failure = mapSupabaseFailure(error, operation: 'createOrder');
       if (failure.code == DomainFailureCode.conflict) {
         final replayed = await _loadByIdempotencyKey(idempotencyKey.value);
         if (replayed != null) {
           return replayed;
         }
       }
-      rethrow;
-    } catch (error) {
-      throw mapSupabaseFailure(error, operation: 'createOrder');
+      throw failure;
     }
 
     return Order(

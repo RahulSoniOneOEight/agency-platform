@@ -339,6 +339,38 @@ void main() {
       expect(query.tables['order_items']!, hasLength(1));
     });
 
+    test('recovers the existing order when a concurrent insert wins', () async {
+      final raceQuery = FakeSupabaseQueryClient();
+      raceQuery.onInsert = (table) {
+        if (table == 'orders') {
+          raceQuery.tables['orders'] = [
+            {
+              'id': 'order-winner',
+              'status': 'pending',
+              'total_minor': 2000,
+              'idempotency_key': 'race-key',
+            },
+          ];
+        }
+      };
+      raceQuery.insertError = const PostgrestException(
+        message: 'duplicate key',
+        code: '23505',
+      );
+      final raceRepository = SupabaseOrderRepository(
+        query: raceQuery,
+        newId: () => 'order-loser',
+      );
+
+      final order = await raceRepository.createOrder(
+        cart: cart,
+        idempotencyKey: IdempotencyKey('race-key'),
+      );
+
+      expect(order.id, 'order-winner');
+      expect(order.totalMinor, 2000);
+    });
+
     test('normalizes a raw query failure to a DomainFailure', () async {
       query.error = const PostgrestException(
         message: 'duplicate key',
@@ -397,6 +429,46 @@ void main() {
       expect(second.id, first.id);
       expect(query.tables['rfqs']!, hasLength(1));
       expect(query.tables['rfq_items']!, hasLength(1));
+    });
+
+    test('recovers the existing RFQ when a concurrent insert wins', () async {
+      final raceQuery = FakeSupabaseQueryClient();
+      raceQuery.onInsert = (table) {
+        if (table == 'rfqs') {
+          raceQuery.tables['rfqs'] = [
+            {
+              'id': 'rfq-winner',
+              'account_id': 'acct-1',
+              'status': 'submitted',
+              'message': null,
+              'idempotency_key': 'race-rfq',
+            },
+          ];
+        }
+      };
+      raceQuery.insertError = const PostgrestException(
+        message: 'duplicate key',
+        code: '23505',
+      );
+      final raceRepository = SupabaseQuoteRepository(
+        query: raceQuery,
+        newId: () => 'rfq-loser',
+      );
+
+      final rfq = await raceRepository.createRfq(
+        accountId: 'acct-1',
+        items: [
+          CartItem(
+            productId: 'prd-1',
+            variantId: 'var-1',
+            quantity: 3,
+            unitPriceMinor: 2000,
+          ),
+        ],
+        idempotencyKey: IdempotencyKey('race-rfq'),
+      );
+
+      expect(rfq.id, 'rfq-winner');
     });
 
     test('reads an RFQ with items and status', () async {

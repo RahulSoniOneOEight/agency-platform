@@ -39,6 +39,12 @@ final class FakeSupabaseQueryClient implements SupabaseQueryClient {
 
   Object? error;
 
+  /// Optional failure thrown by [insert] only (e.g. a unique violation).
+  Object? insertError;
+
+  /// Invoked before every [insert]; lets a test simulate a concurrent writer.
+  void Function(String table)? onInsert;
+
   @override
   Future<List<Map<String, dynamic>>> select({
     required String table,
@@ -103,7 +109,8 @@ final class FakeSupabaseQueryClient implements SupabaseQueryClient {
         onConflict: onConflict,
       ),
     );
-    final failure = error;
+    onInsert?.call(table);
+    final failure = insertError ?? error;
     if (failure != null) {
       throw failure;
     }
