@@ -1,0 +1,63 @@
+{
+  "blocking_reasons": [],
+  "candidate_identity": "sha256:be27d17be2be37bf05778fefb983b1116fa5e45e029a7e06b180e68fcfbc98da",
+  "client_id": "reference-commerce",
+  "environment": "production",
+  "outcome": "healthy",
+  "report_identity": "sha256:1b064d34973010529e339483aad292dfa44dfc69b4cfa0741cd0e213758dc934",
+  "report_version": 1,
+  "sample_count": 5,
+  "samples": [
+    {
+      "at": "2026-09-18T10:05:00.000Z",
+      "critical_unhandled_errors": [],
+      "deployment_reachable": true,
+      "error_rate": 0.0,
+      "index": 0,
+      "release_version": "0.1.0+h2rc1",
+      "sentry_health_signal": "healthy",
+      "smoke_passed": true
+    },
+    {
+      "at": "2026-09-18T10:06:00.000Z",
+      "critical_unhandled_errors": [],
+      "deployment_reachable": true,
+      "error_rate": 0.0,
+      "index": 1,
+      "release_version": "0.1.0+h2rc1",
+      "sentry_health_signal": "healthy",
+      "smoke_passed": true
+    },
+    {
+      "at": "2026-09-18T10:07:00.000Z",
+      "critical_unhandled_errors": [],
+      "deployment_reachable": true,
+      "error_rate": 0.0,
+      "index": 2,
+      "release_version": "0.1.0+h2rc1",
+      "sentry_health_signal": "healthy",
+      "smoke_passed": true
+    },
+    {
+      "at": "2026-09-18T10:08:00.000Z",
+      "critical_unhandled_errors": [],
+      "deployment_reachable": true,
+      "error_rate": 0.0,
+      "index": 3,
+      "release_version": "0.1.0+h2rc1",
+      "sentry_health_signal": "healthy",
+      "smoke_passed": true
+    },
+    {
+      "at": "2026-09-18T10:09:00.000Z",
+      "critical_unhandled_errors": [],
+      "deployment_reachable": true,
+      "error_rate": 0.0,
+      "index": 4,
+      "release_version": "0.1.0+h2rc1",
+      "sentry_health_signal": "healthy",
+      "smoke_passed": true
+    }
+  ],
+  "spacing_seconds": 60
+}

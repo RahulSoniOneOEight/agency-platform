@@ -1,0 +1,26 @@
+{
+  "artifact_digest": "sha256:a477522873976ac4b6f816460a1915ca67e6043918b20c84a56c898f9eb3a989",
+  "build_version": "0.1.0+h2rc1",
+  "client_id": "reference-commerce",
+  "completed_at": "2026-09-18T10:10:00.000Z",
+  "deployment_target": "production-deploy-0001",
+  "environment": "production",
+  "hardening_report_id": "sha256:5225ca70bd62b4c4e052f2b73483072a5cebf4c20ce2b51a7eef28d9466502b9",
+  "incident_or_advisory_refs": [],
+  "migration_set": [
+    "supabase/migrations/202609180001_reference_commerce_foundation.sql",
+    "supabase/migrations/202609180002_reference_commerce_rls.sql"
+  ],
+  "previous_known_good_release_id": null,
+  "production_authorization_id": "pa-reference-commerce-production-h2-0001",
+  "production_smoke_evidence": "sha256:71b66ce78966b4ae0a4ac30073e2e7ddd3b43efb4d3b503e258998758a56634b",
+  "release_config_identity": "sha256:43b6737e3c7922c81e8620d113a2f4bd8c2e518578b160fc50c949f35b1659d0",
+  "release_id": "rel-reference-commerce-production-0.1.0+h2rc1",
+  "release_identity": "sha256:2aa6baee590fae8ff144d04d7a6da9dccf0bb5c00b0d9de6d70781ff9802d1e1",
+  "release_status": "healthy",
+  "rollback_or_recovery_ref": null,
+  "source_sha": "b3b18ff1877e72447381c3e7bdfaf31889616f78",
+  "staging_evidence": "sha256:29cb955e290e0c1e3e4745dd70d2ae831eee361791043e784a08fd01e322e43c",
+  "started_at": "2026-09-18T10:04:00.000Z",
+  "telemetry_health_evidence": "sha256:1b064d34973010529e339483aad292dfa44dfc69b4cfa0741cd0e213758dc934"
+}
