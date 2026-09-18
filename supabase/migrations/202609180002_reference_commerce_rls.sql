@@ -9,6 +9,16 @@
 --   b2b_manager membership. Global admin operations are intentionally expressed
 --   through the backend service role (which bypasses RLS); no client-side admin
 --   policy is granted here.
+--
+--   Write scoping: a personal (consumer) row must satisfy
+--   ``identity_id = auth.uid() and account_id is null``; a row with a non-null
+--   ``account_id`` is only writable by an actor who holds a membership on that
+--   account AND sets ``identity_id = auth.uid()``. A consumer can therefore
+--   never attach their own row to an arbitrary account, and an account member
+--   can never attribute a row to another identity. Child rows without an
+--   ``identity_id`` column (cart_items, order_items, rfq_items, quotations) are
+--   scoped by their parent account membership; manager-authored quotations for
+--   a buyer-created RFQ remain possible.
 
 begin;
 
@@ -115,8 +125,14 @@ create policy account_memberships_select_own
 drop policy if exists account_memberships_manage_manager on public.account_memberships;
 create policy account_memberships_manage_manager
     on public.account_memberships for all to authenticated
-    using (public.has_account_role(account_id, array['b2b_manager']))
-    with check (public.has_account_role(account_id, array['b2b_manager']));
+    using (
+        identity_id = auth.uid()
+        and public.has_account_role(account_id, array['b2b_manager'])
+    )
+    with check (
+        identity_id = auth.uid()
+        and public.has_account_role(account_id, array['b2b_manager'])
+    );
 
 -- Credit snapshots: member-visible, manager-maintained -------------------------
 
@@ -145,25 +161,37 @@ create policy carts_insert_owner_or_buyer
     on public.carts for insert to authenticated
     with check (
         identity_id = auth.uid()
-        or public.has_account_role(account_id, array['b2b_buyer', 'b2b_manager'])
+        and (
+            account_id is null
+            or public.has_account_role(account_id, array['b2b_buyer', 'b2b_manager'])
+        )
     );
 drop policy if exists carts_update_owner_or_buyer on public.carts;
 create policy carts_update_owner_or_buyer
     on public.carts for update to authenticated
     using (
         identity_id = auth.uid()
-        or public.has_account_role(account_id, array['b2b_buyer', 'b2b_manager'])
+        and (
+            account_id is null
+            or public.has_account_role(account_id, array['b2b_buyer', 'b2b_manager'])
+        )
     )
     with check (
         identity_id = auth.uid()
-        or public.has_account_role(account_id, array['b2b_buyer', 'b2b_manager'])
+        and (
+            account_id is null
+            or public.has_account_role(account_id, array['b2b_buyer', 'b2b_manager'])
+        )
     );
 drop policy if exists carts_delete_owner_or_manager on public.carts;
 create policy carts_delete_owner_or_manager
     on public.carts for delete to authenticated
     using (
         identity_id = auth.uid()
-        or public.has_account_role(account_id, array['b2b_manager'])
+        and (
+            account_id is null
+            or public.has_account_role(account_id, array['b2b_manager'])
+        )
     );
 
 alter table public.cart_items enable row level security;
@@ -186,7 +214,7 @@ create policy cart_items_insert_owner_or_buyer
             select 1 from public.carts cart
             where cart.id = cart_items.cart_id
               and (
-                  cart.identity_id = auth.uid()
+                  (cart.identity_id = auth.uid() and cart.account_id is null)
                   or public.has_account_role(cart.account_id, array['b2b_buyer', 'b2b_manager'])
               )
         )
@@ -199,7 +227,7 @@ create policy cart_items_update_owner_or_buyer
             select 1 from public.carts cart
             where cart.id = cart_items.cart_id
               and (
-                  cart.identity_id = auth.uid()
+                  (cart.identity_id = auth.uid() and cart.account_id is null)
                   or public.has_account_role(cart.account_id, array['b2b_buyer', 'b2b_manager'])
               )
         )
@@ -209,7 +237,7 @@ create policy cart_items_update_owner_or_buyer
             select 1 from public.carts cart
             where cart.id = cart_items.cart_id
               and (
-                  cart.identity_id = auth.uid()
+                  (cart.identity_id = auth.uid() and cart.account_id is null)
                   or public.has_account_role(cart.account_id, array['b2b_buyer', 'b2b_manager'])
               )
         )
@@ -222,7 +250,7 @@ create policy cart_items_delete_owner_or_manager
             select 1 from public.carts cart
             where cart.id = cart_items.cart_id
               and (
-                  cart.identity_id = auth.uid()
+                  (cart.identity_id = auth.uid() and cart.account_id is null)
                   or public.has_account_role(cart.account_id, array['b2b_manager'])
               )
         )
@@ -241,13 +269,22 @@ create policy orders_insert_owner_or_buyer
     on public.orders for insert to authenticated
     with check (
         identity_id = auth.uid()
-        or public.has_account_role(account_id, array['b2b_buyer', 'b2b_manager'])
+        and (
+            account_id is null
+            or public.has_account_role(account_id, array['b2b_buyer', 'b2b_manager'])
+        )
     );
 drop policy if exists orders_update_manager on public.orders;
 create policy orders_update_manager
     on public.orders for update to authenticated
-    using (public.has_account_role(account_id, array['b2b_manager']))
-    with check (public.has_account_role(account_id, array['b2b_manager']));
+    using (
+        identity_id = auth.uid()
+        and public.has_account_role(account_id, array['b2b_manager'])
+    )
+    with check (
+        identity_id = auth.uid()
+        and public.has_account_role(account_id, array['b2b_manager'])
+    );
 
 alter table public.order_items enable row level security;
 
@@ -272,7 +309,7 @@ create policy order_items_insert_owner_or_buyer
             select 1 from public.orders customer_order
             where customer_order.id = order_items.order_id
               and (
-                  customer_order.identity_id = auth.uid()
+                  (customer_order.identity_id = auth.uid() and customer_order.account_id is null)
                   or public.has_account_role(
                       customer_order.account_id, array['b2b_buyer', 'b2b_manager']
                   )
@@ -292,17 +329,27 @@ drop policy if exists rfqs_insert_buyer_or_manager on public.rfqs;
 create policy rfqs_insert_buyer_or_manager
     on public.rfqs for insert to authenticated
     with check (
-        public.has_account_role(account_id, array['b2b_buyer', 'b2b_manager'])
+        identity_id = auth.uid()
+        and public.has_account_role(account_id, array['b2b_buyer', 'b2b_manager'])
     );
 drop policy if exists rfqs_update_manager on public.rfqs;
 create policy rfqs_update_manager
     on public.rfqs for update to authenticated
-    using (public.has_account_role(account_id, array['b2b_manager']))
-    with check (public.has_account_role(account_id, array['b2b_manager']));
+    using (
+        identity_id = auth.uid()
+        and public.has_account_role(account_id, array['b2b_manager'])
+    )
+    with check (
+        identity_id = auth.uid()
+        and public.has_account_role(account_id, array['b2b_manager'])
+    );
 drop policy if exists rfqs_delete_manager on public.rfqs;
 create policy rfqs_delete_manager
     on public.rfqs for delete to authenticated
-    using (public.has_account_role(account_id, array['b2b_manager']));
+    using (
+        identity_id = auth.uid()
+        and public.has_account_role(account_id, array['b2b_manager'])
+    );
 
 alter table public.rfq_items enable row level security;
 
