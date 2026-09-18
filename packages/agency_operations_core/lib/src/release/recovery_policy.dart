@@ -100,24 +100,34 @@ final class RecoveryDecision {
 /// Pre-authorized, provider-neutral recovery policy.
 ///
 /// The policy encodes whether automated application rollback to the previous
-/// known-good artifact is allowed, whether database reversal requires an
-/// explicitly reversible migration, and whether a blocked reversal falls back
-/// to forward recovery or a manual halt. [allowedRecoveryModes] preserves the
-/// declared order of authorized modes.
+/// known-good artifact is allowed, whether database reverse migration is
+/// authorized at all, and whether a blocked reversal falls back to forward
+/// recovery or a manual halt.
+///
+/// [allowDatabaseReverseMigration] gates database reversal: a reverse
+/// migration is permitted only when this flag is `true` AND the request's
+/// migration is explicitly reversible ([RecoveryRequest.migrationReversible]).
+/// When the flag is `false`, or when the migration is not reversible, database
+/// reversal is never authorized and the result is forward recovery (when
+/// [forwardRecoveryRequired] is `true`) or a manual halt otherwise.
+///
+/// [allowedRecoveryModes] preserves the declared order of authorized modes and
+/// is defensively copied, so later mutation of the supplied list cannot alter
+/// the policy.
 final class RecoveryPolicy {
-  const RecoveryPolicy({
+  RecoveryPolicy({
     required this.allowApplicationRollbackToKnownGood,
-    this.requireReversibleMigrationForDatabaseRollback = true,
+    this.allowDatabaseReverseMigration = true,
     this.forwardRecoveryRequired = true,
-    this.allowedRecoveryModes = const [
+    List<RecoveryAction> allowedRecoveryModes = const [
       RecoveryAction.applicationRollbackToKnownGood,
       RecoveryAction.databaseReverseMigration,
       RecoveryAction.forwardRecoveryMigration,
     ],
-  });
+  }) : allowedRecoveryModes = List.unmodifiable(allowedRecoveryModes);
 
   final bool allowApplicationRollbackToKnownGood;
-  final bool requireReversibleMigrationForDatabaseRollback;
+  final bool allowDatabaseReverseMigration;
   final bool forwardRecoveryRequired;
   final List<RecoveryAction> allowedRecoveryModes;
 
@@ -166,6 +176,12 @@ final class RecoveryPolicy {
             reason: 'Database reverse migration is not an allowed recovery mode.',
           );
         }
+        if (!allowDatabaseReverseMigration) {
+          return _forwardOrHalt(
+            request.action,
+            'The recovery policy does not allow database reverse migration.',
+          );
+        }
         if (!request.migrationReversible) {
           return _forwardOrHalt(
             request.action,
@@ -173,18 +189,11 @@ final class RecoveryPolicy {
             'prohibited.',
           );
         }
-        if (!requireReversibleMigrationForDatabaseRollback) {
-          return _forwardOrHalt(
-            request.action,
-            'The recovery policy does not require reversible migrations, so '
-            'database reversal cannot be authorized.',
-          );
-        }
         return RecoveryDecision(
           action: request.action,
           outcome: RecoveryOutcome.permitted,
-          reason: 'The exact migration is reversible and database reversal is '
-              'permitted.',
+          reason: 'Database reverse migration is allowed and the exact '
+              'migration is reversible, so reversal is permitted.',
         );
 
       case RecoveryAction.forwardRecoveryMigration:
@@ -231,15 +240,15 @@ final class RecoveryPolicy {
       other is RecoveryPolicy &&
           other.allowApplicationRollbackToKnownGood ==
               allowApplicationRollbackToKnownGood &&
-          other.requireReversibleMigrationForDatabaseRollback ==
-              requireReversibleMigrationForDatabaseRollback &&
+          other.allowDatabaseReverseMigration ==
+              allowDatabaseReverseMigration &&
           other.forwardRecoveryRequired == forwardRecoveryRequired &&
           listEquals(other.allowedRecoveryModes, allowedRecoveryModes);
 
   @override
   int get hashCode => Object.hash(
         allowApplicationRollbackToKnownGood,
-        requireReversibleMigrationForDatabaseRollback,
+        allowDatabaseReverseMigration,
         forwardRecoveryRequired,
         Object.hashAll(allowedRecoveryModes),
       );
@@ -248,8 +257,7 @@ final class RecoveryPolicy {
   String toString() =>
       'RecoveryPolicy(allowApplicationRollbackToKnownGood: '
       '$allowApplicationRollbackToKnownGood, '
-      'requireReversibleMigrationForDatabaseRollback: '
-      '$requireReversibleMigrationForDatabaseRollback, '
+      'allowDatabaseReverseMigration: $allowDatabaseReverseMigration, '
       'forwardRecoveryRequired: $forwardRecoveryRequired, '
       'allowedRecoveryModes: $allowedRecoveryModes)';
 }

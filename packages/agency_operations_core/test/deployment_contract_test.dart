@@ -3,6 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 const _validDigest =
     'sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+const _otherDigest =
+    'sha256:fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210';
 
 DeploymentRequest _request({String digest = _validDigest}) {
   return DeploymentRequest(
@@ -18,19 +20,20 @@ DeploymentRequest _request({String digest = _validDigest}) {
 /// A deployment fake with no build capability by design.
 ///
 /// It records the exact requests it receives and can never produce a new
-/// artifact; [rebuildCount] stays zero to prove promotion reuses the exact
-/// authorized digest.
+/// artifact: promotion is accepted only when it reuses the exact artifact
+/// digest previously deployed to staging, and is rejected otherwise.
 class FakeDeploymentPort implements DeploymentPort {
   final List<DeploymentRequest> stagingDeployments = [];
   final List<DeploymentRequest> productionPromotions = [];
   final List<DeploymentRequest> rollbacks = [];
-  int rebuildCount = 0;
+  String? _stagingDigest;
   DeploymentResult? _current;
   DeploymentHealth? _health;
 
   @override
   Future<DeploymentResult> deployStaging(DeploymentRequest request) async {
     stagingDeployments.add(request);
+    _stagingDigest = request.artifactDigest;
     _current = DeploymentResult(
       deploymentId: 'staging-1',
       environment: request.environment,
@@ -45,6 +48,12 @@ class FakeDeploymentPort implements DeploymentPort {
   Future<DeploymentResult> promoteExactArtifactToProduction(
     DeploymentRequest request,
   ) async {
+    if (request.artifactDigest != _stagingDigest) {
+      throw StateError(
+        'Promotion must reuse the exact artifact digest deployed to staging; '
+        'the fake refuses to rebuild or substitute an artifact.',
+      );
+    }
     productionPromotions.add(request);
     _current = DeploymentResult(
       deploymentId: 'production-1',
@@ -124,11 +133,28 @@ void main() {
     expect(port.productionPromotions.single, equals(port.stagingDeployments.single));
   });
 
-  test('the deployment fake never rebuilds an artifact', () async {
+  test('promotion reuses the exact staging digest and rejects a different '
+      'artifact', () async {
     final port = FakeDeploymentPort();
-    await port.deployStaging(_request());
-    await port.promoteExactArtifactToProduction(_request());
-    expect(port.rebuildCount, 0);
+    final request = _request();
+
+    await port.deployStaging(request);
+    await port.promoteExactArtifactToProduction(request);
+
+    expect(
+      port.productionPromotions.single.artifactDigest,
+      port.stagingDeployments.single.artifactDigest,
+    );
+    expect(
+      port.productionPromotions.single.artifactDigest,
+      request.artifactDigest,
+    );
+
+    expect(
+      () => port.promoteExactArtifactToProduction(_request(digest: _otherDigest)),
+      throwsA(isA<StateError>()),
+    );
+    expect(port.productionPromotions, hasLength(1));
   });
 
   test('rollback and deployment queries are provider neutral', () async {

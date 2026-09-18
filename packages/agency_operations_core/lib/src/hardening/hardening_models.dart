@@ -27,15 +27,15 @@ enum FindingStatus { open, closed, waived }
 /// [status]; it is never inferred from a provider. A finding blocks the release
 /// only while it is [FindingStatus.open] and [GateDisposition.blocking].
 final class HardeningFinding {
-  const HardeningFinding({
+  HardeningFinding({
     required this.id,
     required this.area,
     required this.severity,
     required this.disposition,
     required this.summary,
     this.status = FindingStatus.open,
-    this.evidenceRefs = const [],
-  });
+    List<String> evidenceRefs = const [],
+  }) : evidenceRefs = List.unmodifiable(evidenceRefs);
 
   final String id;
   final HardeningArea area;

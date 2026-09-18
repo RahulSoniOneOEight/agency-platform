@@ -59,9 +59,20 @@ class FakeObservabilityPort implements ObservabilityPort {
 }
 
 void main() {
-  test('a fake observability port is provider neutral and compiles', () {
+  test('the fake retains release context, propagates operation errors, and '
+      'flushes', () async {
     final port = FakeObservabilityPort();
-    expect(port, isA<ObservabilityPort>());
+
+    await port.setReleaseContext(const {'environment': 'staging'});
+    expect(port.releaseContext, {'environment': 'staging'});
+
+    await expectLater(
+      port.startOperation<void>('boom', () async => throw StateError('boom')),
+      throwsA(isA<StateError>()),
+    );
+
+    await port.flush();
+    expect(port.flushCount, 1);
   });
 
   test('setReleaseContext carries environment, source sha, build version, '

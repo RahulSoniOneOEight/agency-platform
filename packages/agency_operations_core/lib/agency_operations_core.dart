@@ -7,3 +7,4 @@ export 'src/hardening/hardening_models.dart';
 export 'src/observability/observability_port.dart';
 export 'src/release/recovery_policy.dart';
 export 'src/release/release_failure.dart';
+export 'src/release/release_outcome.dart';

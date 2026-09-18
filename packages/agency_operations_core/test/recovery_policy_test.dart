@@ -6,7 +6,7 @@ const _knownGoodDigest =
 const _newArtifactDigest =
     'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 
-const _policy = RecoveryPolicy(allowApplicationRollbackToKnownGood: true);
+final _policy = RecoveryPolicy(allowApplicationRollbackToKnownGood: true);
 
 RecoveryRequest _request({
   required RecoveryAction action,
@@ -24,7 +24,7 @@ RecoveryRequest _request({
 
 void main() {
   test('blocking severity is policy data, not inferred from provider', () {
-    const finding = HardeningFinding(
+    final finding = HardeningFinding(
       id: 'security-1',
       area: HardeningArea.security,
       severity: HardeningSeverity.high,
@@ -34,6 +34,23 @@ void main() {
     expect(finding.disposition, GateDisposition.blocking);
     expect(finding.status, FindingStatus.open);
     expect(finding.blocksRelease, isTrue);
+  });
+
+  test('HardeningFinding defensively copies evidenceRefs', () {
+    final source = <String>['evidence-1'];
+    final finding = HardeningFinding(
+      id: 'security-2',
+      area: HardeningArea.security,
+      severity: HardeningSeverity.medium,
+      disposition: GateDisposition.advisory,
+      summary: 'example',
+      evidenceRefs: source,
+    );
+
+    source.add('evidence-2');
+
+    expect(finding.evidenceRefs, ['evidence-1']);
+    expect(() => finding.evidenceRefs.add('evidence-3'), throwsUnsupportedError);
   });
 
   test('previous-known-good application rollback may be allowed', () {
@@ -46,7 +63,7 @@ void main() {
   });
 
   test('application rollback is halted when the policy forbids it', () {
-    const policy = RecoveryPolicy(allowApplicationRollbackToKnownGood: false);
+    final policy = RecoveryPolicy(allowApplicationRollbackToKnownGood: false);
 
     final decision = policy.evaluate(
       _request(action: RecoveryAction.applicationRollbackToKnownGood),
@@ -104,7 +121,7 @@ void main() {
 
   test('non-reversible migration halts when forward recovery is not required',
       () {
-    const policy = RecoveryPolicy(
+    final policy = RecoveryPolicy(
       allowApplicationRollbackToKnownGood: true,
       forwardRecoveryRequired: false,
     );
@@ -120,11 +137,11 @@ void main() {
     expect(decision.permitted, isFalse);
   });
 
-  test('database reversal is never authorized when reversibility is not '
-      'required by policy', () {
-    const policy = RecoveryPolicy(
+  test('database reversal is never authorized when the policy disallows it',
+      () {
+    final policy = RecoveryPolicy(
       allowApplicationRollbackToKnownGood: true,
-      requireReversibleMigrationForDatabaseRollback: false,
+      allowDatabaseReverseMigration: false,
     );
 
     final decision = policy.evaluate(
@@ -138,7 +155,7 @@ void main() {
   });
 
   test('allowed recovery modes preserve declared order', () {
-    const policy = RecoveryPolicy(
+    final policy = RecoveryPolicy(
       allowApplicationRollbackToKnownGood: true,
       allowedRecoveryModes: [
         RecoveryAction.forwardRecoveryMigration,
@@ -151,6 +168,24 @@ void main() {
         RecoveryAction.forwardRecoveryMigration);
     expect(policy.allows(RecoveryAction.manualHalt), isTrue);
     expect(policy.allows(RecoveryAction.databaseReverseMigration), isFalse);
+  });
+
+  test('RecoveryPolicy defensively copies allowedRecoveryModes', () {
+    final modes = <RecoveryAction>[RecoveryAction.manualHalt];
+    final policy = RecoveryPolicy(
+      allowApplicationRollbackToKnownGood: true,
+      allowedRecoveryModes: modes,
+    );
+
+    modes.add(RecoveryAction.databaseReverseMigration);
+
+    expect(policy.allowedRecoveryModes, [RecoveryAction.manualHalt]);
+    expect(
+      () => policy.allowedRecoveryModes.add(
+        RecoveryAction.forwardRecoveryMigration,
+      ),
+      throwsUnsupportedError,
+    );
   });
 
   test('forward recovery and manual halt are permitted modes', () {
