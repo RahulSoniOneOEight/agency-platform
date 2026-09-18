@@ -1,6 +1,7 @@
 {
   "artifact_digest": "sha256:a477522873976ac4b6f816460a1915ca67e6043918b20c84a56c898f9eb3a989",
   "authorization_id": "pa-reference-commerce-production-h2-0001",
+  "authorization_path": "client-projects/reference-commerce/release/reference-proof/production-authorization-v0001.json",
   "authorization_version": 1,
   "candidate_identity": "sha256:be27d17be2be37bf05778fefb983b1116fa5e45e029a7e06b180e68fcfbc98da",
   "client_id": "reference-commerce",

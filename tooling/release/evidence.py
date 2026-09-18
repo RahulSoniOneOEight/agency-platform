@@ -41,7 +41,8 @@ MANIFEST_NAME = "artifact-manifest.json"
 H1_REPORT_NAME = "h1-foundation-report.json"
 STAGING_DEPLOYMENT_NAME = "staging-deployment.json"
 AUTHORIZATION_REF_NAME = "production-authorization-ref.json"
-AUTHORIZATIONS_RELATIVE = RELEASE_RELATIVE / "production-authorizations"
+H2_AUTHORIZATION_NAME = "production-authorization-v0001.json"
+REFERENCE_PROOF_RELATIVE = Path("release") / "reference-proof"
 RECOVERY_POLICY_NAME = "recovery-policy.yaml"
 G_EVIDENCE_RELATIVE = Path("release") / "evidence"
 RELEASE_NOTES_NAME = "release-notes.md"
@@ -297,6 +298,22 @@ def build_h2_g_candidate(
         acknowledged_non_blocking_item_ids=_acknowledged_non_blocking_ids(f_report),
         supporting_evidence_refs=supporting_evidence_refs,
     )
+
+
+def h2_authorization_path(client_dir: Path) -> Path:
+    """Path to the committed synthetic-human H.2 authorization fixture.
+
+    The fixture is a G-authority artifact (a human permission), not a production
+    implementation artifact, so it lives under ``release/reference-proof/`` —
+    never under ``production/`` and never under the G authorization area
+    ``release/production-authorizations/``.
+    """
+    return Path(client_dir) / REFERENCE_PROOF_RELATIVE / H2_AUTHORIZATION_NAME
+
+
+def load_h2_authorization(client_dir: Path) -> Mapping[str, Any]:
+    """Return the committed H.2 authorization body, or ``{}`` when absent."""
+    return _load_json_object(h2_authorization_path(client_dir))
 
 
 def h2_authorization_ref_path(client_dir: Path) -> Path:

@@ -37,6 +37,7 @@ from tooling.production_authorization.models import (
     canonical_json,
 )
 from tooling.production_authorization.validity import AuthorizationEvent
+from tooling.production_authorization.validate import validate_client_authorizations
 from tooling.release.coordinator import (
     H2AuthorizationBridgeError,
     verify_h2_authorized_candidate,
@@ -44,9 +45,11 @@ from tooling.release.coordinator import (
 from tooling.release.evidence import (
     build_h2_authorization_ref,
     build_h2_g_candidate,
+    h2_authorization_path,
     h2_authorization_ref_path,
     load_artifact_manifest,
     load_f_report,
+    load_h2_authorization,
     load_h2_authorization_ref,
     load_h2_candidate,
     load_hardening_report,
@@ -56,14 +59,11 @@ ROOT = Path(__file__).resolve().parents[2]
 CLIENT = ROOT / "client-projects" / "reference-commerce"
 RELEASE_DIR = ROOT / "tooling" / "release"
 
-H2_AUTHORIZATION_PATH = (
-    CLIENT
-    / "production"
-    / "release"
-    / "production-authorizations"
-    / "production"
-    / "authorization-v0001.json"
+H2_AUTHORIZATION_RELATIVE = (
+    "client-projects/reference-commerce/release/reference-proof/"
+    "production-authorization-v0001.json"
 )
+H2_AUTHORIZATION_PATH = h2_authorization_path(CLIENT)
 HISTORICAL_AUTHORIZATION_PATH = (
     CLIENT
     / "release"
@@ -100,7 +100,7 @@ def _load_json(path: Path) -> object:
 
 
 def _load_h2_authorization() -> ProductionAuthorization:
-    return ProductionAuthorization.from_dict(_load_json(H2_AUTHORIZATION_PATH))
+    return ProductionAuthorization.from_dict(load_h2_authorization(CLIENT))
 
 
 def _authorization_for(candidate) -> ProductionAuthorization:
@@ -345,6 +345,73 @@ class AuthorityBoundaryTests(unittest.TestCase):
                         FORBIDDEN_DEFINITION_NAMES,
                         f"{path.relative_to(ROOT).as_posix()}:{node.name}",
                     )
+
+
+class AuthorizationPlacementTests(unittest.TestCase):
+    """The H.2 authorization is a G authority artifact, never a production one.
+
+    The synthetic human authorization is a *permission*, not a production
+    implementation artifact, so it must not live under ``production/`` (the H.1
+    authority boundary) nor inside the G authorization area
+    ``release/production-authorizations/`` (which the G validator scans). It is
+    committed as a reference proof and must not alter G's validated set.
+    """
+
+    def test_fixture_lives_at_the_reference_proof_path(self):
+        self.assertTrue(H2_AUTHORIZATION_PATH.is_file(), H2_AUTHORIZATION_PATH)
+        self.assertEqual(
+            H2_AUTHORIZATION_RELATIVE,
+            H2_AUTHORIZATION_PATH.relative_to(ROOT).as_posix(),
+        )
+
+    def test_authorization_body_is_not_under_production(self):
+        production_dir = CLIENT / "production"
+        self.assertNotIn(production_dir, H2_AUTHORIZATION_PATH.parents)
+        colliding = (
+            production_dir
+            / "release"
+            / "production-authorizations"
+            / "production"
+            / "authorization-v0001.json"
+        )
+        self.assertFalse(colliding.exists(), colliding)
+        self.assertFalse(
+            (production_dir / "release" / "production-authorizations").exists(),
+            "the colliding synthetic authorization directory must be deleted",
+        )
+
+    def test_authorization_body_is_not_in_the_g_authorization_area(self):
+        self.assertFalse(
+            H2_AUTHORIZATION_PATH.is_relative_to(
+                CLIENT / "release" / "production-authorizations"
+            ),
+            H2_AUTHORIZATION_PATH,
+        )
+
+    def test_ref_points_at_the_new_authorization_path_and_identity(self):
+        ref = load_h2_authorization_ref(CLIENT)
+        self.assertEqual(H2_AUTHORIZATION_RELATIVE, ref.get("authorization_path"))
+        referenced = ROOT / str(ref["authorization_path"])
+        self.assertTrue(referenced.is_file(), referenced)
+        body = ProductionAuthorization.from_dict(load_h2_authorization(CLIENT))
+        self.assertEqual(ref["authorization_id"], body.authorization_id)
+        self.assertEqual(ref["authorization_version"], body.authorization_version)
+
+    def test_reference_proof_does_not_enter_the_g_authorization_set(self):
+        from tooling.production_authorization.repository import (
+            FileProductionAuthorizationRepository,
+        )
+
+        authorizations = FileProductionAuthorizationRepository(CLIENT).list(
+            "reference-commerce", "production"
+        )
+        self.assertEqual(
+            ["pa-reference-commerce-production-0001"],
+            [item.authorization_id for item in authorizations],
+        )
+
+    def test_g_validation_remains_clean(self):
+        self.assertEqual([], validate_client_authorizations(ROOT, CLIENT))
 
 
 class DeterminismTests(BridgeFixtureMixin):

@@ -19,6 +19,13 @@ Authority boundary: this module imports ``ProductionAuthorization`` only as a
 type annotation and never constructs one; it never imports the G authorization
 coordinator or the authorization repository's ``create`` path. H.2 cannot create
 or mutate the human G authority.
+
+The committed synthetic-human H.2 authorization fixture is read-only data at
+``client-projects/<client>/release/reference-proof/production-authorization-v0001.json``
+(a reference proof, never under ``production/`` and never inside the G
+authorization area ``release/production-authorizations/``). It is loaded by
+``tooling.release.evidence`` and passed in as ``authorization``; the bridge
+itself loads nothing and stays pure.
 """
 
 from __future__ import annotations
