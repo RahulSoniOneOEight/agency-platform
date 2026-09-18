@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "production-release-candidate.schema.json",
+  "type": "object",
+  "required": ["client_id","environment","approval","source_commit_sha","build","unresolved_blocking_feedback_ids","qa_evidence","validation_evidence","security_evidence","rollback_plan_ref","migration","release_notes_ref","acknowledged_non_blocking_item_ids","supporting_evidence_refs"],
+  "properties": {
+    "client_id":{"type":"string","minLength":1},
+    "environment":{"type":"string","minLength":1},
+    "approval":{
+      "type":"object",
+      "required":["version","review_state_hash","source_commit_sha","current"],
+      "properties":{
+        "version":{"type":"integer","minimum":1},
+        "review_state_hash":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+        "source_commit_sha":{"type":"string","pattern":"^[0-9a-f]{40}$"},
+        "current":{"type":"boolean"}
+      },
+      "additionalProperties":false
+    },
+    "source_commit_sha":{"type":"string","pattern":"^[0-9a-f]{40}$"},
+    "build":{
+      "type":"object",
+      "required":["artifact_id","hash"],
+      "properties":{"artifact_id":{"type":"string","minLength":1},"hash":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"}},
+      "additionalProperties":false
+    },
+    "unresolved_blocking_feedback_ids":{"type":"array","items":{"type":"string","minLength":1},"uniqueItems":true},
+    "qa_evidence":{"type":"array"},
+    "validation_evidence":{"type":"array"},
+    "security_evidence":{"type":"array"},
+    "rollback_plan_ref":{"type":"string","minLength":1},
+    "migration":{"type":"object","required":["required","plan_ref"],"properties":{"required":{"type":"boolean"},"plan_ref":{"type":["string","null"]}},"additionalProperties":false},
+    "release_notes_ref":{"type":"string","minLength":1},
+    "acknowledged_non_blocking_item_ids":{"type":"array","items":{"type":"string","minLength":1},"uniqueItems":true},
+    "supporting_evidence_refs":{"type":"array","items":{"type":"string","minLength":1},"uniqueItems":true}
+  },
+  "additionalProperties":false
+}

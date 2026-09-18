@@ -1,0 +1,18 @@
+{
+  "evidence": [
+    {
+      "blocking_count": 0,
+      "build_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "candidate_sha": "89abcdef0123456789abcdef0123456789abcdef",
+      "category": "qa",
+      "evidence_id": "qa-release-candidate-v2",
+      "executed": true,
+      "refs": [
+        "client-projects/reference-commerce/reference-e2e/evidence/review-approval-evidence.json",
+        "client-projects/reference-commerce/reference-e2e/report/reference-report.json"
+      ],
+      "source": "g-reference-release-qa",
+      "status": "passed"
+    }
+  ]
+}

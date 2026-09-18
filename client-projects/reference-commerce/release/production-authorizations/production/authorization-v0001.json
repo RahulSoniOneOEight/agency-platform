@@ -1,0 +1,53 @@
+{
+  "acknowledged_non_blocking_item_ids": [
+    "feedback-non-blocking",
+    "feedback-qa-001",
+    "feedback-visual"
+  ],
+  "approval": {
+    "review_state_hash": "sha256:2b4cc537379f8142b1c629cf6c3bd9b87e78d005363658e526b876e950292153",
+    "source_commit_sha": "89abcdef0123456789abcdef0123456789abcdef",
+    "version": 2
+  },
+  "authorization_id": "pa-reference-commerce-production-0001",
+  "authorization_version": 1,
+  "authorized_at": "2026-09-18T10:00:00Z",
+  "authorized_by": {
+    "actor_id": "release-owner-reference",
+    "kind": "human",
+    "name": "Reference Release Owner",
+    "role": "release_owner"
+  },
+  "build": {
+    "artifact_id": "reference-commerce-web-rc1",
+    "hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "client_id": "reference-commerce",
+  "environment": "production",
+  "migration_plan_ref": "client-projects/reference-commerce/release/evidence/migration.json",
+  "qa_evidence_ids": [
+    "qa-release-candidate-v2"
+  ],
+  "release_notes_ref": "client-projects/reference-commerce/release/evidence/release-notes.md",
+  "rollback_plan_ref": "client-projects/reference-commerce/release/evidence/rollback.md",
+  "security_evidence_ids": [
+    "configuration-review",
+    "dependency-check",
+    "secret-scan"
+  ],
+  "source_commit_sha": "89abcdef0123456789abcdef0123456789abcdef",
+  "status": "active",
+  "supersedes": null,
+  "supporting_evidence_refs": [
+    "client-projects/reference-commerce/reference-e2e/evidence/change-scenarios-evidence.json",
+    "client-projects/reference-commerce/reference-e2e/evidence/resume-evidence.json",
+    "client-projects/reference-commerce/reference-e2e/evidence/review-approval-evidence.json",
+    "client-projects/reference-commerce/reference-e2e/report/reference-report.json"
+  ],
+  "validation_evidence_ids": [
+    "prototype-validation",
+    "repository-validation",
+    "visual-qa-validation",
+    "workflow-validation"
+  ]
+}

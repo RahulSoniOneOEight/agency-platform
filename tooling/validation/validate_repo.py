@@ -36,6 +36,9 @@ from tooling.prototype.validate_runtime_bundle import (  # noqa: E402
 from tooling.reference_client.validate_reference_client import (  # noqa: E402
     validate_reference_client,
 )
+from tooling.production_authorization.validate import (  # noqa: E402
+    validate_client_authorizations,
+)
 
 REFERENCE_CLIENT_RELATIVE = "client-projects/reference-commerce"
 
@@ -191,6 +194,26 @@ REQUIRED_PATHS = (
     "client-projects/reference-commerce/reference-e2e/evidence/change-scenarios-evidence.json",
     "client-projects/reference-commerce/reference-e2e/evidence/resume-evidence.json",
     "tooling/validation/test_reference_client_report.py",
+    "tooling/production_authorization",
+    "tooling/production_authorization/models.py",
+    "tooling/production_authorization/eligibility.py",
+    "tooling/production_authorization/repository.py",
+    "tooling/production_authorization/coordinator.py",
+    "tooling/production_authorization/validity.py",
+    "tooling/production_authorization/evidence.py",
+    "tooling/production_authorization/reference_client.py",
+    "tooling/production_authorization/release_gate.py",
+    "tooling/production_authorization/validate.py",
+    "client-projects/schema/production-authorization.schema.json",
+    "client-projects/schema/production-release-candidate.schema.json",
+    "client-projects/schema/production-authorization-event.schema.json",
+    "client-projects/schema/production-release-evidence.schema.json",
+    "client-projects/reference-commerce/release/candidate.json",
+    "client-projects/reference-commerce/release/production-authorizations/production/authorization-v0001.json",
+    "docs/production-authorization.md",
+    "docs/superpowers/specs/2026-09-18-milestone-g-production-authorization-design.md",
+    "docs/superpowers/plans/2026-09-18-milestone-g-production-authorization-implementation.md",
+    "docs/superpowers/ledgers/2026-09-18-milestone-g-production-authorization-ledger.md",
 )
 
 
@@ -348,6 +371,12 @@ def reference_client_errors(root: Path) -> list[str]:
     return validate_reference_client(root, client_dir)
 
 
+def production_authorization_errors(root: Path) -> list[str]:
+    """Return Milestone G exact-candidate authorization validation errors."""
+    client_dir = root / REFERENCE_CLIENT_RELATIVE
+    return validate_client_authorizations(root, client_dir)
+
+
 def main(root: Path | None = None) -> int:
     root = root if root is not None else _ROOT
     missing = missing_required_paths(root)
@@ -356,6 +385,7 @@ def main(root: Path | None = None) -> int:
     theme_errors = theme_contract_errors(root)
     note_errors = refinement_note_errors(root)
     reference_errors = reference_client_errors(root)
+    authorization_errors = production_authorization_errors(root)
     if (
         missing
         or bundle_errors
@@ -363,6 +393,7 @@ def main(root: Path | None = None) -> int:
         or theme_errors
         or note_errors
         or reference_errors
+        or authorization_errors
     ):
         print("Repository validation failed.")
         if missing:
@@ -389,13 +420,17 @@ def main(root: Path | None = None) -> int:
             print("Reference client validation errors:")
             for error in reference_errors:
                 print(f"- {error}")
+        if authorization_errors:
+            print("Production authorization validation errors:")
+            for error in authorization_errors:
+                print(f"- {error}")
         return 1
 
     print(
         f"Repository validation passed: {len(REQUIRED_PATHS)} required paths present, "
         "generated runtime bundles are fresh, Flutter design bindings are valid, "
         "token/theme contracts are valid, refinement notes are valid, and the "
-        "reference client is valid."
+        "reference client is valid, and production authorization is valid."
     )
     return 0
 
