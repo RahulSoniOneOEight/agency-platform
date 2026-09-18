@@ -1,0 +1,104 @@
+{
+  "version": 1,
+  "client_id": "reference-commerce",
+  "synthetic": true,
+  "description": "Deterministic production-path scenarios proven by apps/production_app tests. Values are expectations, not data: tests drive the same application services as production composition and assert these provider-neutral outcomes.",
+  "b2c_path": {
+    "id": "b2c-consumer-order",
+    "steps": [
+      "sign_in",
+      "load_catalog_inventory",
+      "create_persist_cart",
+      "place_order",
+      "repeat_submission",
+      "assert_single_order_identity"
+    ]
+  },
+  "b2b_path": {
+    "id": "b2b-rfq-quote-order",
+    "steps": [
+      "sign_in",
+      "resolve_business_membership",
+      "load_credit",
+      "create_rfq",
+      "receive_deterministic_quote",
+      "convert_quote_to_order"
+    ],
+    "cases": [
+      {
+        "id": "insufficient-role",
+        "expected_code": "forbidden",
+        "retryable": false,
+        "operation": "create_rfq"
+      },
+      {
+        "id": "insufficient-credit",
+        "expected_code": "conflict",
+        "retryable": false,
+        "operation": "convert_quotation_to_order"
+      }
+    ]
+  },
+  "failure_scenarios": [
+    {
+      "id": "expired-session-refresh",
+      "kind": "session",
+      "expected_code": "unauthorized",
+      "retryable": false,
+      "operation": "refreshSession"
+    },
+    {
+      "id": "forbidden-b2b-action",
+      "kind": "failure",
+      "expected_code": "forbidden",
+      "retryable": false,
+      "operation": "create_rfq"
+    },
+    {
+      "id": "inventory-unavailable",
+      "kind": "failure",
+      "expected_code": "unavailable",
+      "retryable": true,
+      "operation": "load_catalog"
+    },
+    {
+      "id": "stale-cart",
+      "kind": "failure",
+      "expected_code": "staleData",
+      "retryable": false,
+      "operation": "place_order"
+    },
+    {
+      "id": "backend-unavailable",
+      "kind": "failure",
+      "expected_code": "unavailable",
+      "retryable": true,
+      "operation": "load_catalog"
+    },
+    {
+      "id": "timeout",
+      "kind": "failure",
+      "expected_code": "timeout",
+      "retryable": true,
+      "operation": "place_order"
+    },
+    {
+      "id": "retryable-vs-non-retryable",
+      "kind": "contrast",
+      "expected_code": "timeout",
+      "retryable": true,
+      "operation": "place_order",
+      "contrast_code": "validation",
+      "contrast_retryable": false
+    },
+    {
+      "id": "duplicate-order-protection",
+      "kind": "idempotency"
+    },
+    {
+      "id": "malformed-environment-config",
+      "kind": "config",
+      "expected_error": "FormatException"
+    }
+  ]
+}

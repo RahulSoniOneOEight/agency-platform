@@ -39,6 +39,9 @@ from tooling.reference_client.validate_reference_client import (  # noqa: E402
 from tooling.production_authorization.validate import (  # noqa: E402
     validate_client_authorizations,
 )
+from tooling.production.report import (  # noqa: E402
+    validate_production_foundation,
+)
 
 REFERENCE_CLIENT_RELATIVE = "client-projects/reference-commerce"
 
@@ -214,6 +217,29 @@ REQUIRED_PATHS = (
     "docs/superpowers/specs/2026-09-18-milestone-g-production-authorization-design.md",
     "docs/superpowers/plans/2026-09-18-milestone-g-production-authorization-implementation.md",
     "docs/superpowers/ledgers/2026-09-18-milestone-g-production-authorization-ledger.md",
+    "tooling/production",
+    "tooling/production/validate_config.py",
+    "tooling/production/validate_migrations.py",
+    "tooling/production/sync_app_config.py",
+    "tooling/production/report.py",
+    "supabase/migrations",
+    "supabase/migrations/202609180001_reference_commerce_foundation.sql",
+    "supabase/migrations/202609180002_reference_commerce_rls.sql",
+    "packages/agency_production_core",
+    "packages/agency_supabase_adapter",
+    "packages/agency_integration_adapters",
+    "apps/production_app",
+    "apps/production_app/pubspec.yaml",
+    "client-projects/reference-commerce/production/config/dev.json",
+    "client-projects/reference-commerce/production/config/staging.json",
+    "client-projects/reference-commerce/production/config/production.json",
+    "client-projects/reference-commerce/production/fixtures/integration-scenarios.json",
+    "client-projects/reference-commerce/production/evidence/h1-foundation-report.json",
+    "tooling/validation/test_production_config.py",
+    "tooling/validation/test_production_migrations.py",
+    "tooling/validation/test_h1_reference_report.py",
+    "tooling/validation/test_h1_authority_boundaries.py",
+    "workflows/08-productionize.md",
 )
 
 
@@ -377,6 +403,17 @@ def production_authorization_errors(root: Path) -> list[str]:
     return validate_client_authorizations(root, client_dir)
 
 
+def production_foundation_errors(root: Path) -> list[str]:
+    """Return Milestone H.1 production-foundation validation errors.
+
+    Composes the client-safe environment config, app config asset, migration,
+    production-app contract evidence, and H.1 report freshness checks. It never
+    creates a ``ProductionAuthorization`` and never deploys (H.1 boundary).
+    """
+    client_dir = root / REFERENCE_CLIENT_RELATIVE
+    return validate_production_foundation(root, client_dir)
+
+
 def main(root: Path | None = None) -> int:
     root = root if root is not None else _ROOT
     missing = missing_required_paths(root)
@@ -386,6 +423,7 @@ def main(root: Path | None = None) -> int:
     note_errors = refinement_note_errors(root)
     reference_errors = reference_client_errors(root)
     authorization_errors = production_authorization_errors(root)
+    production_errors = production_foundation_errors(root)
     if (
         missing
         or bundle_errors
@@ -394,6 +432,7 @@ def main(root: Path | None = None) -> int:
         or note_errors
         or reference_errors
         or authorization_errors
+        or production_errors
     ):
         print("Repository validation failed.")
         if missing:
@@ -424,13 +463,18 @@ def main(root: Path | None = None) -> int:
             print("Production authorization validation errors:")
             for error in authorization_errors:
                 print(f"- {error}")
+        if production_errors:
+            print("Production foundation validation errors:")
+            for error in production_errors:
+                print(f"- {error}")
         return 1
 
     print(
         f"Repository validation passed: {len(REQUIRED_PATHS)} required paths present, "
         "generated runtime bundles are fresh, Flutter design bindings are valid, "
-        "token/theme contracts are valid, refinement notes are valid, and the "
-        "reference client is valid, and production authorization is valid."
+        "token/theme contracts are valid, refinement notes are valid, the "
+        "reference client is valid, production authorization is valid, and the "
+        "production foundation is valid."
     )
     return 0
 

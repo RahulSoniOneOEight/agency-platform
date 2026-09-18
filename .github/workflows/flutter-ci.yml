@@ -71,3 +71,16 @@ jobs:
             flutter pub get
             flutter build web
           fi
+
+      - name: Build production app for web
+        if: steps.detect.outputs.has_packages == 'true'
+        shell: bash
+        run: |
+          # H.1 production composition boots from committed client-safe config
+          # assets (deterministic fakes for dev). No live Supabase project or
+          # production credential is required for this build.
+          if [ -f apps/production_app/pubspec.yaml ]; then
+            cd apps/production_app
+            flutter pub get
+            flutter build web
+          fi

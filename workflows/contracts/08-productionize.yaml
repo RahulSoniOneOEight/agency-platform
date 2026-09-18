@@ -8,6 +8,7 @@ requires:
 produces: []
 validators:
   - productionize-contract
+  - production-foundation
 checkpoints:
-  - release-ready
+  - production-capable
 next: []

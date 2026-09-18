@@ -272,7 +272,7 @@
       "status": "completed"
     }
   ],
-  "report_identity": "sha256:56f8d5ea75ef18e58226a427d762eb008d03440004399fbd12c2b7e0d960529c",
+  "report_identity": "sha256:b1f9234cb24db40ca1463022fabd0527a434283a1ddd0de89e9409f020037c23",
   "report_version": 1,
   "resume": {
     "attempt_ids": [
@@ -440,7 +440,8 @@
         "stage": "productionize",
         "status": "declared_only",
         "validators": [
-          "productionize-contract"
+          "productionize-contract",
+          "production-foundation"
         ]
       }
     ],
@@ -458,7 +459,8 @@
         "direction-contract"
       ],
       "productionize": [
-        "productionize-contract"
+        "productionize-contract",
+        "production-foundation"
       ],
       "resolve-intelligence": [
         "resolved-intelligence-contract"

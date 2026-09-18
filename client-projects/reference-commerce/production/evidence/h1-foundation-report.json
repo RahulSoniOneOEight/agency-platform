@@ -1,0 +1,357 @@
+{
+  "adapters": {
+    "deterministic": [
+      {
+        "implements": [
+          "AccountRepository",
+          "AuthService",
+          "CartRepository",
+          "CatalogRepository",
+          "CrmPort",
+          "CustomerRepository",
+          "ErpPort",
+          "InventoryRepository",
+          "OrderRepository",
+          "PaymentPort",
+          "QuoteRepository",
+          "ShippingPort",
+          "WhatsAppPort"
+        ],
+        "name": "DeterministicCommerceBoundaries",
+        "ref": "apps/production_app/lib/runtime/deterministic_boundaries.dart"
+      }
+    ],
+    "fake_integrations": [
+      {
+        "implements": [
+          "CrmPort"
+        ],
+        "name": "FakeCrmAdapter",
+        "ref": "packages/agency_integration_adapters/lib/src/fake/fake_crm_adapter.dart"
+      },
+      {
+        "implements": [
+          "ErpPort"
+        ],
+        "name": "FakeErpAdapter",
+        "ref": "packages/agency_integration_adapters/lib/src/fake/fake_erp_adapter.dart"
+      },
+      {
+        "implements": [
+          "PaymentPort"
+        ],
+        "name": "FakePaymentAdapter",
+        "ref": "packages/agency_integration_adapters/lib/src/fake/fake_payment_adapter.dart"
+      },
+      {
+        "implements": [
+          "ShippingPort"
+        ],
+        "name": "FakeShippingAdapter",
+        "ref": "packages/agency_integration_adapters/lib/src/fake/fake_shipping_adapter.dart"
+      },
+      {
+        "implements": [
+          "WhatsAppPort"
+        ],
+        "name": "FakeWhatsAppAdapter",
+        "ref": "packages/agency_integration_adapters/lib/src/fake/fake_whatsapp_adapter.dart"
+      }
+    ],
+    "supabase": [
+      {
+        "implements": [
+          "AccountRepository",
+          "CustomerRepository"
+        ],
+        "name": "SupabaseAccountRepository",
+        "ref": "packages/agency_supabase_adapter/lib/src/supabase_account_repository.dart"
+      },
+      {
+        "implements": [
+          "AuthService"
+        ],
+        "name": "SupabaseAuthAdapter",
+        "ref": "packages/agency_supabase_adapter/lib/src/supabase_auth_adapter.dart"
+      },
+      {
+        "implements": [
+          "CartRepository"
+        ],
+        "name": "SupabaseCartRepository",
+        "ref": "packages/agency_supabase_adapter/lib/src/supabase_cart_repository.dart"
+      },
+      {
+        "implements": [
+          "CatalogRepository",
+          "InventoryRepository"
+        ],
+        "name": "SupabaseCatalogRepository",
+        "ref": "packages/agency_supabase_adapter/lib/src/supabase_catalog_repository.dart"
+      },
+      {
+        "implements": [
+          "OrderRepository"
+        ],
+        "name": "SupabaseOrderRepository",
+        "ref": "packages/agency_supabase_adapter/lib/src/supabase_order_repository.dart"
+      },
+      {
+        "implements": [
+          "QuoteRepository"
+        ],
+        "name": "SupabaseQuoteRepository",
+        "ref": "packages/agency_supabase_adapter/lib/src/supabase_quote_repository.dart"
+      }
+    ]
+  },
+  "authority_checks": {
+    "f_machine_report": {
+      "ref": "client-projects/reference-commerce/reference-e2e/report/reference-report.json",
+      "report_identity": "sha256:b1f9234cb24db40ca1463022fabd0527a434283a1ddd0de89e9409f020037c23"
+    },
+    "g_production_authorization": {
+      "identity": "sha256:74c9e507e78d87da5250baa907dab7019fe39c089c5320773baa38ad2230e0e5",
+      "ref": "client-projects/reference-commerce/release/production-authorizations/production/authorization-v0001.json"
+    },
+    "g_release_candidate": {
+      "identity": "sha256:0592c762b7a9a546f52aadf9f2bdb5f3e8926f8948d0b3c7186af19a778eec57",
+      "ref": "client-projects/reference-commerce/release/candidate.json"
+    },
+    "h1_creates_production_authorization": false,
+    "h1_performs_production_deployment": false
+  },
+  "b2b_path": {
+    "cases": [
+      {
+        "expected_code": "forbidden",
+        "id": "insufficient-role",
+        "operation": "create_rfq",
+        "retryable": false
+      },
+      {
+        "expected_code": "conflict",
+        "id": "insufficient-credit",
+        "operation": "convert_quotation_to_order",
+        "retryable": false
+      }
+    ],
+    "id": "b2b-rfq-quote-order",
+    "steps": [
+      "sign_in",
+      "resolve_business_membership",
+      "load_credit",
+      "create_rfq",
+      "receive_deterministic_quote",
+      "convert_quote_to_order"
+    ]
+  },
+  "b2c_path": {
+    "id": "b2c-consumer-order",
+    "steps": [
+      "sign_in",
+      "load_catalog_inventory",
+      "create_persist_cart",
+      "place_order",
+      "repeat_submission",
+      "assert_single_order_identity"
+    ]
+  },
+  "client_id": "reference-commerce",
+  "environments": [
+    {
+      "analytics_enabled": false,
+      "api_base_url": "https://api.dev.agency-platform.example",
+      "app_version": "0.1.0",
+      "config_identity": "sha256:1f3663bc474e7a4e8baeaab3b1194467afc5d80d3643b3e9ab357e748c6d7509",
+      "environment": "dev",
+      "feature_flags": {
+        "b2b_rfq": true,
+        "whatsapp_notifications": false
+      },
+      "integration_modes": {
+        "crm": "fake",
+        "erp": "fake",
+        "payment": "fake",
+        "shipping": "fake",
+        "whatsapp": "fake"
+      },
+      "ref": "client-projects/reference-commerce/production/config/dev.json",
+      "supabase_configured": false
+    },
+    {
+      "analytics_enabled": true,
+      "api_base_url": "https://api.staging.agency-platform.example",
+      "app_version": "0.1.0",
+      "config_identity": "sha256:da9f0a0e727683130581bbd29973ac37d824ebe353602182bab67628a8f31cbe",
+      "environment": "staging",
+      "feature_flags": {
+        "b2b_rfq": true,
+        "whatsapp_notifications": true
+      },
+      "integration_modes": {
+        "crm": "fake",
+        "erp": "fake",
+        "payment": "fake",
+        "shipping": "fake",
+        "whatsapp": "fake"
+      },
+      "ref": "client-projects/reference-commerce/production/config/staging.json",
+      "supabase_configured": true
+    },
+    {
+      "analytics_enabled": true,
+      "api_base_url": "https://api.reference-commerce.example",
+      "app_version": "0.1.0",
+      "config_identity": "sha256:43b6737e3c7922c81e8620d113a2f4bd8c2e518578b160fc50c949f35b1659d0",
+      "environment": "production",
+      "feature_flags": {
+        "b2b_rfq": true,
+        "whatsapp_notifications": true
+      },
+      "integration_modes": {
+        "crm": "fake",
+        "erp": "fake",
+        "payment": "fake",
+        "shipping": "fake",
+        "whatsapp": "fake"
+      },
+      "ref": "client-projects/reference-commerce/production/config/production.json",
+      "supabase_configured": true
+    }
+  ],
+  "failure_scenarios": [
+    {
+      "expected_code": "unauthorized",
+      "id": "expired-session-refresh",
+      "kind": "session",
+      "operation": "refreshSession",
+      "retryable": false
+    },
+    {
+      "expected_code": "forbidden",
+      "id": "forbidden-b2b-action",
+      "kind": "failure",
+      "operation": "create_rfq",
+      "retryable": false
+    },
+    {
+      "expected_code": "unavailable",
+      "id": "inventory-unavailable",
+      "kind": "failure",
+      "operation": "load_catalog",
+      "retryable": true
+    },
+    {
+      "expected_code": "staleData",
+      "id": "stale-cart",
+      "kind": "failure",
+      "operation": "place_order",
+      "retryable": false
+    },
+    {
+      "expected_code": "unavailable",
+      "id": "backend-unavailable",
+      "kind": "failure",
+      "operation": "load_catalog",
+      "retryable": true
+    },
+    {
+      "expected_code": "timeout",
+      "id": "timeout",
+      "kind": "failure",
+      "operation": "place_order",
+      "retryable": true
+    },
+    {
+      "contrast_code": "validation",
+      "contrast_retryable": false,
+      "expected_code": "timeout",
+      "id": "retryable-vs-non-retryable",
+      "kind": "contrast",
+      "operation": "place_order",
+      "retryable": true
+    },
+    {
+      "id": "duplicate-order-protection",
+      "kind": "idempotency"
+    },
+    {
+      "expected_error": "FormatException",
+      "id": "malformed-environment-config",
+      "kind": "config"
+    }
+  ],
+  "migrations": [
+    {
+      "identity": "sha256:0b274c533894ba14e7b3edac926071b02b428e9da81f086f1e23e8ead445ce9b",
+      "migration_class": "additive",
+      "name": "reference_commerce_foundation",
+      "ref": "supabase/migrations/202609180001_reference_commerce_foundation.sql",
+      "version": "202609180001"
+    },
+    {
+      "identity": "sha256:74c05f902e1e2ea6ed318e9384287efdde7add2fd30e1a4298d837d7767f72a7",
+      "migration_class": "additive",
+      "name": "reference_commerce_rls",
+      "ref": "supabase/migrations/202609180002_reference_commerce_rls.sql",
+      "version": "202609180002"
+    }
+  ],
+  "ports": [
+    {
+      "name": "AccountRepository",
+      "ref": "packages/agency_production_core/lib/src/ports/repositories.dart"
+    },
+    {
+      "name": "AuthService",
+      "ref": "packages/agency_production_core/lib/src/ports/auth_service.dart"
+    },
+    {
+      "name": "CartRepository",
+      "ref": "packages/agency_production_core/lib/src/ports/repositories.dart"
+    },
+    {
+      "name": "CatalogRepository",
+      "ref": "packages/agency_production_core/lib/src/ports/repositories.dart"
+    },
+    {
+      "name": "CrmPort",
+      "ref": "packages/agency_production_core/lib/src/ports/integrations.dart"
+    },
+    {
+      "name": "CustomerRepository",
+      "ref": "packages/agency_production_core/lib/src/ports/repositories.dart"
+    },
+    {
+      "name": "ErpPort",
+      "ref": "packages/agency_production_core/lib/src/ports/integrations.dart"
+    },
+    {
+      "name": "InventoryRepository",
+      "ref": "packages/agency_production_core/lib/src/ports/repositories.dart"
+    },
+    {
+      "name": "OrderRepository",
+      "ref": "packages/agency_production_core/lib/src/ports/repositories.dart"
+    },
+    {
+      "name": "PaymentPort",
+      "ref": "packages/agency_production_core/lib/src/ports/integrations.dart"
+    },
+    {
+      "name": "QuoteRepository",
+      "ref": "packages/agency_production_core/lib/src/ports/repositories.dart"
+    },
+    {
+      "name": "ShippingPort",
+      "ref": "packages/agency_production_core/lib/src/ports/integrations.dart"
+    },
+    {
+      "name": "WhatsAppPort",
+      "ref": "packages/agency_production_core/lib/src/ports/integrations.dart"
+    }
+  ],
+  "report_identity": "sha256:f9a40ab4bea212f9c6a35022df4765739d91f80a1bd871142ce96487e3adbd8c",
+  "report_version": 1
+}
