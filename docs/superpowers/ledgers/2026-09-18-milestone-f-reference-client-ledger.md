@@ -172,6 +172,16 @@ committed Dart review records cannot be byte-reproduced. Determinism must be ass
   content tampering cannot pass silently. `no_duplicate_authority` matches `.json`/`.yaml`/`.yml`
   authority filenames.
 
+## Final delivery
+
+- Branch: `milestone-f-reference-client`
+- Final SHA: `a65ac1390e530a363a1c46feed0ca7688ab152f9`
+- PR: **#23** — https://github.com/RahulSoniOneOEight/agency-platform/pull/23 (base `main`, state
+  OPEN, MERGEABLE, **not merged**)
+- CI: **green** — `flutter-checks` pass (3m27s), `validate-structure` pass (40s)
+- Lockfiles: the three `pubspec.lock` files remain untracked and uncommitted; no policy change.
+- Commits on the branch: 20 (from `4a9a532`, the Milestone E merge).
+
 ## Cycle table
 
 | Cycle | Scope | Status | Commits |
