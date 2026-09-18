@@ -72,7 +72,24 @@ bool _isSensitiveKey(String key) {
 /// through [setReleaseContext], a user identity through [setUserContext], and a
 /// correlation/request id supplied in a capture context is propagated on the
 /// resulting payload. Sensitive values are redacted recursively before the
-/// transport is ever called.
+/// transport is ever called: the fully assembled payload is passed through
+/// [redactSensitive] immediately before `capture`, so no code path can emit an
+/// unredacted field.
+///
+/// Release context supplied through [setReleaseContext] is merged *before* the
+/// constructor-bound identity fields, so it can never override `clientId`,
+/// `environment`, `sourceSha`, `buildVersion`, or `releaseCandidateId` — and a
+/// sensitive release-context key is redacted like any other sensitive field.
+///
+/// Free-text `message` and `stackTrace` values are caller-supplied and are NOT
+/// key-redacted: only map/list values under sensitive key names are scrubbed.
+/// Callers must therefore never place secrets in message or stack-trace text
+/// (M1). This is a documented contract, not an enforced one.
+///
+/// The last non-empty correlation/request id observed in a capture context is
+/// retained on the adapter and re-attached to subsequent captures by design, so
+/// a single request's correlation id keeps flowing through its later events
+/// (M6). Supplying a new non-empty id replaces the retained one.
 final class SentryObservabilityAdapter implements ObservabilityPort {
   SentryObservabilityAdapter({
     required SentryTransport transport,
@@ -101,11 +118,11 @@ final class SentryObservabilityAdapter implements ObservabilityPort {
     Map<String, Object?> context = const {},
   }) async {
     _rememberCorrelation(context);
-    await _transport.capture(<String, Object?>{
+    await _capture(<String, Object?>{
       ..._envelope('exception'),
       'message': error.toString(),
       'stackTrace': stackTrace.toString(),
-      'context': redactSensitive(context),
+      'context': context,
     });
   }
 
@@ -115,10 +132,10 @@ final class SentryObservabilityAdapter implements ObservabilityPort {
     Map<String, Object?> context = const {},
   }) async {
     _rememberCorrelation(context);
-    await _transport.capture(<String, Object?>{
+    await _capture(<String, Object?>{
       ..._envelope('message'),
       'message': message,
-      'context': redactSensitive(context),
+      'context': context,
     });
   }
 
@@ -128,10 +145,10 @@ final class SentryObservabilityAdapter implements ObservabilityPort {
     Map<String, Object?> data = const {},
   }) async {
     _rememberCorrelation(data);
-    await _transport.capture(<String, Object?>{
+    await _capture(<String, Object?>{
       ..._envelope('breadcrumb'),
       'message': message,
-      'data': redactSensitive(data),
+      'data': data,
     });
   }
 
@@ -165,14 +182,22 @@ final class SentryObservabilityAdapter implements ObservabilityPort {
   @override
   Future<void> flush() => _transport.flush();
 
+  /// Sends [payload] after recursively redacting every sensitive field. This is
+  /// the single choke point through which all captures pass, so redaction cannot
+  /// be bypassed by any caller-supplied or release-context value.
+  Future<void> _capture(Map<String, Object?> payload) =>
+      _transport.capture(redactSensitive(payload));
+
   Map<String, Object?> _envelope(String type) => <String, Object?>{
+        // Release context is merged first so the constructor-bound identity
+        // fields below always win and can never be overridden.
+        ..._releaseContext,
         'type': type,
         'clientId': clientId,
         'environment': environment,
         'sourceSha': sourceSha,
         'buildVersion': buildVersion,
         'releaseCandidateId': releaseCandidateId,
-        ..._releaseContext,
         if (_userId != null) 'userId': _userId,
         if (_correlationId != null) 'correlationId': _correlationId,
       };

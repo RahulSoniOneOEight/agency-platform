@@ -75,29 +75,38 @@ final class Ga4AnalyticsAdapter implements AnalyticsPort {
         if (measurementId != null) 'measurementId': measurementId,
       };
 
+  /// Safe, secret-free rendering. The Measurement Protocol secret is never
+  /// stored on the adapter, so it cannot appear here.
+  @override
+  String toString() => 'Ga4AnalyticsAdapter(environment: $environment, '
+      'measurementId: $measurementId, '
+      'analyticsStorageEnabled: $_analyticsStorageEnabled)';
+
   @override
   Future<void> trackEvent(AnalyticsEvent event) async {
-    _rejectSensitiveParameters(event.parameters);
-    if (!_analyticsStorageEnabled) {
-      return;
-    }
-    await _transport.sendEvent(event.name, <String, Object?>{
+    final parameters = <String, Object?>{
       ..._releaseContext,
       ...event.parameters,
       'environment': environment,
-    });
+    };
+    _rejectSensitiveParameters(parameters);
+    if (!_analyticsStorageEnabled) {
+      return;
+    }
+    await _transport.sendEvent(event.name, parameters);
   }
 
   @override
   Future<void> setUserProperties(Map<String, Object?> properties) async {
-    _rejectSensitiveParameters(properties);
+    final assembled = <String, Object?>{
+      ...properties,
+      'environment': environment,
+    };
+    _rejectSensitiveParameters(assembled);
     if (!_analyticsStorageEnabled) {
       return;
     }
-    await _transport.sendUserProperties(<String, Object?>{
-      ...properties,
-      'environment': environment,
-    });
+    await _transport.sendUserProperties(assembled);
   }
 
   @override
@@ -107,6 +116,10 @@ final class Ga4AnalyticsAdapter implements AnalyticsPort {
 
   @override
   Future<void> setReleaseContext(Map<String, String> context) async {
+    // Release context is merged into every emitted event, so it is validated
+    // with the same sensitive-key governance as event parameters. This closes
+    // the bypass where a sensitive key could enter via setReleaseContext.
+    _rejectSensitiveParameters(context);
     _releaseContext.addAll(context);
   }
 
@@ -122,15 +135,18 @@ final class Ga4AnalyticsAdapter implements AnalyticsPort {
           'sensitive analytics parameter names are not permitted',
         );
       }
-      final value = entry.value;
-      if (value is Map) {
-        _rejectSensitiveParameters(_stringKeyed(value));
-      } else if (value is Iterable) {
-        for (final item in value) {
-          if (item is Map) {
-            _rejectSensitiveParameters(_stringKeyed(item));
-          }
-        }
+      _rejectSensitiveValue(entry.value);
+    }
+  }
+
+  void _rejectSensitiveValue(Object? value) {
+    if (value is Map) {
+      _rejectSensitiveParameters(_stringKeyed(value));
+    } else if (value is Iterable) {
+      // Recurse uniformly so lists nested inside lists (or any depth of
+      // Iterable) are governed, not only lists-of-maps.
+      for (final item in value) {
+        _rejectSensitiveValue(item);
       }
     }
   }

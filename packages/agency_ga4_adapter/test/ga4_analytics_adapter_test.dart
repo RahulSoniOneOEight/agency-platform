@@ -161,15 +161,71 @@ void main() {
       );
       expect(transport.events, isEmpty);
     });
+
+    test('rejects sensitive keys supplied via setReleaseContext', () async {
+      final transport = RecordingGa4Transport();
+      final adapter = _adapter(transport);
+
+      await expectLater(
+        adapter.setReleaseContext(<String, String>{'access_token': 'abc'}),
+        throwsA(isA<ArgumentError>()),
+      );
+
+      // The rejected context must not have been retained on the adapter.
+      await adapter.trackEvent(AnalyticsEvent(name: 'sign_in'));
+      expect(
+        jsonEncode(transport.events.single.parameters),
+        isNot(contains('access_token')),
+      );
+    });
+
+    test('rejects sensitive names nested in lists inside lists', () async {
+      final transport = RecordingGa4Transport();
+      final adapter = _adapter(transport);
+
+      await expectLater(
+        adapter.trackEvent(
+          AnalyticsEvent(
+            name: 'product_view',
+            parameters: <String, Object?>{
+              'groups': <Object?>[
+                <Object?>[
+                  <String, Object?>{'secret_key': 'abc'},
+                ],
+              ],
+            },
+          ),
+        ),
+        throwsA(isA<ArgumentError>()),
+      );
+      expect(transport.events, isEmpty);
+    });
   });
 
   group('Ga4AnalyticsAdapter credential handling', () {
     const secret = 'ga4-api-secret-xyz';
 
-    test('the secret never appears in toJson or toString', () {
+    test('the secret never appears in emitted payloads or safe renderings',
+        () async {
       final transport = RecordingGa4Transport();
       final adapter = _adapter(transport, apiSecret: secret);
 
+      await adapter.setUserProperties(<String, Object?>{'plan': 'pro'});
+      await adapter.trackEvent(
+        AnalyticsEvent(
+          name: 'product_view',
+          parameters: <String, Object?>{'product_id': 'p-1'},
+        ),
+      );
+
+      expect(
+        jsonEncode(transport.events.single.parameters),
+        isNot(contains(secret)),
+      );
+      expect(
+        jsonEncode(transport.userProperties.single),
+        isNot(contains(secret)),
+      );
       expect(adapter.toJson().toString(), isNot(contains(secret)));
       expect(adapter.toString(), isNot(contains(secret)));
       expect(adapter.toJson().keys, contains('environment'));

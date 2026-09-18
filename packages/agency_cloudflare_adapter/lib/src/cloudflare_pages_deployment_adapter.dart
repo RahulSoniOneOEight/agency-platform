@@ -95,6 +95,11 @@ final class CloudflarePagesDeploymentAdapter implements DeploymentPort {
 
   String? _stagedArtifactDigest;
 
+  /// Safe, secret-free rendering. Credentials are held privately and are never
+  /// included here.
+  @override
+  String toString() => 'CloudflarePagesDeploymentAdapter(project: $project)';
+
   @override
   Future<DeploymentResult> deployStaging(DeploymentRequest request) async {
     final deployment = await _transport.createDeployment(
@@ -105,8 +110,13 @@ final class CloudflarePagesDeploymentAdapter implements DeploymentPort {
       environment: request.environment,
       credentials: _credentials,
     );
+    // Validate the provider digest before recording anything as staged: a
+    // mismatched provider response must not leave a staged digest behind, or a
+    // later promotion could be authorized against an artifact that was never
+    // staged.
+    final result = _toResult(deployment, request.artifactDigest);
     _stagedArtifactDigest = request.artifactDigest;
-    return _toResult(deployment, request.artifactDigest);
+    return result;
   }
 
   @override

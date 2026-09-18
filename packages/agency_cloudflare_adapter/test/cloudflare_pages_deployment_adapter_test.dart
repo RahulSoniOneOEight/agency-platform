@@ -211,6 +211,30 @@ void main() {
         throwsA(isA<StateError>()),
       );
     });
+
+    test('a mismatched provider digest leaves no staged digest', () async {
+      final transport = RecordingCloudflareTransport(
+        responseDigestOverride: _digestB,
+      );
+      final adapter = _adapter(transport);
+
+      await expectLater(
+        adapter.deployStaging(
+          _request(digest: _digestA, environment: 'staging'),
+        ),
+        throwsA(isA<StateError>()),
+      );
+
+      // Because the failed staging must not have recorded a staged digest, a
+      // later promotion of that same digest is rejected as "no staging".
+      await expectLater(
+        adapter.promoteExactArtifactToProduction(
+          _request(digest: _digestA, environment: 'production'),
+        ),
+        throwsA(isA<StateError>()),
+      );
+      expect(transport.creates, hasLength(1));
+    });
   });
 
   group('CloudflarePagesDeploymentAdapter rollback', () {
@@ -345,19 +369,43 @@ void main() {
   });
 
   group('CloudflarePagesDeploymentAdapter no-build guarantee', () {
-    test('the adapter source exposes no build method or build command', () {
-      final source = File(
-        'lib/src/cloudflare_pages_deployment_adapter.dart',
-      ).readAsStringSync();
+    test('no file under lib/ exposes a build method or build command', () {
+      final files = Directory('lib')
+          .listSync(recursive: true)
+          .whereType<File>()
+          .where((file) => file.path.endsWith('.dart'))
+          .toList();
+      expect(files, isNotEmpty);
 
-      expect(source, isNot(contains('Process.')));
-      expect(source, isNot(contains('build_runner')));
-      expect(source, isNot(contains('flutter build')));
-      expect(
-        RegExp(r'\b(?:Future<[^>]*>|void|DeploymentResult)\s+build\s*\(')
-            .hasMatch(source),
-        isFalse,
+      const buildCommands = <String>[
+        'Process.',
+        'build_runner',
+        'flutter build',
+        'build web',
+        'wrangler pages',
+        'npm run build',
+        'dart run build',
+      ];
+      final buildMethod = RegExp(
+        r'\b(?:Future<[^>]*>|void|DeploymentResult)\s+build\s*\(',
       );
+
+      for (final file in files) {
+        final source = file.readAsStringSync();
+        for (final command in buildCommands) {
+          expect(
+            source,
+            isNot(contains(command)),
+            reason: '${file.path} must not reference a build command '
+                '("$command")',
+          );
+        }
+        expect(
+          buildMethod.hasMatch(source),
+          isFalse,
+          reason: '${file.path} must not expose a build method',
+        );
+      }
     });
   });
 
@@ -371,11 +419,17 @@ void main() {
       expect(credentials.toString(), isNot(contains('api-token-xyz')));
     });
 
-    test('the adapter does not leak credentials through toString', () {
+    test('the adapter and deployment result never render the api token',
+        () async {
       final transport = RecordingCloudflareTransport();
       final adapter = _adapter(transport);
 
+      final result = await adapter.deployStaging(
+        _request(digest: _digestA, environment: 'staging'),
+      );
+
       expect(adapter.toString(), isNot(contains('api-token-xyz')));
+      expect(result.toString(), isNot(contains('api-token-xyz')));
     });
   });
 }

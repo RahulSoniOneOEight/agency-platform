@@ -61,6 +61,40 @@ void main() {
       expect(transport.captures.single['releaseRecordId'], 'record-9');
     });
 
+    test('redacts a sensitive release context value', () async {
+      final transport = RecordingSentryTransport();
+      final adapter = _adapter(transport);
+      const secret = 'secret-value';
+
+      await adapter.setReleaseContext(<String, String>{'token': secret});
+      await adapter.captureMessage('hello');
+
+      final payload = transport.captures.single;
+      expect(payload['token'], redactedValue);
+      expect(jsonEncode(payload), isNot(contains(secret)));
+    });
+
+    test('release context cannot override constructor identity', () async {
+      final transport = RecordingSentryTransport();
+      final adapter = _adapter(transport);
+
+      await adapter.setReleaseContext(<String, String>{
+        'environment': 'production',
+        'clientId': 'attacker-client',
+        'sourceSha': 'attacker-sha',
+        'buildVersion': '9.9.9',
+        'releaseCandidateId': 'attacker-candidate',
+      });
+      await adapter.captureMessage('hello');
+
+      final payload = transport.captures.single;
+      expect(payload['environment'], 'staging');
+      expect(payload['clientId'], 'client-1');
+      expect(payload['sourceSha'], 'sha-abc');
+      expect(payload['buildVersion'], '1.2.3');
+      expect(payload['releaseCandidateId'], 'candidate-1');
+    });
+
     test('propagates a correlation id supplied in capture context', () async {
       final transport = RecordingSentryTransport();
       final adapter = _adapter(transport);
