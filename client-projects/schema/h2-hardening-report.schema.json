@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "h2-hardening-report.schema.json",
+  "type": "object",
+  "required": ["report_version","client_id","target_environment","candidate_identity","artifact_digest","migration_set_identity","release_config_identity","gate_results","blocking_findings","advisory_findings","staging_smoke_ref","eligible_for_authorization","report_identity"],
+  "properties": {
+    "report_version": {"type":"integer","minimum":1},
+    "client_id": {"type":"string","minLength":1},
+    "target_environment": {"type":"string","enum":["production"]},
+    "candidate_identity": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "artifact_digest": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "migration_set_identity": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "release_config_identity": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "gate_results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["area","findings","blocking_findings","advisory_findings","passed"],
+        "properties": {
+          "area": {"type":"string","enum":["security","performance","accessibility","analytics","observability","migrations"]},
+          "findings": {"type":"array","items":{"$ref":"#/$defs/finding"}},
+          "blocking_findings": {"type":"array","items":{"$ref":"#/$defs/finding"}},
+          "advisory_findings": {"type":"array","items":{"$ref":"#/$defs/finding"}},
+          "passed": {"type":"boolean"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "blocking_findings": {"type":"array","items":{"$ref":"#/$defs/finding"}},
+    "advisory_findings": {"type":"array","items":{"$ref":"#/$defs/finding"}},
+    "staging_smoke_ref": {
+      "type": "object",
+      "required": ["ref","report_identity","deployment_id","artifact_digest","critical_journeys_passed"],
+      "properties": {
+        "ref": {"type":"string","minLength":1},
+        "report_identity": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+        "deployment_id": {"type":"string","minLength":1},
+        "artifact_digest": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+        "critical_journeys_passed": {"type":"boolean"}
+      },
+      "additionalProperties": false
+    },
+    "eligible_for_authorization": {"type":"boolean"},
+    "report_identity": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$"}
+  },
+  "$defs": {
+    "finding": {
+      "type": "object",
+      "required": ["id","area","severity","disposition","status","summary","evidence_refs"],
+      "properties": {
+        "id": {"type":"string","minLength":1},
+        "area": {"type":"string","enum":["security","performance","accessibility","analytics","observability","migrations"]},
+        "severity": {"type":"string","enum":["info","low","medium","high","critical"]},
+        "disposition": {"type":"string","enum":["advisory","blocking"]},
+        "status": {"type":"string","enum":["open","closed","waived"]},
+        "summary": {"type":"string","minLength":1},
+        "evidence_refs": {"type":"array","items":{"type":"string","minLength":1}}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

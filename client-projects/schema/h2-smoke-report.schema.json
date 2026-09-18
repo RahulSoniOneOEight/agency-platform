@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "h2-smoke-report.schema.json",
+  "type": "object",
+  "required": ["report_version","client_id","environment","candidate_identity","artifact_digest","deployment_id","journeys","critical_journeys_passed","report_identity"],
+  "properties": {
+    "report_version": {"type":"integer","minimum":1},
+    "client_id": {"type":"string","minLength":1},
+    "environment": {"type":"string","enum":["staging"]},
+    "candidate_identity": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "artifact_digest": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "deployment_id": {"type":"string","minLength":1},
+    "journeys": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name","critical","steps","passed","error_class"],
+        "properties": {
+          "name": {"type":"string","minLength":1},
+          "critical": {"type":"boolean"},
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["name","passed"],
+              "properties": {
+                "name": {"type":"string","minLength":1},
+                "passed": {"type":"boolean"}
+              },
+              "additionalProperties": false
+            }
+          },
+          "passed": {"type":"boolean"},
+          "error_class": {"type":["string","null"]}
+        },
+        "additionalProperties": false
+      }
+    },
+    "critical_journeys_passed": {"type":"boolean"},
+    "report_identity": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$"}
+  },
+  "additionalProperties": false
+}

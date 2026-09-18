@@ -1,0 +1,142 @@
+{
+  "security": {
+    "findings": [
+      {
+        "id": "CVE-REF-0001",
+        "severity": "low",
+        "status": "open",
+        "release_relevant": false,
+        "summary": "Low-severity dependency advisory tracked outside the release-relevant set",
+        "refs": ["https://security.example/CVE-REF-0001"]
+      }
+    ],
+    "secret_leak": false,
+    "rls_validation": {
+      "ok": true
+    },
+    "production_debug_enabled": false
+  },
+  "performance": {
+    "main_js_raw_bytes": 4200000,
+    "web_build_total_bytes": 17000000,
+    "first_contentful_paint_ms": 2400,
+    "largest_contentful_paint_ms": 3900,
+    "critical_screen_ready_ms": 3800,
+    "critical_api_p95_ms": 850,
+    "baseline_regression_percent": 14
+  },
+  "accessibility": {
+    "journeys": {
+      "sign-in": {
+        "keyboard": true,
+        "focus": true,
+        "semantics": true,
+        "labels": true,
+        "contrast": true
+      },
+      "catalog": {
+        "keyboard": true,
+        "focus": true,
+        "semantics": true,
+        "labels": true,
+        "contrast": true
+      },
+      "product-detail": {
+        "keyboard": true,
+        "focus": true,
+        "semantics": true,
+        "labels": true,
+        "contrast": false
+      },
+      "cart-order": {
+        "keyboard": true,
+        "focus": true,
+        "semantics": true,
+        "labels": true,
+        "contrast": true
+      },
+      "b2b-account-credit": {
+        "keyboard": true,
+        "focus": true,
+        "semantics": true,
+        "labels": true,
+        "contrast": true
+      },
+      "rfq-quotation-order": {
+        "keyboard": true,
+        "focus": true,
+        "semantics": true,
+        "labels": true,
+        "contrast": true
+      }
+    },
+    "manual_review": []
+  },
+  "analytics": {
+    "environment": "staging",
+    "events": [
+      {"name": "sign_in", "parameters": {"method": "password"}},
+      {"name": "catalog_view", "parameters": {"source": "home"}},
+      {"name": "product_view", "parameters": {"sku": "SKU-0001"}},
+      {"name": "cart_created", "parameters": {"currency": "USD"}},
+      {"name": "cart_updated", "parameters": {"items": 2}},
+      {"name": "checkout_or_order_start", "parameters": {"channel": "web"}},
+      {"name": "order_created", "parameters": {"order_id": "order-0001"}},
+      {"name": "business_account_selected", "parameters": {"account_id": "acct-0001"}},
+      {"name": "credit_viewed", "parameters": {"account_id": "acct-0001"}},
+      {"name": "rfq_created", "parameters": {"rfq_id": "rfq-0001"}},
+      {"name": "quotation_viewed", "parameters": {"quotation_id": "quote-0001"}},
+      {"name": "quotation_converted", "parameters": {"quotation_id": "quote-0001"}},
+      {"name": "experiment_flag_exposed", "parameters": {"flag": "checkout_v2"}}
+    ]
+  },
+  "observability": {
+    "adapter_initialized": true,
+    "tags": {
+      "release": "0.1.0+h2rc1",
+      "environment": "staging",
+      "client": "reference-commerce",
+      "candidate": "sha256:be27d17be2be37bf05778fefb983b1116fa5e45e029a7e06b180e68fcfbc98da"
+    },
+    "exception_capture": {
+      "handled": true,
+      "unhandled": true
+    },
+    "redaction": {
+      "proven": true
+    },
+    "alert_tuning": [
+      "Tune staging alert thresholds after the first production week"
+    ],
+    "dashboard_notes": [
+      "Add a checkout latency panel before production"
+    ]
+  },
+  "migrations": {
+    "migration_set_identity": "sha256:f37830c5d1f64588127bc2a1b8c9311650e3db255e2c079821fd3d0d784455e5",
+    "migration_set_entries": [
+      {
+        "path": "supabase/migrations/202609180001_reference_commerce_foundation.sql",
+        "sha256": "sha256:0b274c533894ba14e7b3edac926071b02b428e9da81f086f1e23e8ead445ce9b"
+      },
+      {
+        "path": "supabase/migrations/202609180002_reference_commerce_rls.sql",
+        "sha256": "sha256:74c05f902e1e2ea6ed318e9384287efdde7add2fd30e1a4298d837d7767f72a7"
+      }
+    ],
+    "migration_classes": {
+      "supabase/migrations/202609180001_reference_commerce_foundation.sql": "additive",
+      "supabase/migrations/202609180002_reference_commerce_rls.sql": "additive"
+    },
+    "staging_apply": {
+      "ok": true
+    },
+    "post_apply_verification": {
+      "ok": true
+    },
+    "recovery_treatment": {},
+    "optimization_recommendations": [
+      "Add a covering index for catalog filtering before sustained production load"
+    ]
+  }
+}
