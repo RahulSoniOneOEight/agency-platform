@@ -588,11 +588,36 @@ def validate_resume_evidence(evidence: Any) -> list[str]:
     elif resume.get("same_attempt") is not True:
         errors.append("resume.same_attempt must be true")
 
+    interruption = evidence.get("interruption")
+    if not isinstance(interruption, Mapping):
+        errors.append("interruption must be a mapping")
+    else:
+        if interruption.get("lease_expired") is not True:
+            errors.append("interruption.lease_expired must be true")
+        if interruption.get("recovery_action") != "resume":
+            errors.append("interruption.recovery_action must be 'resume'")
+
+    if isinstance(resume, Mapping):
+        if resume.get("recovery_action") != "resume":
+            errors.append("resume.recovery_action must be 'resume'")
+        if resume.get("lease_reclaimed") is not True:
+            errors.append("resume.lease_reclaimed must be true")
+        audit_records = resume.get("audit_records")
+        if not isinstance(audit_records, int) or audit_records < 1:
+            errors.append("resume.audit_records must be a positive integer")
+        if resume.get("manifest_count_for_stage") != 1:
+            errors.append("resume.manifest_count_for_stage must be 1")
+
     completion = evidence.get("completion")
     if not isinstance(completion, Mapping):
         errors.append("completion must be a mapping")
-    elif completion.get("advanced_to") != "client-review":
-        errors.append("completion.advanced_to must be 'client-review'")
+    else:
+        if completion.get("advanced_to") != "client-review":
+            errors.append("completion.advanced_to must be 'client-review'")
+        if completion.get("last_transition_from") != RESUME_STAGE:
+            errors.append(f"completion.last_transition_from must be {RESUME_STAGE!r}")
+        if completion.get("lease_released") is not True:
+            errors.append("completion.lease_released must be true")
 
     retry = evidence.get("retry")
     if not isinstance(retry, Mapping):

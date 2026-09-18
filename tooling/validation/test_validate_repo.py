@@ -266,6 +266,21 @@ class ValidatorContractTests(unittest.TestCase):
             "generated per-client execution manifests must never be required globally",
         )
 
+    def test_milestone_f_reference_client_paths_are_required(self):
+        validator = self.load_validator()
+        for path in (
+            "tooling/reference_client/report.py",
+            "tooling/reference_client/validate_reference_client.py",
+            "client-projects/schema/reference-client-machine-report.schema.json",
+            "client-projects/reference-commerce/reference-e2e/report/reference-report.json",
+            "client-projects/reference-commerce/reference-e2e/report/reference-report.md",
+            "client-projects/reference-commerce/reference-e2e/evidence/review-approval-evidence.json",
+            "client-projects/reference-commerce/reference-e2e/evidence/change-scenarios-evidence.json",
+            "client-projects/reference-commerce/reference-e2e/evidence/resume-evidence.json",
+            "tooling/validation/test_reference_client_report.py",
+        ):
+            self.assertIn(path, validator.REQUIRED_PATHS)
+
     def test_main_reports_refinement_note_errors(self):
         validator = self.load_validator()
         with tempfile.TemporaryDirectory() as tmp:

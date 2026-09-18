@@ -33,6 +33,11 @@ from tooling.prototype.validate_runtime_bundle import (  # noqa: E402
     validate_runtime_bundle,
     validate_runtime_bundle_against_design_contract,
 )
+from tooling.reference_client.validate_reference_client import (  # noqa: E402
+    validate_reference_client,
+)
+
+REFERENCE_CLIENT_RELATIVE = "client-projects/reference-commerce"
 
 
 REQUIRED_PATHS = (
@@ -177,6 +182,15 @@ REQUIRED_PATHS = (
     "docs/superpowers/specs/2026-09-17-milestone-e-workflow-hardening-design.md",
     "docs/superpowers/plans/2026-09-17-milestone-e-workflow-hardening-implementation.md",
     "docs/superpowers/ledgers/2026-09-17-milestone-e-workflow-hardening-ledger.md",
+    "tooling/reference_client/report.py",
+    "tooling/reference_client/validate_reference_client.py",
+    "client-projects/schema/reference-client-machine-report.schema.json",
+    "client-projects/reference-commerce/reference-e2e/report/reference-report.json",
+    "client-projects/reference-commerce/reference-e2e/report/reference-report.md",
+    "client-projects/reference-commerce/reference-e2e/evidence/review-approval-evidence.json",
+    "client-projects/reference-commerce/reference-e2e/evidence/change-scenarios-evidence.json",
+    "client-projects/reference-commerce/reference-e2e/evidence/resume-evidence.json",
+    "tooling/validation/test_reference_client_report.py",
 )
 
 
@@ -322,6 +336,18 @@ def flutter_binding_errors(root: Path) -> list[str]:
     return sorted(set(errors))
 
 
+def reference_client_errors(root: Path) -> list[str]:
+    """Return F.3 reference-client fixture/evidence/report validation errors.
+
+    The reference client is validated through the composed, Flutter-free
+    ``validate_reference_client`` entry point (fixture, scenario, assertions,
+    evidence, and the byte-fresh machine/human reports). CI validates but never
+    mutates authority (RF9).
+    """
+    client_dir = root / REFERENCE_CLIENT_RELATIVE
+    return validate_reference_client(root, client_dir)
+
+
 def main(root: Path | None = None) -> int:
     root = root if root is not None else _ROOT
     missing = missing_required_paths(root)
@@ -329,7 +355,15 @@ def main(root: Path | None = None) -> int:
     binding_errors = flutter_binding_errors(root)
     theme_errors = theme_contract_errors(root)
     note_errors = refinement_note_errors(root)
-    if missing or bundle_errors or binding_errors or theme_errors or note_errors:
+    reference_errors = reference_client_errors(root)
+    if (
+        missing
+        or bundle_errors
+        or binding_errors
+        or theme_errors
+        or note_errors
+        or reference_errors
+    ):
         print("Repository validation failed.")
         if missing:
             print("Missing required paths:")
@@ -351,12 +385,17 @@ def main(root: Path | None = None) -> int:
             print("Visual refinement note errors:")
             for error in note_errors:
                 print(f"- {error}")
+        if reference_errors:
+            print("Reference client validation errors:")
+            for error in reference_errors:
+                print(f"- {error}")
         return 1
 
     print(
         f"Repository validation passed: {len(REQUIRED_PATHS)} required paths present, "
         "generated runtime bundles are fresh, Flutter design bindings are valid, "
-        "token/theme contracts are valid, and refinement notes are valid."
+        "token/theme contracts are valid, refinement notes are valid, and the "
+        "reference client is valid."
     )
     return 0
 

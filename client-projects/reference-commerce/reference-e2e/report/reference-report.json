@@ -1,0 +1,400 @@
+{
+  "approvals": [
+    {
+      "review_round": 1,
+      "review_state_hash": "sha256:366034b1d1f9f1b6fee921d41ac93700cd1268437200e7e1504f88399adcb981",
+      "source_commit_sha": "0123456789abcdef0123456789abcdef01234567",
+      "version": 1
+    },
+    {
+      "review_round": 2,
+      "review_state_hash": "sha256:2b4cc537379f8142b1c629cf6c3bd9b87e78d005363658e526b876e950292153",
+      "source_commit_sha": "89abcdef0123456789abcdef0123456789abcdef",
+      "version": 2
+    }
+  ],
+  "assertions": {
+    "by_source": {
+      "client-projects/reference-commerce/reference-e2e/assertions.yaml": {
+        "passed": 31,
+        "total": 31
+      },
+      "client-projects/reference-commerce/reference-e2e/evidence/change-scenarios-evidence.json": {
+        "passed": 19,
+        "total": 19
+      },
+      "client-projects/reference-commerce/reference-e2e/evidence/resume-evidence.json": {
+        "passed": 38,
+        "total": 38
+      },
+      "client-projects/reference-commerce/reference-e2e/evidence/review-approval-evidence.json": {
+        "passed": 38,
+        "total": 38
+      }
+    },
+    "failed": 0,
+    "passed": 126,
+    "total": 126
+  },
+  "change_boundaries": {
+    "contract_impacting": {
+      "approval_versions": [
+        1,
+        2
+      ],
+      "review_rounds": 2,
+      "third_approval_refused": true,
+      "v1_immutable": true,
+      "v2_hash_differs": true,
+      "v2_review_round": 2,
+      "v2_source_sha_differs": true,
+      "v2_supersedes": 1,
+      "v2_version": 2
+    },
+    "implementation_only": {
+      "approval_versions": [
+        1
+      ],
+      "approved_hash_unchanged": true,
+      "classification": "implementation_only",
+      "default_classification": "contract_impacting",
+      "review_round": 1,
+      "still_eligible": true
+    }
+  },
+  "client_id": "reference-commerce",
+  "client_name": "Reference Commerce",
+  "client_profile": {
+    "business_model": "b2c-b2b",
+    "display_name": "Reference Commerce",
+    "id": "reference-commerce",
+    "industry": "electronics-appliances",
+    "jobs": [
+      "discover-products",
+      "compare-prices",
+      "reorder",
+      "request-quote"
+    ],
+    "objectives": [
+      "increase-conversion",
+      "reduce-order-time",
+      "grow-trade-accounts"
+    ],
+    "personas": [
+      "consumer-shopper",
+      "trade-buyer",
+      "procurement-manager"
+    ],
+    "platforms": [
+      "web",
+      "mobile"
+    ],
+    "use_cases": [
+      "direct-purchase",
+      "request-quote",
+      "repeat-order"
+    ]
+  },
+  "directions": [
+    {
+      "archetype": "efficient-commerce",
+      "components": [
+        "commerce.product-card",
+        "commerce.price-display",
+        "commerce.search-field"
+      ],
+      "density": "compact",
+      "id": "a",
+      "name": "Efficient Commerce",
+      "patterns": [
+        "commerce.search",
+        "commerce.plp",
+        "commerce.pdp",
+        "commerce.cart"
+      ],
+      "primary_journey": {
+        "id": "search-to-order",
+        "steps": [
+          "search",
+          "plp",
+          "pdp",
+          "cart",
+          "order"
+        ]
+      },
+      "thesis": "Known-item shoppers and repeat trade buyers should reach a confident purchase in the fewest steps."
+    },
+    {
+      "archetype": "premium-discovery",
+      "components": [
+        "commerce.product-card"
+      ],
+      "density": "spacious",
+      "id": "b",
+      "name": "Premium Discovery",
+      "patterns": [
+        "commerce.home",
+        "commerce.plp",
+        "commerce.pdp"
+      ],
+      "primary_journey": {
+        "id": "browse-to-pdp",
+        "steps": [
+          "home",
+          "plp",
+          "pdp"
+        ]
+      },
+      "thesis": "Considered consumer purchases benefit from an editorial, spacious browsing experience that builds desire before price comparison."
+    },
+    {
+      "archetype": "trade-first",
+      "components": [
+        "commerce.credit-summary",
+        "commerce.quote-card",
+        "commerce.product-card"
+      ],
+      "density": "normal",
+      "id": "c",
+      "name": "Trade First",
+      "patterns": [
+        "commerce.trade-dashboard",
+        "commerce.rfq",
+        "commerce.cart",
+        "commerce.reorder"
+      ],
+      "primary_journey": {
+        "id": "reorder-to-order",
+        "steps": [
+          "trade-dashboard",
+          "reorder",
+          "cart",
+          "order"
+        ]
+      },
+      "thesis": "Existing trade accounts should manage credit, quotes, and repeat orders from a single procurement workspace."
+    }
+  ],
+  "evidence_refs": [
+    "client-projects/reference-commerce/reference-e2e/evidence/change-scenarios-evidence.json",
+    "client-projects/reference-commerce/reference-e2e/evidence/resume-evidence.json",
+    "client-projects/reference-commerce/reference-e2e/evidence/review-approval-evidence.json"
+  ],
+  "feedback": {
+    "blocking": [
+      {
+        "blocking": true,
+        "history_types": [
+          "created",
+          "addressed",
+          "resolved"
+        ],
+        "id": "feedback-blocking",
+        "origin_qa_finding_id": null,
+        "scope": "section",
+        "status": "resolved",
+        "target": {
+          "screen": "commerce.pdp",
+          "section": "pdp.price"
+        }
+      }
+    ],
+    "non_blocking": [
+      {
+        "blocking": false,
+        "history_types": [
+          "created"
+        ],
+        "id": "feedback-non-blocking",
+        "origin_qa_finding_id": null,
+        "scope": "general",
+        "status": "open",
+        "target": {}
+      }
+    ],
+    "visual_annotations": [
+      {
+        "effective_direction": "b",
+        "id": "feedback-visual",
+        "screen": "commerce.pdp",
+        "screenshot_ref": "sha256:4187fa0a2878b8298f57f293c933c880520b2014ff1279c00d029c566e16ce44",
+        "section": "pdp.price",
+        "status": "open"
+      }
+    ]
+  },
+  "fixture_identity": "sha256:d52dfd83073cc4b2469932fc5750baea0a62bf0f3755bf547a467bf8f45d6835",
+  "fixture_version": 1,
+  "known_limitations": [
+    "Checkout is a platform gap (RF13): the merged platform has no governed checkout pattern, so the reference journey represents order conversion as the terminal `order` journey step plus the governed cart calls to action; a governed checkout pattern is deferred to a later milestone.",
+    "Two fixtures have distinct roles (RF14): `prototype/fixtures/demo.yaml` is the runtime fixture pack and `reference-e2e/fixture.yaml` is the richer scenario/E2E fixture; unifying them is deliberately out of scope.",
+    "Determinism of the Dart review/approval/QA journey is asserted behaviourally (RF5) because the Dart domain has no injectable clock; the committed machine evidence is the authoritative record of those outcomes.",
+    "This report is explanatory evidence; it never replaces the machine assertions and never grants an approval or a production authorization."
+  ],
+  "qa": {
+    "findings": [
+      {
+        "category": "spacing",
+        "id": "qa-001",
+        "rule_source": "design_contract",
+        "screen": "commerce.pdp",
+        "screenshot_ref": "sha256:4187fa0a2878b8298f57f293c933c880520b2014ff1279c00d029c566e16ce44",
+        "section": "pdp.price",
+        "severity": "major",
+        "source_commit_sha": "0123456789abcdef0123456789abcdef01234567",
+        "status": "promoted",
+        "surface": "prototype"
+      }
+    ],
+    "outcomes": [
+      {
+        "blocking": false,
+        "finding_id": "qa-001",
+        "promoted_feedback_id": "feedback-qa-001",
+        "status": "promoted"
+      }
+    ],
+    "promotions": [
+      {
+        "blocking": false,
+        "feedback_id": "feedback-qa-001",
+        "finding_id": "qa-001"
+      }
+    ]
+  },
+  "refinement_batches": [
+    {
+      "classification": "implementation_only",
+      "feedback_ids": [
+        "feedback-blocking"
+      ],
+      "id": "batch-001",
+      "status": "completed"
+    }
+  ],
+  "report_identity": "sha256:761a4ce023b30f7b1a06c5c712d2c2d7f31dadc424736e05f1c9292b8eae6e22",
+  "report_version": 1,
+  "resume": {
+    "attempt_ids": [
+      {
+        "attempt": 1,
+        "run_id": "wf-reference-commerce-20260918T120000Z-b997a029",
+        "stage": "visual-qa"
+      },
+      {
+        "attempt": 2,
+        "run_id": "wf-reference-commerce-20260918T123100Z-e5112921",
+        "stage": "visual-qa"
+      }
+    ],
+    "checkpoints": [
+      {
+        "at": "2026-09-18T12:00:00Z",
+        "name": "capture-complete"
+      }
+    ],
+    "completion": {
+      "advanced_to": "client-review",
+      "completed_stages": [
+        "client-intake",
+        "resolve-intelligence",
+        "generate-directions",
+        "build-prototype",
+        "visual-qa"
+      ],
+      "last_transition_from": "visual-qa",
+      "lease_released": true
+    },
+    "interruption": {
+      "lease_expired": true,
+      "recovery_action": "resume"
+    },
+    "no_chat_memory_required": true,
+    "retry": {
+      "attempt": 2,
+      "prior_manifest_unchanged": true,
+      "recovery_action": "retry"
+    },
+    "stage": "visual-qa"
+  },
+  "review": {
+    "approval_versions": [
+      1,
+      2
+    ],
+    "rounds": 2
+  },
+  "scenario_ids": [
+    "normal-happy-path",
+    "contract-change-reapproval",
+    "implementation-only-change",
+    "resume-after-interruption"
+  ],
+  "selected_experience": {
+    "direction_identities": {
+      "a": "efficient-commerce",
+      "b": "premium-discovery",
+      "c": "trade-first"
+    },
+    "screen_overrides": {
+      "commerce.search": "a"
+    },
+    "section_overrides": {
+      "commerce.pdp": {
+        "pdp.price": "a"
+      }
+    },
+    "selected_direction": "b"
+  },
+  "source_commit_sha": "0123456789abcdef0123456789abcdef01234567",
+  "workflow": {
+    "attempt_ids": [
+      {
+        "attempt": 1,
+        "run_id": "wf-reference-commerce-20260918T120000Z-b997a029",
+        "stage": "visual-qa"
+      },
+      {
+        "attempt": 2,
+        "run_id": "wf-reference-commerce-20260918T123100Z-e5112921",
+        "stage": "visual-qa"
+      }
+    ],
+    "completed": [
+      "client-intake",
+      "resolve-intelligence",
+      "generate-directions",
+      "build-prototype"
+    ],
+    "current_stage": "visual-qa",
+    "skipped": [
+      "resource-research"
+    ],
+    "validators": {
+      "build-prototype": [
+        "prototype-platform-contract"
+      ],
+      "client-intake": [
+        "client-input-contract"
+      ],
+      "client-review": [
+        "approved-experience-contract"
+      ],
+      "generate-directions": [
+        "direction-contract"
+      ],
+      "productionize": [
+        "productionize-contract"
+      ],
+      "resolve-intelligence": [
+        "resolved-intelligence-contract"
+      ],
+      "resource-research": [
+        "resource-selection-contract"
+      ],
+      "visual-qa": [
+        "visual-qa-contract"
+      ]
+    }
+  }
+}
