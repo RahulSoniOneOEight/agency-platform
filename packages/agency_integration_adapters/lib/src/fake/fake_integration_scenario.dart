@@ -78,14 +78,56 @@ void fakeGuard(FakeIntegrationScenario scenario, String operation) {
   }
 }
 
+/// Joins request fields into a deterministic payload fingerprint.
+///
+/// Used by [FakeIntegrationScenario.duplicate] to detect a reused idempotency
+/// key carrying a different request. The separator is a control character that
+/// cannot appear in the field values, so distinct field lists cannot collide.
+String fakeFingerprint(Iterable<Object?> parts) =>
+    parts.map((part) => part.toString()).join('\u0001');
+
+/// Deterministically fingerprints a string map, independent of insertion order.
+String fakeMapFingerprint(Map<String, String> values) {
+  final entries = values.entries.toList()
+    ..sort((a, b) => a.key.compareTo(b.key));
+  return entries.map((entry) => '${entry.key}=${entry.value}').join('\u0001');
+}
+
+/// Resolves a mutating call against [store] under [scenario].
+///
+/// [FakeIntegrationScenario.duplicate] enforces provider-side payload
+/// integrity: a reused key with an equal request replays the cached result,
+/// while a reused key with a different request conflicts. Every other
+/// scenario keeps the permissive replay behavior (the key alone wins).
+T fakeIdempotentResult<T extends Object>({
+  required FakeIntegrationScenario scenario,
+  required FakeIdempotencyStore store,
+  required String operation,
+  required IdempotencyKey key,
+  required String requestFingerprint,
+  required T Function() create,
+}) {
+  if (scenario == FakeIntegrationScenario.duplicate) {
+    return store.resolveWithIntegrity(
+      operation,
+      key,
+      requestFingerprint,
+      create,
+    );
+  }
+  return store.resolve(operation, key, create);
+}
+
 /// In-memory idempotency ledger shared by the fake mutating adapters.
 ///
 /// Re-submitting the same [IdempotencyKey] for the same [operation] returns the
 /// exact result instance produced by the original request, so a duplicate
-/// cannot create a second externally visible effect. The ledger is per adapter
-/// instance and deterministic.
+/// cannot create a second externally visible effect. [resolveWithIntegrity]
+/// additionally enforces payload integrity for the `duplicate` scenario. The
+/// ledger is per adapter instance and deterministic.
 final class FakeIdempotencyStore {
   final Map<String, Object> _results = {};
+  final Map<String, String> _fingerprints = {};
 
   T resolve<T extends Object>(
     String operation,
@@ -102,6 +144,42 @@ final class FakeIdempotencyStore {
     return created;
   }
 
-  /// Clears every remembered result.
-  void reset() => _results.clear();
+  /// Resolves with provider-side payload-integrity enforcement.
+  ///
+  /// The first request for a key is created and remembered. A repeat with an
+  /// equal [requestFingerprint] replays the cached result; a repeat with a
+  /// different fingerprint fails with a non-retryable
+  /// [DomainFailureCode.conflict], modelling a provider rejecting a reused
+  /// idempotency key whose request does not match.
+  T resolveWithIntegrity<T extends Object>(
+    String operation,
+    IdempotencyKey key,
+    String requestFingerprint,
+    T Function() create,
+  ) {
+    final cacheKey = '$operation#${key.value}';
+    final existing = _results[cacheKey];
+    if (existing != null) {
+      if (_fingerprints[cacheKey] != requestFingerprint) {
+        throw DomainFailure(
+          code: DomainFailureCode.conflict,
+          operation: operation,
+          retryable: false,
+          message:
+              'Idempotency key was reused with a different request payload.',
+        );
+      }
+      return existing as T;
+    }
+    final created = create();
+    _results[cacheKey] = created;
+    _fingerprints[cacheKey] = requestFingerprint;
+    return created;
+  }
+
+  /// Clears every remembered result and fingerprint.
+  void reset() {
+    _results.clear();
+    _fingerprints.clear();
+  }
 }

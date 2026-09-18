@@ -37,18 +37,25 @@ final class FakeErpAdapter implements ErpPort {
   }) async {
     const operation = 'ErpPort.requestQuotation';
     fakeGuard(scenario, operation);
-    return _store.resolve(operation, idempotencyKey, () {
-      final totalMinor = rfq.items.fold<int>(
-        0,
-        (total, item) => total + item.lineTotalMinor,
-      );
-      return Quotation(
-        id: 'quo_${rfq.id}_${idempotencyKey.value}',
-        rfqId: rfq.id,
-        totalMinor: totalMinor,
-        status: QuotationStatus.sent,
-      );
-    });
+    return fakeIdempotentResult(
+      scenario: scenario,
+      store: _store,
+      operation: operation,
+      key: idempotencyKey,
+      requestFingerprint: _rfqFingerprint(rfq),
+      create: () {
+        final totalMinor = rfq.items.fold<int>(
+          0,
+          (total, item) => total + item.lineTotalMinor,
+        );
+        return Quotation(
+          id: 'quo_${rfq.id}_${idempotencyKey.value}',
+          rfqId: rfq.id,
+          totalMinor: totalMinor,
+          status: QuotationStatus.sent,
+        );
+      },
+    );
   }
 
   @override
@@ -58,11 +65,40 @@ final class FakeErpAdapter implements ErpPort {
   }) async {
     const operation = 'ErpPort.syncOrder';
     fakeGuard(scenario, operation);
-    return _store.resolve(operation, idempotencyKey, () {
-      return ErpSyncReceipt(
+    return fakeIdempotentResult(
+      scenario: scenario,
+      store: _store,
+      operation: operation,
+      key: idempotencyKey,
+      requestFingerprint: _orderFingerprint(order),
+      create: () => ErpSyncReceipt(
         erpReference: 'erp_${order.id}_${idempotencyKey.value}',
         accepted: true,
-      );
-    });
+      ),
+    );
   }
 }
+
+String _orderFingerprint(Order order) => fakeFingerprint([
+      order.id,
+      ...order.items.expand(
+        (item) => [
+          item.productId,
+          item.variantId,
+          item.quantity,
+          item.unitPriceMinor,
+        ],
+      ),
+    ]);
+
+String _rfqFingerprint(Rfq rfq) => fakeFingerprint([
+      rfq.id,
+      ...rfq.items.expand(
+        (item) => [
+          item.productId,
+          item.variantId,
+          item.quantity,
+          item.unitPriceMinor,
+        ],
+      ),
+    ]);

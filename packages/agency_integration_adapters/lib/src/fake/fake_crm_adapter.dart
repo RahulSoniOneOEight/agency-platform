@@ -21,11 +21,20 @@ final class FakeCrmAdapter implements CrmPort {
   }) async {
     const operation = 'CrmPort.recordActivity';
     fakeGuard(scenario, operation);
-    return _store.resolve(operation, idempotencyKey, () {
-      return CrmActivityReceipt(
+    return fakeIdempotentResult(
+      scenario: scenario,
+      store: _store,
+      operation: operation,
+      key: idempotencyKey,
+      requestFingerprint: fakeFingerprint([
+        identityId,
+        activityType,
+        fakeMapFingerprint(attributes),
+      ]),
+      create: () => CrmActivityReceipt(
         activityId: 'crm_${identityId}_${activityType}_${idempotencyKey.value}',
         recorded: true,
-      );
-    });
+      ),
+    );
   }
 }

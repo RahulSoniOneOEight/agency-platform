@@ -21,11 +21,20 @@ final class FakeWhatsAppAdapter implements WhatsAppPort {
   }) async {
     const operation = 'WhatsAppPort.sendTemplateMessage';
     fakeGuard(scenario, operation);
-    return _store.resolve(operation, idempotencyKey, () {
-      return WhatsAppMessageReceipt(
+    return fakeIdempotentResult(
+      scenario: scenario,
+      store: _store,
+      operation: operation,
+      key: idempotencyKey,
+      requestFingerprint: fakeFingerprint([
+        toPhoneNumber,
+        templateName,
+        fakeMapFingerprint(parameters),
+      ]),
+      create: () => WhatsAppMessageReceipt(
         messageId: 'wa_${templateName}_${idempotencyKey.value}',
         accepted: true,
-      );
-    });
+      ),
+    );
   }
 }

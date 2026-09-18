@@ -22,15 +22,20 @@ final class FakeShippingAdapter implements ShippingPort {
   }) async {
     const operation = 'ShippingPort.createShipment';
     fakeGuard(scenario, operation);
-    final shipment = _store.resolve(operation, idempotencyKey, () {
-      return Shipment(
+    final shipment = fakeIdempotentResult(
+      scenario: scenario,
+      store: _store,
+      operation: operation,
+      key: idempotencyKey,
+      requestFingerprint: fakeFingerprint([orderId, destinationAddress]),
+      create: () => Shipment(
         shipmentId: 'shp_${orderId}_${idempotencyKey.value}',
         orderId: orderId,
         carrier: 'FakeCarrier',
         trackingNumber: 'trk_${idempotencyKey.value}',
         status: ShipmentStatus.created,
-      );
-    });
+      ),
+    );
     _shipments[shipment.shipmentId] = shipment;
     return shipment;
   }

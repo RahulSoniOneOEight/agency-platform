@@ -328,17 +328,6 @@ void main() {
           expect(second, isNot(same(first)));
         });
 
-        test('duplicate returns the same result as the original request',
-            () async {
-          final adapter = subject.build(FakeIntegrationScenario.duplicate);
-          final original = await subject.invoke(adapter, _keyA);
-          final repeated = await subject.invoke(adapter, _keyA);
-          final repeatedWithNewPayload =
-              await subject.invokeWithDifferentPayload(adapter, _keyA);
-          expect(repeated, same(original));
-          expect(repeatedWithNewPayload, same(original));
-        });
-
         test('validationFailure is a non-retryable DomainFailure', () async {
           final failure = await captureFailure(
             subject.invoke(
@@ -442,6 +431,78 @@ void main() {
         });
       });
     }
+  });
+
+  group('fake integration adapter contract — duplicate semantics', () {
+    for (final subject in mutatingSubjects) {
+      group(subject.name, () {
+        test('a first request succeeds and an equal-payload replay returns the '
+            'same result', () async {
+          final adapter = subject.build(FakeIntegrationScenario.duplicate);
+          final original = await subject.invoke(adapter, _keyA);
+          final replay = await subject.invoke(adapter, _keyA);
+          expect(replay, same(original));
+        });
+
+        test('reusing the key with a different payload conflicts '
+            '(non-retryable), unlike success which replays', () async {
+          final duplicate = subject.build(FakeIntegrationScenario.duplicate);
+          await subject.invoke(duplicate, _keyA);
+          final failure = await captureFailure(
+            subject.invokeWithDifferentPayload(duplicate, _keyA),
+          );
+          expect(failure.runtimeType, DomainFailure);
+          expect(failure.code, DomainFailureCode.conflict);
+          expect(failure.retryable, isFalse);
+
+          final permissive = subject.build(FakeIntegrationScenario.success);
+          final original = await subject.invoke(permissive, _keyA);
+          final replayed = await subject.invokeWithDifferentPayload(
+            permissive,
+            _keyA,
+          );
+          expect(replayed, same(original));
+        });
+      });
+    }
+  });
+
+  group('FakeShippingAdapter.trackShipment failure and unknown-id behavior', () {
+    test('normalizes timeout, unavailable, and validationFailure directly',
+        () async {
+      final expectations = {
+        FakeIntegrationScenario.validationFailure: (
+          DomainFailureCode.validation,
+          false,
+        ),
+        FakeIntegrationScenario.timeout: (DomainFailureCode.timeout, true),
+        FakeIntegrationScenario.unavailable: (
+          DomainFailureCode.unavailable,
+          true,
+        ),
+      };
+      for (final entry in expectations.entries) {
+        final adapter = FakeShippingAdapter(scenario: entry.key);
+        final failure = await captureFailure(
+          adapter.trackShipment('missing-shipment'),
+        );
+        expect(failure.runtimeType, DomainFailure);
+        expect(failure.code, entry.value.$1);
+        expect(failure.retryable, entry.value.$2);
+      }
+    });
+
+    test('returns null for an unknown shipment id under success', () async {
+      final adapter = FakeShippingAdapter();
+      expect(await adapter.trackShipment('missing-shipment'), isNull);
+    });
+
+    test('returns null for an unknown shipment id under duplicate', () async {
+      final adapter = FakeShippingAdapter(
+        scenario: FakeIntegrationScenario.duplicate,
+      );
+      expect(await adapter.trackShipment('missing-shipment'), isNull);
+    });
   });
 
   test('no fake adapter leaks a provider-specific exception', () async {

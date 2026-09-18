@@ -24,14 +24,19 @@ final class FakePaymentAdapter implements PaymentPort {
   }) async {
     const operation = 'PaymentPort.authorizePayment';
     fakeGuard(scenario, operation);
-    final result = _store.resolve(operation, idempotencyKey, () {
-      return PaymentResult(
+    final result = fakeIdempotentResult(
+      scenario: scenario,
+      store: _store,
+      operation: operation,
+      key: idempotencyKey,
+      requestFingerprint: fakeFingerprint([orderId, amountMinor, currency]),
+      create: () => PaymentResult(
         paymentId: 'pay_${orderId}_${idempotencyKey.value}',
         status: PaymentStatus.authorized,
         amountMinor: amountMinor,
         currency: currency,
-      );
-    });
+      ),
+    );
     _authorizedCurrencies[result.paymentId] = result.currency;
     return result;
   }
@@ -44,13 +49,18 @@ final class FakePaymentAdapter implements PaymentPort {
   }) async {
     const operation = 'PaymentPort.refundPayment';
     fakeGuard(scenario, operation);
-    return _store.resolve(operation, idempotencyKey, () {
-      return PaymentResult(
+    return fakeIdempotentResult(
+      scenario: scenario,
+      store: _store,
+      operation: operation,
+      key: idempotencyKey,
+      requestFingerprint: fakeFingerprint([paymentId, amountMinor]),
+      create: () => PaymentResult(
         paymentId: paymentId,
         status: PaymentStatus.refunded,
         amountMinor: amountMinor,
         currency: _authorizedCurrencies[paymentId] ?? 'USD',
-      );
-    });
+      ),
+    );
   }
 }
