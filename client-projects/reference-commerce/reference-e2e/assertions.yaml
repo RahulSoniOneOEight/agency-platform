@@ -194,3 +194,17 @@ assertions:
     the reference E2E journey exists under reference-e2e/evidence/.
   params:
     path: reference-e2e/evidence/review-approval-evidence.json
+- id: artifact-contract-change-evidence
+  scenario: contract-change-reapproval
+  kind: artifact_exists
+  description: The machine-readable contract-change reapproval evidence report emitted
+    by the reference change-boundary journey exists under reference-e2e/evidence/.
+  params:
+    path: reference-e2e/evidence/change-scenarios-evidence.json
+- id: artifact-implementation-only-evidence
+  scenario: implementation-only-change
+  kind: artifact_exists
+  description: The machine-readable implementation-only no-reapproval evidence report
+    emitted by the reference change-boundary journey exists under reference-e2e/evidence/.
+  params:
+    path: reference-e2e/evidence/change-scenarios-evidence.json
