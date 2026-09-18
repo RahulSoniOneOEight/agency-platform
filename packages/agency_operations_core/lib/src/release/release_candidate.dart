@@ -17,7 +17,8 @@ import 'package:flutter/foundation.dart';
 /// 3. strings are escaped exactly as Python does with `ensure_ascii=True`: `"`
 ///    and `\` are backslash-escaped, the short control escapes (`\b`, `\f`,
 ///    `\n`, `\r`, `\t`) are used where they apply, and every other code unit
-///    below `0x20` or at/above `0x80` is emitted as a lowercase `\uXXXX`
+///    outside the printable ASCII range `[^ -~]` (below `0x20` or above
+///    `0x7E`, so `U+007F` DEL is included) is emitted as a lowercase `\uXXXX`
 ///    escape (a non-BMP character becomes a surrogate pair of escapes);
 /// 4. arrays preserve their declared order.
 ///
@@ -47,7 +48,19 @@ String canonicalizeJson(Object? value) {
     return '[${value.map(canonicalizeJson).join(',')}]';
   }
   if (value is Map) {
-    final keys = value.keys.map((key) => key as String).toList()..sort();
+    final keys = <String>[];
+    for (final key in value.keys) {
+      if (key is! String) {
+        throw ArgumentError.value(
+          key,
+          'value',
+          'Canonical identity payload map keys must be String, got '
+              '${key.runtimeType}.',
+        );
+      }
+      keys.add(key);
+    }
+    keys.sort();
     final buffer = StringBuffer('{');
     for (var index = 0; index < keys.length; index++) {
       if (index > 0) {
@@ -87,7 +100,7 @@ String _canonicalString(String value) {
       buffer.write(r'\r');
     } else if (codeUnit == 0x09) {
       buffer.write(r'\t');
-    } else if (codeUnit < 0x20 || codeUnit >= 0x80) {
+    } else if (codeUnit < 0x20 || codeUnit > 0x7e) {
       buffer.write('\\u${codeUnit.toRadixString(16).padLeft(4, '0')}');
     } else {
       buffer.writeCharCode(codeUnit);
@@ -275,5 +288,6 @@ final class ReleaseCandidate {
       'releaseConfigIdentity: $releaseConfigIdentity, '
       'approvedExperienceRef: $approvedExperienceRef, '
       'h1FoundationReportRef: $h1FoundationReportRef, '
-      'candidateIdentity: $candidateIdentity)';
+      'candidateIdentity: $candidateIdentity, '
+      'migrationSetIdentity: $migrationSetIdentity)';
 }

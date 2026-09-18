@@ -24,6 +24,11 @@ const _goldenValue = <String, Object?>{
   },
 };
 
+const _delGoldenValue = <String, Object?>{
+  'boundary': <Object?>['tilde:~', 'del:\u007f', 'unit:\u001f'],
+  'client_id': 'caf\u00e9-\u007f',
+};
+
 ReleaseCandidate _candidate({
   String clientId = 'reference-commerce',
   String targetEnvironment = 'production',
@@ -179,11 +184,41 @@ void main() {
     );
   });
 
+  test('canonical JSON escapes U+007F DEL exactly as Python ensure_ascii', () {
+    expect(
+      canonicalizeJson(_delGoldenValue),
+      r'{"boundary":["tilde:~","del:\u007f","unit:\u001f"],"client_id":"caf\u00e9-\u007f"}',
+    );
+  });
+
+  test('canonical hash matches the pinned DEL cross-language golden digest', () {
+    expect(
+      canonicalJsonHash(_delGoldenValue),
+      'sha256:4524d5df540240cacc11237736ea82483fdd205b875b4b748b1f1c9923c26f9e',
+    );
+  });
+
   test('canonicalization rejects numeric values', () {
     expect(() => canonicalizeJson(1), throwsArgumentError);
     expect(() => canonicalizeJson(1.5), throwsArgumentError);
     expect(() => canonicalizeJson(<String, Object?>{'n': 0}), throwsArgumentError);
     expect(() => canonicalizeJson(<Object?>[1]), throwsArgumentError);
+  });
+
+  test('canonicalization rejects non-String map keys with ArgumentError', () {
+    expect(
+      () => canonicalizeJson(<Object?, Object?>{1: 'value'}),
+      throwsArgumentError,
+    );
+    expect(
+      () => canonicalizeJson(<Object?, Object?>{null: 'value'}),
+      throwsArgumentError,
+    );
+  });
+
+  test('toString includes the migration set identity', () {
+    final candidate = _candidate();
+    expect(candidate.toString(), contains(candidate.migrationSetIdentity));
   });
 
   test('fromJson rejects a tampered candidate identity', () {
