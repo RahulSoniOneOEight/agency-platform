@@ -6,21 +6,40 @@ pipeline's structural invariants without executing a single live step.
 
 They prove:
 
-- the production workflow contains no build/rebuild command of any kind;
-- it contains no command that could create or mutate a ``ProductionAuthorization``;
-- the G release-gate verification and the artifact-digest verification both occur
-  before the deploy step;
-- production smoke and the telemetry health window both occur after the deploy;
+- the production workflow contains no build/compile/bundle tooling anywhere,
+  scanning **every** step's ``name``/``run``/``uses``/``with`` text rather than a
+  single first-step name or a whole-file substring blocklist;
+- no local composite action (``uses: ./...``) is referenced, since one could hide
+  a build behind an opaque action;
+- the only step that contains deploy tokens (``wrangler``, ``pages deploy``,
+  ``cloudflare``, ``deploy``) is the named deploy step, and that step is ordered
+  after the G release-gate verification and the artifact-digest verification, so
+  a deploy command hidden in an earlier step fails;
+- smoke/health tokens appear only in steps that run after the deploy step;
+- no step writes or creates a ``ProductionAuthorization`` (including a
+  ``python -c`` creation that only mentions the coordinator/repository module);
+- the artifact is obtained through ``actions/download-artifact`` and the deploy
+  step references that downloaded path, never a freshly built directory;
 - the governed recovery step runs only on a failed outcome;
 - live secrets are referenced only through GitHub secret contexts, never as
   literal values, and the ``production`` environment is declared;
 - ``validate.yml`` runs every new H.2 test module and validator;
 - ``validate.yml`` and ``flutter-ci.yml`` stay credential-free and never invoke a
   live deployment.
+
+I3 adjudication (recorded; behavior intentionally unchanged): the
+production-release workflow validates the committed deterministic reference
+candidate fixture (ruling R10). ``tooling.hardening.candidate`` is invoked
+without ``--artifact`` / ``--source-sha`` / ``--build-version`` overrides, so it
+validates the pinned fixture (``FIXTURE_SOURCE_SHA`` /
+``FIXTURE_BUILD_VERSION``). Live/general candidate support is a documented known
+limitation: a real candidate would require a non-fixture validation mode, which
+this workflow does not implement. See ``ReferenceCandidateFixtureScopeTests``.
 """
 
 from __future__ import annotations
 
+import copy
 import re
 import unittest
 from pathlib import Path
@@ -79,6 +98,81 @@ TELEMETRY = "5-sample telemetry health window"
 FINALIZE = "finalize releaserecord"
 RECOVERY = "governed recovery path"
 
+# The downloaded artifact directory must be exactly what the deploy step ships.
+DOWNLOADED_ARTIFACT_PATH = "apps/production_app/build/web"
+
+# Build/compile/bundle tooling that must never appear in ANY step. Matched
+# case-insensitively against the normalized per-step blob.
+FORBIDDEN_BUILD_TOKENS: tuple[str, ...] = (
+    "flutter",
+    "dart compile",
+    "dart build",
+    "dart pub",
+    "build_runner",
+    "npm run build",
+    "yarn build",
+    "pnpm build",
+    "webpack",
+    "vite build",
+    "esbuild",
+    "rollup",
+    "gulp",
+    "gradle",
+    "xcodebuild",
+    "cargo build",
+)
+
+# ``make`` needs a word boundary so it cannot be smuggled in as part of a benign
+# identifier; it is still matched anywhere a build could hide.
+FORBIDDEN_BUILD_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"\bmake\b"),
+)
+
+# Deploy invocations. These are matched against a case-preserving blob so the
+# proper-noun ``Cloudflare`` does not collide with ``CLOUDFLARE_*`` environment
+# variable/secret names (which are not deploy commands).
+DEPLOY_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"\bwrangler\b", re.IGNORECASE),
+    re.compile(r"\bpages\s+deploy\b", re.IGNORECASE),
+    re.compile(r"\bCloudflare\b"),
+    # A bare ``deploy`` verb, but not a hyphenated filename such as
+    # ``production-deploy-output.txt`` nor an env identifier like
+    # ``DEPLOY_STARTED_AT`` (both are output/telemetry plumbing, not a deploy).
+    re.compile(r"(?<![-\w])deploy(?![-\w])", re.IGNORECASE),
+)
+
+# Smoke/health execution tokens. Deliberately specific so that secret/env names
+# such as ``TELEMETRY_HEALTH_URL`` (which contain ``health``) are not mistaken
+# for a smoke/health step.
+SMOKE_HEALTH_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"tooling\.release\.smoke", re.IGNORECASE),
+    re.compile(r"tooling\.release\.telemetry_health", re.IGNORECASE),
+    re.compile(r"\bproduction\s+smoke\b", re.IGNORECASE),
+    re.compile(r"\btelemetry\s+health\b", re.IGNORECASE),
+)
+
+# Authorization-mutating tokens. ``production_authorization.validate`` (the
+# read-only G release gate) is intentionally NOT forbidden; only creation paths
+# are. Tokens are matched case-insensitively on the normalized per-step blob.
+FORBIDDEN_AUTHORIZATION_TOKENS: tuple[str, ...] = (
+    "authorization-v",
+    "production-authorization",
+    "tooling.production_authorization.coordinator",
+    "tooling.production_authorization.repository",
+    "create_authorization",
+    "filereleaseauthorization",
+    ".authorize(",
+    "repository.create",
+    "--authorize",
+)
+
+# Case-sensitive camelCase authority symbol.
+FORBIDDEN_AUTHORIZATION_SYMBOLS: tuple[str, ...] = ("ProductionAuthorization",)
+
+AUTHORIZATION_WRITE_PATTERN = re.compile(r"--(?:write|create|authorize)\b")
+
+REFERENCE_CANDIDATE_VALIDATOR = "python -m tooling.hardening.candidate"
+
 
 def _load_yaml(path: Path) -> dict[str, Any]:
     return yaml.safe_load(path.read_text(encoding="utf-8"))
@@ -87,6 +181,47 @@ def _load_yaml(path: Path) -> dict[str, Any]:
 def _steps() -> list[dict[str, Any]]:
     document = _load_yaml(PRODUCTION_WORKFLOW)
     return document["jobs"][PRODUCTION_JOB]["steps"]
+
+
+def _collect_strings(value: Any) -> list[str]:
+    """Flatten any YAML value (scalars, mappings, sequences) into strings."""
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, dict):
+        collected: list[str] = []
+        for key, item in value.items():
+            collected.append(str(key))
+            collected.extend(_collect_strings(item))
+        return collected
+    if isinstance(value, (list, tuple)):
+        collected = []
+        for item in value:
+            collected.extend(_collect_strings(item))
+        return collected
+    return [str(value)]
+
+
+def _step_text(step: dict[str, Any]) -> str:
+    """Raw text of a step from its name/run/uses/with fields (and nothing else)."""
+    parts: list[str] = []
+    for key in ("name", "run", "uses", "with"):
+        if key in step:
+            parts.extend(_collect_strings(step[key]))
+    return "\n".join(parts)
+
+
+def _collapse(text: str) -> str:
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _normalized(step: dict[str, Any]) -> str:
+    return _collapse(_step_text(step)).lower()
+
+
+def _matches_any(text: str, patterns: tuple[re.Pattern[str], ...]) -> bool:
+    return any(pattern.search(text) for pattern in patterns)
 
 
 def _find_step(
@@ -107,44 +242,118 @@ def _index(token: str) -> int:
     return index
 
 
+def _build_violations(steps: list[dict[str, Any]]) -> list[str]:
+    """Every build/compile/bundle escape hatch found across all steps."""
+    violations: list[str] = []
+    for index, step in enumerate(steps):
+        blob = _normalized(step)
+        for token in FORBIDDEN_BUILD_TOKENS:
+            if token in blob:
+                violations.append(f"step {index}: forbidden build token {token!r}")
+        for pattern in FORBIDDEN_BUILD_PATTERNS:
+            if pattern.search(blob):
+                violations.append(
+                    f"step {index}: forbidden build tool {pattern.pattern!r}"
+                )
+        uses = str(step.get("uses", ""))
+        if uses.startswith("."):
+            violations.append(
+                f"step {index}: local composite action {uses!r} could hide a build"
+            )
+    return violations
+
+
+def _authorization_violations(steps: list[dict[str, Any]]) -> list[str]:
+    """Every authorization-creation escape hatch found across all steps."""
+    violations: list[str] = []
+    for index, step in enumerate(steps):
+        raw = _collapse(_step_text(step))
+        lowered = raw.lower()
+        for token in FORBIDDEN_AUTHORIZATION_TOKENS:
+            if token in lowered:
+                violations.append(
+                    f"step {index}: forbidden authorization token {token!r}"
+                )
+        for symbol in FORBIDDEN_AUTHORIZATION_SYMBOLS:
+            if symbol in raw:
+                violations.append(
+                    f"step {index}: forbidden authorization symbol {symbol!r}"
+                )
+        if "production_authorization" in lowered and AUTHORIZATION_WRITE_PATTERN.search(
+            lowered
+        ):
+            violations.append(
+                f"step {index}: production_authorization referenced with a write/create flag"
+            )
+    return violations
+
+
+def _deploy_token_indices(steps: list[dict[str, Any]]) -> list[int]:
+    return [
+        index
+        for index, step in enumerate(steps)
+        if _matches_any(_collapse(_step_text(step)), DEPLOY_PATTERNS)
+    ]
+
+
+def _deploy_offenders(steps: list[dict[str, Any]]) -> list[int]:
+    """Deploy-token steps other than the named deploy step."""
+    named = next(
+        (
+            index
+            for index, step in enumerate(steps)
+            if DEPLOY in str(step.get("name", "")).lower()
+        ),
+        None,
+    )
+    return [index for index in _deploy_token_indices(steps) if index != named]
+
+
+def _smoke_health_indices(steps: list[dict[str, Any]]) -> list[int]:
+    return [
+        index
+        for index, step in enumerate(steps)
+        if _matches_any(_collapse(_step_text(step)), SMOKE_HEALTH_PATTERNS)
+    ]
+
+
 class ProductionWorkflowNoRebuildTests(unittest.TestCase):
     def setUp(self) -> None:
         self.text = PRODUCTION_WORKFLOW.read_text(encoding="utf-8")
         self.lowered = self.text.lower()
         self.steps = _steps()
 
-    def test_no_build_or_rebuild_command_anywhere(self):
-        for forbidden in (
-            "flutter",
-            "flutter build",
-            "flutter build web",
-            "build web",
-            "dart build",
-            "npm run build",
-            "subosito/flutter-action",
-        ):
-            self.assertNotIn(forbidden, self.lowered)
+    def test_no_build_or_compile_tooling_in_any_step(self):
+        # Whole-workflow, per-step scan. A ``dart compile js`` step or a build
+        # hidden in a benignly named step must fail here.
+        self.assertEqual(_build_violations(self.steps), [])
+
+    def test_forbids_local_composite_actions(self):
+        local = [
+            step.get("uses")
+            for step in self.steps
+            if str(step.get("uses", "")).startswith(".")
+        ]
+        self.assertEqual(local, [])
 
     def test_downloads_exact_artifact_instead_of_building(self):
         index, step = _find_step(self.steps, DOWNLOAD)
-        self.assertIn("actions/download-artifact@v4", step["uses"])
+        self.assertIn("actions/download-artifact", step["uses"])
         self.assertLess(index, _index(DEPLOY))
 
+    def test_deploy_uses_the_downloaded_artifact_path(self):
+        _, download_step = _find_step(self.steps, DOWNLOAD)
+        download_path = download_step["with"]["path"]
+        self.assertEqual(download_path, DOWNLOADED_ARTIFACT_PATH)
+        _, deploy_step = _find_step(self.steps, DEPLOY)
+        self.assertIn(download_path, deploy_step["run"])
+        # And the path is only ever produced by the download, never a build.
+        self.assertEqual(_build_violations(self.steps), [])
+
     def test_no_authorization_creation_command(self):
-        for forbidden in (
-            "tooling.production_authorization.coordinator",
-            "production_authorization.repository",
-            "filereleaseauthorization",
-            "create_authorization",
-            ".authorize(",
-            "repository.create",
-            "--authorize",
-        ):
-            self.assertNotIn(forbidden, self.lowered)
-        for line in self.text.splitlines():
-            if "production_authorization" in line:
-                self.assertNotIn("--write", line)
-                self.assertNotIn("--create", line)
+        # Whole-workflow, per-step scan including run/with text. A ``python -c``
+        # creation must fail here.
+        self.assertEqual(_authorization_violations(self.steps), [])
 
     def test_invokes_existing_g_release_gate(self):
         self.assertIn(
@@ -174,6 +383,24 @@ class ProductionWorkflowOrderingTests(unittest.TestCase):
 
     def test_authorized_migrations_apply_before_deploy(self):
         self.assertLess(_index(APPLY_MIGRATIONS), _index(DEPLOY))
+
+    def test_deploy_tokens_appear_only_in_the_named_deploy_step(self):
+        # A deploy command hidden inside any earlier step fails this.
+        self.assertEqual(_deploy_offenders(self.steps), [])
+
+    def test_named_deploy_step_follows_gate_and_digest_verification(self):
+        deploy_index, _ = _find_step(self.steps, DEPLOY)
+        self.assertGreater(deploy_index, _index(VERIFY_AUTHORIZATION))
+        self.assertGreater(deploy_index, _index(VERIFY_DIGEST))
+
+    def test_smoke_and_health_run_only_after_deploy(self):
+        deploy_index, _ = _find_step(self.steps, DEPLOY)
+        offenders = [
+            index
+            for index in _smoke_health_indices(self.steps)
+            if index <= deploy_index
+        ]
+        self.assertEqual(offenders, [])
 
     def test_production_smoke_runs_after_deploy(self):
         self.assertGreater(_index(PRODUCTION_SMOKE), _index(DEPLOY))
@@ -226,6 +453,95 @@ class ProductionWorkflowRecoveryTests(unittest.TestCase):
     def test_recovery_uses_governed_recovery_module(self):
         _, step = _find_step(self.steps, RECOVERY)
         self.assertIn("tooling.release.recovery", step["run"])
+
+
+class ProductionWorkflowAdversarialScanTests(unittest.TestCase):
+    """Prove the hardened scanner rejects the previously-evading variants."""
+
+    def setUp(self) -> None:
+        self.steps = copy.deepcopy(_steps())
+
+    def _with_leading_step(self, step: dict[str, Any]) -> list[dict[str, Any]]:
+        self.steps.insert(0, step)
+        return self.steps
+
+    def test_dart_compile_js_build_step_is_rejected(self):
+        steps = self._with_leading_step(
+            {
+                "name": "Build the web bundle",
+                "run": (
+                    "dart compile js -O4 "
+                    "-o apps/production_app/build/web/main.dart.js web/main.dart"
+                ),
+            }
+        )
+        violations = _build_violations(steps)
+        self.assertTrue(violations)
+        self.assertTrue(any("dart compile" in violation for violation in violations))
+
+    def test_local_composite_action_is_rejected(self):
+        steps = self._with_leading_step(
+            {"name": "Build the web bundle", "uses": "./.github/actions/build-web"}
+        )
+        violations = _build_violations(steps)
+        self.assertTrue(violations)
+        self.assertTrue(
+            any("local composite" in violation for violation in violations)
+        )
+
+    def test_hidden_deploy_command_in_earlier_step_is_rejected(self):
+        steps = self._with_leading_step(
+            {
+                "name": "Warm the CDN cache",
+                "run": (
+                    "npx --yes wrangler@3 pages deploy "
+                    "apps/production_app/build/web --project-name demo "
+                    "--branch production"
+                ),
+            }
+        )
+        self.assertTrue(_deploy_offenders(steps))
+
+    def test_python_c_authorization_creation_is_rejected(self):
+        steps = self._with_leading_step(
+            {
+                "name": "Prepare authorization",
+                "run": (
+                    'python -c "from tooling.production_authorization.coordinator '
+                    'import create_authorization; create_authorization()"'
+                ),
+            }
+        )
+        violations = _authorization_violations(steps)
+        self.assertTrue(violations)
+        self.assertTrue(
+            any("coordinator" in violation for violation in violations)
+        )
+
+
+class ReferenceCandidateFixtureScopeTests(unittest.TestCase):
+    """I3 adjudication: the workflow proves the committed reference fixture.
+
+    The production-release workflow validates the committed deterministic
+    reference candidate (ruling R10), not an arbitrary live candidate. A real
+    candidate would require a non-fixture validation mode; live/general candidate
+    support is a documented known limitation and this workflow deliberately does
+    not implement one.
+    """
+
+    def setUp(self) -> None:
+        self.text = PRODUCTION_WORKFLOW.read_text(encoding="utf-8")
+
+    def test_invokes_the_fixture_candidate_validator_without_overrides(self):
+        self.assertIn(REFERENCE_CANDIDATE_VALIDATOR, self.text)
+        for override in ("--artifact", "--source-sha", "--build-version"):
+            self.assertNotIn(override, self.text)
+
+    def test_reference_candidate_scope_is_documented(self):
+        # The module docstring records the I3 ruling: fixture-only validation.
+        docstring = _collapse(__doc__ or "")
+        self.assertIn("reference candidate fixture", docstring)
+        self.assertIn("non-fixture validation mode", docstring)
 
 
 class ProductionWorkflowSafetyTests(unittest.TestCase):
