@@ -1,0 +1,19 @@
+{
+  "environment": "staging",
+  "api_base_url": "https://api.staging.agency-platform.example",
+  "supabase_url": "https://staging-reference-commerce.supabase.co",
+  "supabase_anon_key": "staging-anon-public-key",
+  "analytics_enabled": true,
+  "feature_flags": {
+    "b2b_rfq": true,
+    "whatsapp_notifications": true
+  },
+  "integration_modes": {
+    "payment": "server",
+    "shipping": "server",
+    "erp": "server",
+    "crm": "server",
+    "whatsapp": "server"
+  },
+  "app_version": "0.1.0"
+}

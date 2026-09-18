@@ -1,0 +1,28 @@
+name: production_app
+description: Reference-commerce production composition root and runtime.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: '>=3.9.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  agency_flutter_ui:
+    path: ../../packages/agency_flutter_ui
+  agency_production_core:
+    path: ../../packages/agency_production_core
+  agency_integration_adapters:
+    path: ../../packages/agency_integration_adapters
+  agency_supabase_adapter:
+    path: ../../packages/agency_supabase_adapter
+  supabase_flutter: ^2.17.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
