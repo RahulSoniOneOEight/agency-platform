@@ -27,6 +27,15 @@ They prove:
 - ``validate.yml`` and ``flutter-ci.yml`` stay credential-free and never invoke a
   live deployment.
 
+Scope and limits (defense-in-depth): this module is a static, after-the-fact
+check. It raises the cost of an accidental or careless regression and catches
+build/deploy/authorization commands smuggled into step ``name``/``run``/
+``uses``/``with``/``env`` text, but it is **not** a security boundary: a
+committer who edits this test file can defeat it trivially. The real guarantee
+is the workflow design itself (download-only artifact, gate-before-deploy, no
+build step) plus human review of any change to the workflow or these tests.
+Static analysis exists to make the wrong change loud, not to make it impossible.
+
 I3 adjudication (recorded; behavior intentionally unchanged): the
 production-release workflow validates the committed deterministic reference
 candidate fixture (ruling R10). ``tooling.hardening.candidate`` is invoked
@@ -108,24 +117,37 @@ FORBIDDEN_BUILD_TOKENS: tuple[str, ...] = (
     "dart compile",
     "dart build",
     "dart pub",
+    "dart2js",
+    "dart run",
     "build_runner",
     "npm run build",
+    "npm run-script build",
     "yarn build",
     "pnpm build",
+    "bun build",
     "webpack",
     "vite build",
     "esbuild",
     "rollup",
     "gulp",
+    "parcel",
     "gradle",
+    "cmake",
+    "ninja",
+    "melos",
+    "bazel",
+    "msbuild",
     "xcodebuild",
     "cargo build",
 )
 
-# ``make`` needs a word boundary so it cannot be smuggled in as part of a benign
-# identifier; it is still matched anywhere a build could hide.
+# Word-bounded build tools: ``make`` and ``just`` are common English substrings
+# and ``tsc`` is a substring of ``tsconfig``, so they need boundaries to avoid
+# false positives while still matching the real command anywhere it could hide.
 FORBIDDEN_BUILD_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"\bmake\b"),
+    re.compile(r"\bjust\b"),
+    re.compile(r"\btsc\b"),
 )
 
 # Deploy invocations. These are matched against a case-preserving blob so the
@@ -159,7 +181,10 @@ FORBIDDEN_AUTHORIZATION_TOKENS: tuple[str, ...] = (
     "production-authorization",
     "tooling.production_authorization.coordinator",
     "tooling.production_authorization.repository",
+    "write_authorization",
     "create_authorization",
+    "update_authorization",
+    "save_authorization",
     "filereleaseauthorization",
     ".authorize(",
     "repository.create",
@@ -169,7 +194,27 @@ FORBIDDEN_AUTHORIZATION_TOKENS: tuple[str, ...] = (
 # Case-sensitive camelCase authority symbol.
 FORBIDDEN_AUTHORIZATION_SYMBOLS: tuple[str, ...] = ("ProductionAuthorization",)
 
-AUTHORIZATION_WRITE_PATTERN = re.compile(r"--(?:write|create|authorize)\b")
+# A write/create/authorize *act*, in either CLI-flag or method-call form. Used
+# together with a reference to the production_authorization module so that a
+# read-only ``.validate`` invocation stays legal while an aliased write call
+# (``import tooling.production_authorization as p; p.write_authorization()``)
+# does not.
+AUTHORIZATION_WRITE_PATTERN = re.compile(
+    r"(?:"
+    r"--(?:write|create|authorize)\b"
+    r"|\.(?:write|create|authorize|update|save)\w*\s*\("
+    r"|\b(?:write|create|update|save)_authorization\b"
+    r")",
+    re.IGNORECASE,
+)
+
+# ``import tooling.production_authorization as <alias>`` (optionally importing a
+# submodule), i.e. the alias form used to reach a write method indirectly.
+AUTHORIZATION_IMPORT_ALIAS_PATTERN = re.compile(
+    r"\bimport\s+tooling\.production_authorization(?:\.\w+)*\s+as\s+\w+"
+)
+
+PRODUCTION_AUTHORIZATION_MODULE = "tooling.production_authorization"
 
 REFERENCE_CANDIDATE_VALIDATOR = "python -m tooling.hardening.candidate"
 
@@ -204,9 +249,16 @@ def _collect_strings(value: Any) -> list[str]:
 
 
 def _step_text(step: dict[str, Any]) -> str:
-    """Raw text of a step from its name/run/uses/with fields (and nothing else)."""
+    """Raw text of a step from its name/run/uses/with/env fields.
+
+    ``env`` is scanned too (keys and values), so a build/authorization command
+    hidden in an environment variable that a later ``run`` step consumes
+    (``env: {BUILD_CMD: "dart compile js ..."}`` + ``run: eval "$BUILD_CMD"``)
+    is caught. ``_collect_strings`` recurses, so a nested ``with.env`` mapping is
+    covered by the ``with`` field as well.
+    """
     parts: list[str] = []
-    for key in ("name", "run", "uses", "with"):
+    for key in ("name", "run", "uses", "with", "env"):
         if key in step:
             parts.extend(_collect_strings(step[key]))
     return "\n".join(parts)
@@ -279,11 +331,16 @@ def _authorization_violations(steps: list[dict[str, Any]]) -> list[str]:
                 violations.append(
                     f"step {index}: forbidden authorization symbol {symbol!r}"
                 )
-        if "production_authorization" in lowered and AUTHORIZATION_WRITE_PATTERN.search(
-            lowered
-        ):
+        write_act = AUTHORIZATION_WRITE_PATTERN.search(raw)
+        if PRODUCTION_AUTHORIZATION_MODULE in lowered and write_act:
             violations.append(
-                f"step {index}: production_authorization referenced with a write/create flag"
+                f"step {index}: production_authorization referenced with a "
+                f"write/create/authorize call {write_act.group(0)!r}"
+            )
+        if AUTHORIZATION_IMPORT_ALIAS_PATTERN.search(raw) and write_act:
+            violations.append(
+                f"step {index}: aliased production_authorization import used "
+                f"with a write call {write_act.group(0)!r}"
             )
     return violations
 
@@ -516,6 +573,86 @@ class ProductionWorkflowAdversarialScanTests(unittest.TestCase):
         self.assertTrue(violations)
         self.assertTrue(
             any("coordinator" in violation for violation in violations)
+        )
+
+    def test_env_hidden_build_command_is_rejected(self):
+        # The build command lives only in an env var consumed by ``run``; the
+        # scanner must still see it.
+        steps = self._with_leading_step(
+            {
+                "name": "Restore cached dependencies",
+                "env": {
+                    "BUILD_CMD": (
+                        "dart compile js -O4 -o "
+                        "apps/production_app/build/web/main.dart.js web/main.dart"
+                    )
+                },
+                "run": 'eval "$BUILD_CMD"',
+            }
+        )
+        violations = _build_violations(steps)
+        self.assertTrue(violations)
+        self.assertTrue(any("dart compile" in violation for violation in violations))
+
+    def test_nested_with_env_build_command_is_rejected(self):
+        steps = self._with_leading_step(
+            {
+                "name": "Restore build cache",
+                "uses": "actions/cache@v4",
+                "with": {
+                    "path": "apps/production_app/build/web",
+                    "env": {"BUILD_CMD": "cmake -S . -B build"},
+                },
+            }
+        )
+        violations = _build_violations(steps)
+        self.assertTrue(violations)
+        self.assertTrue(any("cmake" in violation for violation in violations))
+
+    def test_broadened_build_denylist_is_rejected(self):
+        broadened = {
+            "dart2js": "dart2js -O4 -o out.js web/main.dart",
+            "dart run": "dart run tool/build.dart",
+            "cmake": "cmake -S . -B build",
+            "ninja": "ninja -C build",
+            "melos": "melos run build",
+            "just": "just build",
+            "tsc": "npx tsc -p tsconfig.json",
+            "parcel": "parcel build web/index.html",
+            "npm run-script build": "npm run-script build",
+            "yarn build": "yarn build",
+            "pnpm build": "pnpm build",
+            "bun build": "bun build ./web/main.ts --outdir dist",
+            "bazel": "bazel build //web:app",
+            "msbuild": "msbuild App.sln /p:Configuration=Release",
+        }
+        for label, command in broadened.items():
+            with self.subTest(tool=label):
+                steps = self._with_leading_step(
+                    {"name": "Warm the cache", "run": command}
+                )
+                self.assertTrue(
+                    _build_violations(steps),
+                    f"build tool {label!r} was not rejected",
+                )
+
+    def test_aliased_authorization_write_call_is_rejected(self):
+        steps = self._with_leading_step(
+            {
+                "name": "Prepare authorization",
+                "run": (
+                    'python -c "import tooling.production_authorization as p; '
+                    'p.write_authorization()"'
+                ),
+            }
+        )
+        violations = _authorization_violations(steps)
+        self.assertTrue(violations)
+        self.assertTrue(
+            any(
+                "write_authorization" in violation or "aliased" in violation
+                for violation in violations
+            )
         )
 
 
