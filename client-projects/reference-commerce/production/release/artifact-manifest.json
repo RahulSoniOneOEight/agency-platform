@@ -1,0 +1,21 @@
+{
+  "artifact_digest": "sha256:a477522873976ac4b6f816460a1915ca67e6043918b20c84a56c898f9eb3a989",
+  "entries": [
+    {
+      "path": "assets/AssetManifest.json",
+      "sha256": "sha256:bf9af628c72f78c22981d5abbfca3903f761f85a2bcb7015316bb3eba3d0a775"
+    },
+    {
+      "path": "flutter_bootstrap.js",
+      "sha256": "sha256:62f481808a80713737fec1271a09770464f2c42b4ef903691519a65d7498d74f"
+    },
+    {
+      "path": "index.html",
+      "sha256": "sha256:ee4625f18ad3acf166e0f3f8209c6bb164cd138064fd387456a621aff8cb5ac7"
+    },
+    {
+      "path": "version.json",
+      "sha256": "sha256:f8aaa661424107be21b91f1a19b096f3710c8ba77f52b894c995f0e001de12f3"
+    }
+  ]
+}
