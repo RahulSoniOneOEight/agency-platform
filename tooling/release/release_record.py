@@ -46,12 +46,14 @@ from tooling.release.evidence import (
     load_h2_authorization_ref,
 )
 from tooling.release.smoke import (
+    CHECK_IDS as SMOKE_CHECK_IDS,
     ENVIRONMENT as PRODUCTION_ENVIRONMENT,
     build_fixture_production_deployment,
     load_candidate,
     load_production_smoke_report,
     production_smoke_report_identity,
     run_production_smoke,
+    validate_production_smoke,
     write_smoke_report,
 )
 from tooling.release.telemetry_health import (
@@ -61,6 +63,7 @@ from tooling.release.telemetry_health import (
     evaluate_telemetry_health,
     load_telemetry_report,
     telemetry_report_identity,
+    validate_telemetry_health,
     write_telemetry_report,
 )
 
@@ -446,10 +449,30 @@ def _authorization_errors(
             "committed G authorization"
         )
     body = load_h2_authorization(client_dir)
-    if body and body.get("authorization_id") != ref.get("authorization_id"):
+    if not body:
         errors.append(
-            f"{relative}: committed G authorization body id does not match the ref"
+            f"{relative}: committed G authorization body is missing or invalid"
         )
+    else:
+        if body.get("authorization_id") != ref.get("authorization_id"):
+            errors.append(
+                f"{relative}: committed G authorization body id does not match the ref"
+            )
+        if body.get("source_commit_sha") != candidate.get("source_sha"):
+            errors.append(
+                f"{relative}: committed G authorization body source_commit_sha does "
+                "not match the H.2 candidate"
+            )
+        build = body.get("build")
+        if not isinstance(build, Mapping):
+            errors.append(
+                f"{relative}: committed G authorization body build hash is missing"
+            )
+        elif build.get("hash") != candidate.get("artifact_digest"):
+            errors.append(
+                f"{relative}: committed G authorization body build.hash does not "
+                "match the H.2 candidate"
+            )
     for field in (
         "candidate_identity",
         "artifact_digest",
@@ -505,6 +528,7 @@ def _production_smoke_errors(
     if not report:
         errors.append(f"{_relative(root, report_path)}: missing or invalid")
         return errors
+    errors.extend(validate_production_smoke(root, client_dir))
     if report.get("report_identity") != production_smoke_report_identity(report):
         errors.append(
             f"{_relative(root, report_path)}: report_identity does not verify"
@@ -539,7 +563,19 @@ def _production_smoke_errors(
             "mutations"
         )
     checks = report.get("checks")
-    if isinstance(checks, list):
+    if not isinstance(checks, list):
+        errors.append(
+            f"{relative}: committed production smoke report checks must be a list"
+        )
+    else:
+        check_ids = [
+            check.get("id") for check in checks if isinstance(check, Mapping)
+        ]
+        if check_ids != list(SMOKE_CHECK_IDS):
+            errors.append(
+                f"{relative}: committed production smoke report checks do not equal "
+                "the canonical check set"
+            )
         for check in checks:
             if isinstance(check, Mapping) and check.get("status") != "passed":
                 errors.append(
@@ -562,6 +598,7 @@ def _telemetry_errors(
     if not report:
         errors.append(f"{_relative(root, report_path)}: missing or invalid")
         return errors
+    errors.extend(validate_telemetry_health(root, client_dir))
     if report.get("report_identity") != telemetry_report_identity(report):
         errors.append(
             f"{_relative(root, report_path)}: report_identity does not verify"
@@ -576,6 +613,16 @@ def _telemetry_errors(
             f"{relative}: committed telemetry health report is bound to another "
             "candidate"
         )
+    if report.get("artifact_digest") != candidate.get("artifact_digest"):
+        errors.append(
+            f"{relative}: committed telemetry health report artifact_digest does "
+            "not match the H.2 candidate"
+        )
+    if report.get("environment") != record.get("environment"):
+        errors.append(
+            f"{relative}: committed telemetry health report environment does not "
+            "match the release record environment"
+        )
     if report.get("sample_count") != REQUIRED_SAMPLE_COUNT:
         errors.append(
             f"{relative}: committed telemetry health report sample_count is not "
@@ -587,16 +634,29 @@ def _telemetry_errors(
             f"not {SAMPLE_SPACING_SECONDS}"
         )
 
+    derived = evaluate_telemetry_health(
+        root,
+        client_dir,
+        report.get("samples") or [],
+        candidate,
+    )
+    derived_outcome = derived.get("outcome")
+    if report.get("outcome") != derived_outcome:
+        errors.append(
+            f"{relative}: committed telemetry health report outcome "
+            f"{report.get('outcome')!r} does not match the re-derived outcome "
+            f"{derived_outcome!r}"
+        )
     status = record.get("release_status")
     expected_outcome = {
         "healthy": "healthy",
         "degraded": "degraded",
         "failed": "failed",
     }.get(status)
-    if expected_outcome is not None and report.get("outcome") != expected_outcome:
+    if expected_outcome is not None and derived_outcome != expected_outcome:
         errors.append(
-            f"{relative}: committed telemetry health report outcome "
-            f"{report.get('outcome')!r} is inconsistent with release_status "
+            f"{relative}: re-derived telemetry health outcome "
+            f"{derived_outcome!r} is inconsistent with release_status "
             f"{status!r}"
         )
     return errors

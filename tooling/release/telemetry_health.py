@@ -288,6 +288,7 @@ def evaluate_telemetry_health(
         "client_id": client_id if isinstance(client_id, str) else client_dir.name,
         "environment": environment if isinstance(environment, str) else ENVIRONMENT,
         "candidate_identity": candidate.get("candidate_identity"),
+        "artifact_digest": candidate.get("artifact_digest"),
         "samples": [
             dict(sample) if isinstance(sample, Mapping) else sample
             for sample in sample_list
