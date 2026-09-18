@@ -4,7 +4,9 @@ Plan: `docs/superpowers/plans/2026-09-18-milestone-h2-production-hardening-autho
 Spec: `docs/superpowers/specs/2026-09-18-milestone-h2-production-hardening-authorized-release-design.md`
 Branch: `milestone-h2-production-hardening-release`
 Base: `origin/main` (H.1 merged, `3653cfc`)
-Reviewed code tip: `9b77d72` (Task 13); final delivery tip recorded at PR time.
+Reviewed code tip: `9b77d72` (Task 13).
+Delivery: pushed as `milestone-h2-production-hardening-release`; PR **#26** (`https://github.com/RahulSoniOneOEight/agency-platform/pull/26`), not merged.
+Final CI (PR #26): `validate-structure` pass, `credential-free-validation` pass, `flutter-checks` pass, `candidate-build` pass, `live-hardening` skipped (no live secrets, by design).
 
 H.2 is one milestone with H.2A Operational Hardening → Milestone-G
 `ProductionAuthorization` for the exact candidate → H.2B Authorized Release. It
