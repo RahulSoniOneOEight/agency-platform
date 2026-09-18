@@ -1,48 +1,62 @@
-import 'dart:convert';
-
-import 'package:agency_production_core/agency_production_core.dart';
+import 'package:agency_flutter_ui/agency_flutter_ui.dart';
 import 'package:flutter/material.dart';
 
+import 'app/environment_config_loader.dart';
 import 'app/production_app.dart';
 import 'app/production_composition_root.dart';
 
-/// Compile-time, client-safe configuration.
-///
-/// Deployment passes the selected environment file as JSON, e.g.
-/// `--dart-define=REFERENCE_COMMERCE_CONFIG=$(cat .../dev.json)`. When absent
-/// (local runs, `flutter build web`) the app boots on a deterministic dev
-/// configuration. No privileged value is ever embedded here.
-const String _configJson = String.fromEnvironment('REFERENCE_COMMERCE_CONFIG');
+/// Runtime environment selected at build time, e.g.
+/// `--dart-define=ENVIRONMENT=staging`. Defaults to `dev`.
+const String _environment = String.fromEnvironment(
+  'ENVIRONMENT',
+  defaultValue: 'dev',
+);
 
-EnvironmentConfig bootstrapConfig() {
-  if (_configJson.trim().isNotEmpty) {
-    final decoded = json.decode(_configJson);
-    if (decoded is! Map) {
-      throw const FormatException(
-        'REFERENCE_COMMERCE_CONFIG must be a JSON object',
-      );
-    }
-    return EnvironmentConfig.fromJson(Map<String, Object?>.from(decoded));
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  try {
+    final config = await EnvironmentConfigLoader.load(_environment);
+    runApp(
+      ProductionApp(
+        runtime: ProductionCompositionRoot.referenceCommerce(config),
+      ),
+    );
+  } on FormatException catch (error) {
+    // No silent dev fallback: an invalid environment config stops the boot with
+    // an explicit, deterministic error surface.
+    runApp(_ConfigErrorApp(message: error.message));
   }
-  return EnvironmentConfig(
-    environment: ProductionEnvironment.dev,
-    apiBaseUrl: 'https://api.dev.agency-platform.example',
-    analyticsEnabled: false,
-    featureFlags: const {'b2b_rfq': true, 'whatsapp_notifications': false},
-    integrationModes: const {
-      'payment': 'fake',
-      'shipping': 'fake',
-      'erp': 'fake',
-      'crm': 'fake',
-      'whatsapp': 'fake',
-    },
-    appVersion: '0.1.0',
-  );
 }
 
-void main() {
-  final config = bootstrapConfig();
-  runApp(
-    ProductionApp(runtime: ProductionCompositionRoot.referenceCommerce(config)),
-  );
+class _ConfigErrorApp extends StatelessWidget {
+  const _ConfigErrorApp({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'Reference Commerce',
+      theme: AgencyTheme.lightDefault(),
+      home: Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Configuration error',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 8),
+                Text(message, textAlign: TextAlign.center),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

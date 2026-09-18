@@ -14,6 +14,10 @@ from tooling.production.validate_config import (
     main,
     validate_production_config,
 )
+from tooling.production.sync_app_config import (
+    APP_ASSETS_RELATIVE,
+    sync_app_config,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 REFERENCE_CLIENT = ROOT / "client-projects" / "reference-commerce"
@@ -101,6 +105,16 @@ class ProductionConfigValidationTests(unittest.TestCase):
     def test_hyphenated_privileged_key_is_rejected(self):
         config = _valid_config("dev")
         config["feature_flags"] = {"service-role-enabled": True}
+        self._write("dev", config)
+        errors = validate_production_config(self.root, self.client_dir)
+        self.assertTrue(
+            any("privileged configuration key" in error for error in errors),
+            errors,
+        )
+
+    def test_dotted_privileged_key_is_rejected(self):
+        config = _valid_config("dev")
+        config["feature_flags"] = {"service_role.x": True}
         self._write("dev", config)
         errors = validate_production_config(self.root, self.client_dir)
         self.assertTrue(
@@ -202,6 +216,77 @@ class ReferenceProductionConfigTests(unittest.TestCase):
             self.assertNotIn("webhook_secret", json.dumps(payload).lower())
             self.assertNotIn("payment_secret", json.dumps(payload).lower())
             self.assertNotIn("whatsapp_token", json.dumps(payload).lower())
+
+    def test_reference_configs_declare_fake_integration_modes(self):
+        for environment in REQUIRED_ENVIRONMENTS:
+            path = (
+                REFERENCE_CLIENT
+                / "production"
+                / "config"
+                / f"{environment}.json"
+            )
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            modes = payload["integration_modes"]
+            self.assertEqual(
+                set(modes),
+                {"payment", "shipping", "erp", "crm", "whatsapp"},
+            )
+            self.assertTrue(
+                all(mode == "fake" for mode in modes.values()),
+                modes,
+            )
+
+
+class AppConfigSyncTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.client_dir = self.root / "client-projects" / "reference-commerce"
+        self.config_dir = self.client_dir / "production" / "config"
+        self.config_dir.mkdir(parents=True)
+        self.assets_dir = self.root / APP_ASSETS_RELATIVE
+        for environment in REQUIRED_ENVIRONMENTS:
+            (self.config_dir / f"{environment}.json").write_text(
+                json.dumps(_valid_config(environment)), encoding="utf-8"
+            )
+
+    def tearDown(self) -> None:
+        self._tmp.cleanup()
+
+    def test_sync_copies_byte_for_byte(self):
+        self.assertEqual([], sync_app_config(self.root, self.client_dir))
+        for environment in REQUIRED_ENVIRONMENTS:
+            source = (self.config_dir / f"{environment}.json").read_bytes()
+            target = (self.assets_dir / f"{environment}.json").read_bytes()
+            self.assertEqual(source, target)
+
+    def test_check_mode_reports_missing_assets(self):
+        errors = sync_app_config(self.root, self.client_dir, check=True)
+        self.assertTrue(
+            any("missing app config asset" in error for error in errors),
+            errors,
+        )
+
+    def test_check_mode_reports_stale_assets(self):
+        sync_app_config(self.root, self.client_dir)
+        (self.assets_dir / "dev.json").write_bytes(b"{}")
+        errors = sync_app_config(self.root, self.client_dir, check=True)
+        self.assertTrue(any("stale" in error for error in errors), errors)
+
+    def test_check_mode_does_not_write(self):
+        sync_app_config(self.root, self.client_dir, check=True)
+        self.assertFalse(self.assets_dir.exists())
+
+    def test_check_mode_passes_after_sync(self):
+        sync_app_config(self.root, self.client_dir)
+        self.assertEqual(
+            [], sync_app_config(self.root, self.client_dir, check=True)
+        )
+
+    def test_repository_app_config_assets_are_fresh(self):
+        self.assertEqual(
+            [], sync_app_config(ROOT, REFERENCE_CLIENT, check=True)
+        )
 
 
 if __name__ == "__main__":

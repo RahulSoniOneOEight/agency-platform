@@ -1,0 +1,19 @@
+{
+  "environment": "dev",
+  "api_base_url": "https://api.dev.agency-platform.example",
+  "supabase_url": "",
+  "supabase_anon_key": "",
+  "analytics_enabled": false,
+  "feature_flags": {
+    "b2b_rfq": true,
+    "whatsapp_notifications": false
+  },
+  "integration_modes": {
+    "payment": "fake",
+    "shipping": "fake",
+    "erp": "fake",
+    "crm": "fake",
+    "whatsapp": "fake"
+  },
+  "app_version": "0.1.0"
+}

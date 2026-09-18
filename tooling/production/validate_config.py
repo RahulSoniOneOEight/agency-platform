@@ -75,6 +75,20 @@ def _contains_forbidden_fragment(key: str) -> bool:
     return any(fragment in normalized for fragment in FORBIDDEN_KEY_FRAGMENTS)
 
 
+def _key_is_privileged(key_path: str) -> bool:
+    """Whether ``key_path`` (or any of its dot-separated segments) is privileged.
+
+    Both the raw path and every dot-separated segment are checked, so a key
+    whose *name* contains a dot (for example ``service_role.x``) cannot smuggle
+    a privileged fragment past the check.
+    """
+    if _contains_forbidden_fragment(key_path):
+        return True
+    return any(
+        _contains_forbidden_fragment(segment) for segment in key_path.split(".")
+    )
+
+
 def _walk_keys(value: object, prefix: str = ""):
     """Yield every mapping key path in ``value``, depth-first."""
     if isinstance(value, dict):
@@ -160,7 +174,7 @@ def _validate_config_file(path: Path, environment: str, root: Path) -> list[str]
             errors.append(f"{relative}: unsupported configuration key: {key}")
 
     for key_path in _walk_keys(payload):
-        if _contains_forbidden_fragment(key_path.split(".")[-1]):
+        if _key_is_privileged(key_path):
             errors.append(f"{relative}: privileged configuration key: {key_path}")
 
     errors.extend(_validate_value_types(relative, payload))

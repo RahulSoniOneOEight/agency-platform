@@ -1,30 +1,53 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:agency_integration_adapters/agency_integration_adapters.dart';
 import 'package:agency_production_core/agency_production_core.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:production_app/app/environment_config_loader.dart';
 import 'package:production_app/app/production_composition_root.dart';
 
-/// Tests run on the VM from `apps/production_app`, so the committed reference
-/// configs are reachable relative to the package root.
-const String _configDir =
-    '../../client-projects/reference-commerce/production/config';
+/// Deterministic asset bundle used to inject malformed config bytes without
+/// touching the declared assets.
+class _FakeAssetBundle extends CachingAssetBundle {
+  _FakeAssetBundle(this.values);
 
-EnvironmentConfig _loadReferenceConfig(String environment) {
-  final raw = File('$_configDir/$environment.json').readAsStringSync();
-  return EnvironmentConfig.fromJson(
-    Map<String, Object?>.from(json.decode(raw) as Map),
-  );
+  final Map<String, String> values;
+
+  @override
+  Future<ByteData> load(String key) async {
+    final value = values[key];
+    if (value == null) {
+      throw Exception('Unable to load asset: $key');
+    }
+    return ByteData.sublistView(Uint8List.fromList(utf8.encode(value)));
+  }
 }
 
 void main() {
-  group('reference environment config parsing', () {
-    test('dev config parses and boots deterministic boundaries', () async {
-      final config = _loadReferenceConfig('dev');
-      expect(config.environment, ProductionEnvironment.dev);
-      expect(config.analyticsEnabled, isFalse);
+  TestWidgetsFlutterBinding.ensureInitialized();
 
+  group('declared environment config assets', () {
+    for (final environment in const ['dev', 'staging', 'production']) {
+      test('$environment asset parses through the asset bundle', () async {
+        final config = await EnvironmentConfigLoader.load(environment);
+        expect(config.environment.name, environment);
+      });
+    }
+
+    test('dev asset is client-safe and deterministic', () async {
+      final config = await EnvironmentConfigLoader.load('dev');
+      expect(config.analyticsEnabled, isFalse);
+      expect(
+        config.integrationModes.values.every((mode) => mode == 'fake'),
+        isTrue,
+      );
+    });
+  });
+
+  group('reference environment composition', () {
+    test('dev boots deterministic boundaries', () async {
+      final config = await EnvironmentConfigLoader.load('dev');
       final runtime = ProductionCompositionRoot.referenceCommerce(config);
       expect(runtime.environment, ProductionEnvironment.dev);
       expect(runtime.isSupabaseBacked, isFalse);
@@ -38,9 +61,9 @@ void main() {
       );
     });
 
-    test('dev boot exposes deterministic fake integration adapters', () {
+    test('dev boot exposes deterministic fake integration adapters', () async {
       final runtime = ProductionCompositionRoot.referenceCommerce(
-        _loadReferenceConfig('dev'),
+        await EnvironmentConfigLoader.load('dev'),
       );
       expect(runtime.payment, isA<FakePaymentAdapter>());
       expect(runtime.shipping, isA<FakeShippingAdapter>());
@@ -49,19 +72,16 @@ void main() {
       expect(runtime.whatsapp, isA<FakeWhatsAppAdapter>());
     });
 
-    test('staging config parses and composes Supabase adapters', () {
-      final config = _loadReferenceConfig('staging');
+    test('staging composes Supabase adapters', () async {
+      final config = await EnvironmentConfigLoader.load('staging');
       expect(config.environment, ProductionEnvironment.staging);
-      expect(config.analyticsEnabled, isTrue);
-
       final runtime = ProductionCompositionRoot.referenceCommerce(config);
       expect(runtime.isSupabaseBacked, isTrue);
     });
 
-    test('production config parses and composes Supabase adapters', () {
-      final config = _loadReferenceConfig('production');
+    test('production composes Supabase adapters', () async {
+      final config = await EnvironmentConfigLoader.load('production');
       expect(config.environment, ProductionEnvironment.production);
-
       final runtime = ProductionCompositionRoot.referenceCommerce(config);
       expect(runtime.isSupabaseBacked, isTrue);
     });
@@ -82,7 +102,7 @@ void main() {
   group('deterministic commerce boundaries', () {
     test('order placement is idempotent per key', () async {
       final runtime = ProductionCompositionRoot.referenceCommerce(
-        _loadReferenceConfig('dev'),
+        await EnvironmentConfigLoader.load('dev'),
       );
       final key = IdempotencyKey('order-submission-1');
 
@@ -100,7 +120,7 @@ void main() {
 
     test('B2B membership and credit resolve deterministically', () async {
       final runtime = ProductionCompositionRoot.referenceCommerce(
-        _loadReferenceConfig('dev'),
+        await EnvironmentConfigLoader.load('dev'),
       );
       final identity = await runtime.auth.signIn(
         email: 'buyer@reference-commerce.example',
@@ -118,6 +138,43 @@ void main() {
   });
 
   group('malformed environment config', () {
+    test('malformed asset bytes fail deterministically', () async {
+      final bundle = _FakeAssetBundle({
+        'assets/config/dev.json': '{ not json',
+      });
+      await expectLater(
+        EnvironmentConfigLoader.load('dev', bundle: bundle),
+        throwsFormatException,
+      );
+    });
+
+    test('missing asset fails deterministically', () async {
+      await expectLater(
+        EnvironmentConfigLoader.load('dev', bundle: _FakeAssetBundle({})),
+        throwsFormatException,
+      );
+    });
+
+    test('unsupported environment fails deterministically', () async {
+      await expectLater(
+        EnvironmentConfigLoader.load('prod'),
+        throwsFormatException,
+      );
+    });
+
+    test('environment/asset mismatch fails deterministically', () async {
+      final bundle = _FakeAssetBundle({
+        'assets/config/dev.json': json.encode({
+          'environment': 'staging',
+          'api_base_url': 'https://api.example.test',
+        }),
+      });
+      await expectLater(
+        EnvironmentConfigLoader.load('dev', bundle: bundle),
+        throwsFormatException,
+      );
+    });
+
     test('missing environment is rejected', () {
       expect(
         () => EnvironmentConfig.fromJson({
