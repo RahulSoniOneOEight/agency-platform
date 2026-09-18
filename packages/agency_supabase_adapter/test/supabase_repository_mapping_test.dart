@@ -210,6 +210,22 @@ void main() {
       expect(saved.displayName, 'New Buyer');
       expect((await repository.getProfile('user-2'))!.id, 'prof-2');
     });
+
+    test('re-saving an identity updates the profile in place', () async {
+      await repository.saveProfile(
+        CustomerProfile(
+          id: 'prof-new',
+          identityId: 'user-1',
+          displayName: 'Updated',
+          email: 'updated@example.test',
+        ),
+      );
+
+      expect(query.tables['profiles'], hasLength(1));
+      final profile = await repository.getProfile('user-1');
+      expect(profile!.displayName, 'Updated');
+      expect(profile.email, 'updated@example.test');
+    });
   });
 
   group('SupabaseCartRepository', () {
@@ -311,6 +327,27 @@ void main() {
       expect(order.totalMinor, 2000);
       expect(query.tables['orders']!.single['total_minor'], 2000);
       expect(query.tables['order_items']!, hasLength(1));
+    });
+
+    test('writes the order and its items in one nested insert', () async {
+      await repository.createOrder(
+        cart: cart,
+        idempotencyKey: IdempotencyKey('order-key-atomic'),
+      );
+
+      final orderInserts = query.calls
+          .where((call) => call.operation == 'insert' && call.table == 'orders')
+          .toList();
+      expect(orderInserts, hasLength(1));
+      final nested = orderInserts.single.rows.single['order_items'];
+      expect(nested, isA<List<Object?>>());
+      expect(nested as List<Object?>, hasLength(1));
+      expect(
+        query.calls.where(
+          (call) => call.operation == 'insert' && call.table == 'order_items',
+        ),
+        isEmpty,
+      );
     });
 
     test('honors the optional authoritative totalMinor', () async {
@@ -431,6 +468,36 @@ void main() {
       expect(query.tables['rfq_items']!, hasLength(1));
     });
 
+    test('writes the RFQ and its items in one nested insert', () async {
+      await repository.createRfq(
+        accountId: 'acct-1',
+        items: [
+          CartItem(
+            productId: 'prd-1',
+            variantId: 'var-1',
+            quantity: 1,
+            unitPriceMinor: 1000,
+          ),
+        ],
+        idempotencyKey: IdempotencyKey('rfq-key-atomic'),
+      );
+
+      final rfqInserts = query.calls
+          .where((call) => call.operation == 'insert' && call.table == 'rfqs')
+          .toList();
+      expect(rfqInserts, hasLength(1));
+      expect(
+        rfqInserts.single.rows.single['rfq_items'] as List<Object?>,
+        hasLength(1),
+      );
+      expect(
+        query.calls.where(
+          (call) => call.operation == 'insert' && call.table == 'rfq_items',
+        ),
+        isEmpty,
+      );
+    });
+
     test('recovers the existing RFQ when a concurrent insert wins', () async {
       final raceQuery = FakeSupabaseQueryClient();
       raceQuery.onInsert = (table) {
@@ -524,6 +591,44 @@ void main() {
       expect(loaded!.status, QuotationStatus.sent);
       expect(loaded.validUntil, DateTime.utc(2026, 12, 31));
       expect(await repository.getQuotation('missing'), isNull);
+    });
+
+    test('recovers the existing quotation on a concurrent conflict', () async {
+      final raceQuery = FakeSupabaseQueryClient();
+      raceQuery.onInsert = (table) {
+        if (table == 'quotations') {
+          raceQuery.tables['quotations'] = [
+            {
+              'id': 'quote-winner',
+              'rfq_id': 'rfq-1',
+              'total_minor': 6000,
+              'status': 'sent',
+              'valid_until': null,
+              'idempotency_key': 'race-quote',
+            },
+          ];
+        }
+      };
+      raceQuery.insertError = const PostgrestException(
+        message: 'duplicate key',
+        code: '23505',
+      );
+      final raceRepository = SupabaseQuoteRepository(
+        query: raceQuery,
+        newId: () => 'unused',
+      );
+
+      final saved = await raceRepository.saveQuotation(
+        quotation: Quotation(
+          id: 'quote-loser',
+          rfqId: 'rfq-1',
+          totalMinor: 6000,
+          status: QuotationStatus.sent,
+        ),
+        idempotencyKey: IdempotencyKey('race-quote'),
+      );
+
+      expect(saved.id, 'quote-winner');
     });
   });
 }

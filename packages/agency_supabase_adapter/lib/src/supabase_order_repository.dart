@@ -34,6 +34,8 @@ final class SupabaseOrderRepository implements OrderRepository {
     final id = _newId();
     final total = totalMinor ?? cart.subtotalMinor;
     try {
+      // Single nested insert: PostgREST writes the order and its line items
+      // atomically, so a partial order with no items can never be persisted.
       await _query.insert(
         table: 'orders',
         rows: [
@@ -42,24 +44,19 @@ final class SupabaseOrderRepository implements OrderRepository {
             'status': OrderStatus.pending.name,
             'total_minor': total,
             'idempotency_key': idempotencyKey.value,
+            if (cart.items.isNotEmpty)
+              'order_items': [
+                for (final item in cart.items)
+                  {
+                    'product_id': item.productId,
+                    'variant_id': item.variantId,
+                    'quantity': item.quantity,
+                    'unit_price_minor': item.unitPriceMinor,
+                  },
+              ],
           },
         ],
       );
-      if (cart.items.isNotEmpty) {
-        await _query.insert(
-          table: 'order_items',
-          rows: [
-            for (final item in cart.items)
-              {
-                'order_id': id,
-                'product_id': item.productId,
-                'variant_id': item.variantId,
-                'quantity': item.quantity,
-                'unit_price_minor': item.unitPriceMinor,
-              },
-          ],
-        );
-      }
     } catch (error) {
       final failure = mapSupabaseFailure(error, operation: 'createOrder');
       if (failure.code == DomainFailureCode.conflict) {
@@ -71,6 +68,10 @@ final class SupabaseOrderRepository implements OrderRepository {
       throw failure;
     }
 
+    final created = await _loadByIdempotencyKey(idempotencyKey.value);
+    if (created != null) {
+      return created;
+    }
     return Order(
       id: id,
       items: [

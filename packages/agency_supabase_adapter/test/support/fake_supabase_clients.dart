@@ -116,23 +116,58 @@ final class FakeSupabaseQueryClient implements SupabaseQueryClient {
     }
     final store = tables.putIfAbsent(table, () => []);
     final inserted = <Map<String, dynamic>>[];
-    for (final row in rows) {
+    for (final rawRow in rows) {
+      // Split embedded child rows (e.g. `order_items`) from the parent row to
+      // model PostgREST's atomic nested insert.
+      final row = <String, dynamic>{};
+      final nested = <String, List<Map<String, dynamic>>>{};
+      rawRow.forEach((key, value) {
+        if (value is List && value.every((child) => child is Map)) {
+          nested[key] = [
+            for (final child in value) Map<String, dynamic>.from(child as Map),
+          ];
+        } else {
+          row[key] = value;
+        }
+      });
+
+      Map<String, dynamic> stored;
       if (onConflict != null) {
         final keys = onConflict.split(',');
         final index = store.indexWhere(
           (existing) => keys.every((key) => existing[key] == row[key]),
         );
         if (index >= 0) {
-          final merged = <String, dynamic>{...store[index], ...row};
-          store[index] = merged;
-          inserted.add(Map<String, dynamic>.from(merged));
-          continue;
+          stored = <String, dynamic>{...store[index], ...row};
+          store[index] = stored;
+        } else {
+          stored = Map<String, dynamic>.from(row);
+          stored.putIfAbsent('id', () => '$table-${store.length + 1}');
+          store.add(stored);
         }
+      } else {
+        stored = Map<String, dynamic>.from(row);
+        stored.putIfAbsent('id', () => '$table-${store.length + 1}');
+        store.add(stored);
       }
-      final copy = Map<String, dynamic>.from(row);
-      copy.putIfAbsent('id', () => '$table-${store.length + 1}');
-      store.add(copy);
-      inserted.add(Map<String, dynamic>.from(copy));
+
+      final foreignKey = table.endsWith('s')
+          ? '${table.substring(0, table.length - 1)}_id'
+          : '${table}_id';
+      nested.forEach((childTable, childRows) {
+        final childStore = tables.putIfAbsent(childTable, () => []);
+        for (final child in childRows) {
+          final childRow = Map<String, dynamic>.from(child);
+          childRow[foreignKey] = stored['id'];
+          childRow.putIfAbsent(
+            'id',
+            () => '$childTable-${childStore.length + 1}',
+          );
+          childStore.add(childRow);
+        }
+      });
+
+      inserted.add(Map<String, dynamic>.from(stored));
     }
     return inserted;
   }

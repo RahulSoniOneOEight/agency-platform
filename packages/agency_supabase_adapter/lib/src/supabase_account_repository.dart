@@ -94,7 +94,7 @@ final class SupabaseAccountRepository
       final rows = await _query.insert(
         table: 'profiles',
         rows: [customerProfileToRow(profile)],
-        onConflict: 'id',
+        onConflict: 'identity_id',
       );
       return customerProfileFromRow(rows.first);
     } catch (error) {

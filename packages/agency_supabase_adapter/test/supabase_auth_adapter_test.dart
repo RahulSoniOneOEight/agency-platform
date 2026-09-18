@@ -1,9 +1,28 @@
 import 'package:agency_production_core/agency_production_core.dart';
 import 'package:agency_supabase_adapter/agency_supabase_adapter.dart';
+import 'package:agency_supabase_adapter/src/supabase_auth_adapter.dart'
+    as src;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'support/fake_supabase_clients.dart';
+
+/// Builds a real provider [Session] so the provider→neutral mapping can be
+/// exercised without a network or a live Supabase project.
+Session _providerSession({
+  Map<String, dynamic> userMetadata = const {},
+  Map<String, dynamic> appMetadata = const {},
+}) => Session(
+  accessToken: 'access-token',
+  tokenType: 'bearer',
+  user: User(
+    id: 'user-1',
+    appMetadata: appMetadata,
+    userMetadata: userMetadata,
+    aud: 'authenticated',
+    createdAt: '2026-01-01T00:00:00Z',
+  ),
+);
 
 void main() {
   late FakeSupabaseAuthClient auth;
@@ -126,6 +145,61 @@ void main() {
       await adapter.signOut();
 
       expect(auth.signedOut, isTrue);
+    });
+  });
+
+  group('SupabaseAuthAdapter global role source', () {
+    test('user_metadata role cannot escalate the global role', () async {
+      final providerSession = src.supabaseAuthSessionFromSession(
+        _providerSession(userMetadata: {'role': 'admin'}),
+      )!;
+      expect(providerSession.role, isNull);
+      auth.signInResult = providerSession;
+
+      final identity = await adapter.signIn(
+        email: 'buyer@example.test',
+        password: 'secret',
+      );
+
+      expect(identity.role, UserRole.consumer);
+    });
+
+    test('app_metadata role is honored', () async {
+      final providerSession = src.supabaseAuthSessionFromSession(
+        _providerSession(appMetadata: {'role': 'admin'}),
+      )!;
+      expect(providerSession.role, 'admin');
+      auth.signInResult = providerSession;
+
+      final identity = await adapter.signIn(
+        email: 'admin@example.test',
+        password: 'secret',
+      );
+
+      expect(identity.role, UserRole.admin);
+    });
+
+    test('neither metadata source falls back to consumer', () async {
+      final providerSession = src.supabaseAuthSessionFromSession(
+        _providerSession(),
+      )!;
+      expect(providerSession.role, isNull);
+      auth.signInResult = providerSession;
+
+      final identity = await adapter.signIn(
+        email: 'buyer@example.test',
+        password: 'secret',
+      );
+
+      expect(identity.role, UserRole.consumer);
+    });
+
+    test('display name still comes from user_metadata', () {
+      final providerSession = src.supabaseAuthSessionFromSession(
+        _providerSession(userMetadata: {'display_name': 'Ada'}),
+      )!;
+
+      expect(providerSession.displayName, 'Ada');
     });
   });
 

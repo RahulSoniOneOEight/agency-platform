@@ -29,6 +29,8 @@ final class SupabaseQuoteRepository implements QuoteRepository {
 
     final id = _newId();
     try {
+      // Single nested insert: PostgREST writes the RFQ and its line items
+      // atomically, so a partial RFQ with no items can never be persisted.
       await _query.insert(
         table: 'rfqs',
         rows: [
@@ -38,24 +40,19 @@ final class SupabaseQuoteRepository implements QuoteRepository {
             'status': RfqStatus.submitted.name,
             'message': message,
             'idempotency_key': idempotencyKey.value,
+            if (items.isNotEmpty)
+              'rfq_items': [
+                for (final item in items)
+                  {
+                    'product_id': item.productId,
+                    'variant_id': item.variantId,
+                    'quantity': item.quantity,
+                    'unit_price_minor': item.unitPriceMinor,
+                  },
+              ],
           },
         ],
       );
-      if (items.isNotEmpty) {
-        await _query.insert(
-          table: 'rfq_items',
-          rows: [
-            for (final item in items)
-              {
-                'rfq_id': id,
-                'product_id': item.productId,
-                'variant_id': item.variantId,
-                'quantity': item.quantity,
-                'unit_price_minor': item.unitPriceMinor,
-              },
-          ],
-        );
-      }
     } catch (error) {
       final failure = mapSupabaseFailure(error, operation: 'createRfq');
       if (failure.code == DomainFailureCode.conflict) {
@@ -67,12 +64,11 @@ final class SupabaseQuoteRepository implements QuoteRepository {
       throw failure;
     }
 
-    return Rfq(
-      id: id,
-      accountId: accountId,
-      items: items,
-      message: message,
-    );
+    final created = await _loadRfqByIdempotencyKey(idempotencyKey.value);
+    if (created != null) {
+      return created;
+    }
+    return Rfq(id: id, accountId: accountId, items: items, message: message);
   }
 
   @override
@@ -125,7 +121,16 @@ final class SupabaseQuoteRepository implements QuoteRepository {
       );
       return quotationFromRow(rows.first);
     } catch (error) {
-      throw mapSupabaseFailure(error, operation: 'saveQuotation');
+      final failure = mapSupabaseFailure(error, operation: 'saveQuotation');
+      if (failure.code == DomainFailureCode.conflict) {
+        final replayed = await _loadQuotationByIdempotencyKey(
+          idempotencyKey.value,
+        );
+        if (replayed != null) {
+          return replayed;
+        }
+      }
+      throw failure;
     }
   }
 

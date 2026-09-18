@@ -40,7 +40,33 @@ abstract interface class SupabaseAuthClient {
   Future<void> signOut();
 }
 
+/// Maps a provider [Session] to the provider-neutral [SupabaseAuthSession].
+///
+/// The global role is read from `app_metadata`, which is server-controlled.
+/// `user_metadata` is client-writable, so it is deliberately never consulted
+/// for the role — otherwise a user could self-escalate to `admin`. Display
+/// name is cosmetic and may come from `user_metadata`.
+SupabaseAuthSession? supabaseAuthSessionFromSession(Session? session) {
+  if (session == null) {
+    return null;
+  }
+  final user = session.user;
+  final metadata = user.userMetadata ?? const <String, dynamic>{};
+  final displayName =
+      metadata['display_name'] ?? metadata['full_name'] ?? metadata['name'];
+  final role = user.appMetadata['role'];
+  return SupabaseAuthSession(
+    userId: user.id,
+    email: user.email,
+    displayName: displayName is String ? displayName : null,
+    role: role is String ? role : null,
+  );
+}
+
 /// Production [SupabaseAuthClient] backed by a live `GoTrueClient`.
+///
+/// Internal to the package: this is the only class that touches a provider
+/// client directly, so it is intentionally not part of the public barrel.
 final class SupabaseGoTrueAuthClient implements SupabaseAuthClient {
   SupabaseGoTrueAuthClient(this._auth);
 
@@ -48,7 +74,9 @@ final class SupabaseGoTrueAuthClient implements SupabaseAuthClient {
 
   @override
   Stream<SupabaseAuthSession?> authStateChanges() =>
-      _auth.onAuthStateChange.map((state) => _toSession(state.session));
+      _auth.onAuthStateChange.map(
+        (state) => supabaseAuthSessionFromSession(state.session),
+      );
 
   @override
   Future<SupabaseAuthSession> signInWithPassword({
@@ -59,7 +87,7 @@ final class SupabaseGoTrueAuthClient implements SupabaseAuthClient {
       email: email,
       password: password,
     );
-    final session = _toSession(response.session);
+    final session = supabaseAuthSessionFromSession(response.session);
     if (session == null) {
       throw const AuthException('Sign-in did not return a session');
     }
@@ -68,31 +96,14 @@ final class SupabaseGoTrueAuthClient implements SupabaseAuthClient {
 
   @override
   Future<SupabaseAuthSession?> currentSession() async =>
-      _toSession(_auth.currentSession);
+      supabaseAuthSessionFromSession(_auth.currentSession);
 
   @override
   Future<SupabaseAuthSession?> refreshSession() async =>
-      _toSession((await _auth.refreshSession()).session);
+      supabaseAuthSessionFromSession((await _auth.refreshSession()).session);
 
   @override
   Future<void> signOut() => _auth.signOut();
-
-  SupabaseAuthSession? _toSession(Session? session) {
-    if (session == null) {
-      return null;
-    }
-    final user = session.user;
-    final metadata = user.userMetadata ?? const <String, dynamic>{};
-    final displayName =
-        metadata['display_name'] ?? metadata['full_name'] ?? metadata['name'];
-    final role = metadata['role'];
-    return SupabaseAuthSession(
-      userId: user.id,
-      email: user.email,
-      displayName: displayName is String ? displayName : null,
-      role: role is String ? role : null,
-    );
-  }
 }
 
 /// [AuthService] implementation backed by Supabase Auth.
