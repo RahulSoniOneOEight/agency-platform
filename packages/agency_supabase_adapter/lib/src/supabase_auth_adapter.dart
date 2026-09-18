@@ -63,6 +63,14 @@ SupabaseAuthSession? supabaseAuthSessionFromSession(Session? session) {
   );
 }
 
+/// Builds the production [SupabaseAuthClient] from a live [GoTrueClient].
+///
+/// This is the public composition-root entry point: the concrete
+/// [SupabaseGoTrueAuthClient] class stays internal to `src/` so its raw auth
+/// exception surface is not exported.
+SupabaseAuthClient createSupabaseAuthClient(GoTrueClient auth) =>
+    SupabaseGoTrueAuthClient(auth);
+
 /// Production [SupabaseAuthClient] backed by a live `GoTrueClient`.
 ///
 /// Internal to the package: this is the only class that touches a provider

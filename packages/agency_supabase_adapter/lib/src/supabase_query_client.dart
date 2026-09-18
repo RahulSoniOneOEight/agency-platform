@@ -35,6 +35,14 @@ abstract interface class SupabaseQueryClient {
   });
 }
 
+/// Builds the production [SupabaseQueryClient] from a live [SupabaseClient].
+///
+/// This is the public composition-root entry point: the concrete
+/// [SupabasePostgrestQueryClient] class stays internal to `src/` so its raw
+/// PostgREST exception surface is not exported.
+SupabaseQueryClient createSupabaseQueryClient(SupabaseClient client) =>
+    SupabasePostgrestQueryClient(client);
+
 /// Production [SupabaseQueryClient] backed by a live [SupabaseClient].
 final class SupabasePostgrestQueryClient implements SupabaseQueryClient {
   SupabasePostgrestQueryClient(this._client);
