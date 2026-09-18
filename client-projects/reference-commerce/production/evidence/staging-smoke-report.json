@@ -1,0 +1,132 @@
+{
+  "artifact_digest": "sha256:a477522873976ac4b6f816460a1915ca67e6043918b20c84a56c898f9eb3a989",
+  "candidate_identity": "sha256:be27d17be2be37bf05778fefb983b1116fa5e45e029a7e06b180e68fcfbc98da",
+  "client_id": "reference-commerce",
+  "critical_journeys_passed": true,
+  "deployment_id": "staging-deploy-0001",
+  "environment": "staging",
+  "journeys": [
+    {
+      "critical": true,
+      "error_class": null,
+      "name": "b2b-quote-order",
+      "passed": true,
+      "steps": [
+        {
+          "name": "sign-in",
+          "passed": true
+        },
+        {
+          "name": "membership",
+          "passed": true
+        },
+        {
+          "name": "credit",
+          "passed": true
+        },
+        {
+          "name": "rfq",
+          "passed": true
+        },
+        {
+          "name": "quotation",
+          "passed": true
+        },
+        {
+          "name": "order",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "critical": true,
+      "error_class": null,
+      "name": "b2c-order",
+      "passed": true,
+      "steps": [
+        {
+          "name": "sign-in",
+          "passed": true
+        },
+        {
+          "name": "catalog",
+          "passed": true
+        },
+        {
+          "name": "inventory",
+          "passed": true
+        },
+        {
+          "name": "cart",
+          "passed": true
+        },
+        {
+          "name": "order",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "critical": true,
+      "error_class": null,
+      "name": "backend-failure",
+      "passed": true,
+      "steps": [
+        {
+          "name": "load-catalog-failure",
+          "passed": true
+        },
+        {
+          "name": "error-mapping",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "critical": true,
+      "error_class": null,
+      "name": "insufficient-permission",
+      "passed": true,
+      "steps": [
+        {
+          "name": "forbidden-action",
+          "passed": true
+        },
+        {
+          "name": "denied",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "critical": true,
+      "error_class": null,
+      "name": "release-identity",
+      "passed": true,
+      "steps": [
+        {
+          "name": "verify-release-marker",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "critical": true,
+      "error_class": null,
+      "name": "session-refresh",
+      "passed": true,
+      "steps": [
+        {
+          "name": "refresh-session",
+          "passed": true
+        },
+        {
+          "name": "session-valid",
+          "passed": true
+        }
+      ]
+    }
+  ],
+  "report_identity": "sha256:29cb955e290e0c1e3e4745dd70d2ae831eee361791043e784a08fd01e322e43c",
+  "report_version": 1
+}

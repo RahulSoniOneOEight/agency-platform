@@ -1,0 +1,64 @@
+{
+  "artifact_digest": "sha256:a477522873976ac4b6f816460a1915ca67e6043918b20c84a56c898f9eb3a989",
+  "blocking_reasons": [],
+  "candidate_identity": "sha256:be27d17be2be37bf05778fefb983b1116fa5e45e029a7e06b180e68fcfbc98da",
+  "client_id": "reference-commerce",
+  "environment": "production",
+  "outcome": "healthy",
+  "report_identity": "sha256:7cb2133f0753c49c7b1d2396b467f9bd8991edb6d717a1531e735eda382c30e0",
+  "report_version": 1,
+  "sample_count": 5,
+  "samples": [
+    {
+      "at": "2026-09-18T10:05:00.000Z",
+      "critical_unhandled_errors": [],
+      "deployment_reachable": true,
+      "error_rate": 0.0,
+      "index": 0,
+      "release_version": "0.1.0+h2rc1",
+      "sentry_health_signal": "healthy",
+      "smoke_passed": true
+    },
+    {
+      "at": "2026-09-18T10:06:00.000Z",
+      "critical_unhandled_errors": [],
+      "deployment_reachable": true,
+      "error_rate": 0.0,
+      "index": 1,
+      "release_version": "0.1.0+h2rc1",
+      "sentry_health_signal": "healthy",
+      "smoke_passed": true
+    },
+    {
+      "at": "2026-09-18T10:07:00.000Z",
+      "critical_unhandled_errors": [],
+      "deployment_reachable": true,
+      "error_rate": 0.0,
+      "index": 2,
+      "release_version": "0.1.0+h2rc1",
+      "sentry_health_signal": "healthy",
+      "smoke_passed": true
+    },
+    {
+      "at": "2026-09-18T10:08:00.000Z",
+      "critical_unhandled_errors": [],
+      "deployment_reachable": true,
+      "error_rate": 0.0,
+      "index": 3,
+      "release_version": "0.1.0+h2rc1",
+      "sentry_health_signal": "healthy",
+      "smoke_passed": true
+    },
+    {
+      "at": "2026-09-18T10:09:00.000Z",
+      "critical_unhandled_errors": [],
+      "deployment_reachable": true,
+      "error_rate": 0.0,
+      "index": 4,
+      "release_version": "0.1.0+h2rc1",
+      "sentry_health_signal": "healthy",
+      "smoke_passed": true
+    }
+  ],
+  "spacing_seconds": 60
+}

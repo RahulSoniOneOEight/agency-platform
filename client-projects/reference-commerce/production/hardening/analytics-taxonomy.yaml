@@ -1,0 +1,40 @@
+policy_version: 1
+environment_separation: true
+consent_handling: true
+events:
+  - name: sign_in
+    required: true
+    domain: b2c
+  - name: catalog_view
+    required: true
+    domain: b2c
+  - name: product_view
+    required: true
+    domain: b2c
+  - name: cart_created
+    required: true
+    domain: b2c
+  - name: cart_updated
+    required: true
+    domain: b2c
+  - name: checkout_or_order_start
+    required: true
+    domain: b2c
+  - name: order_created
+    required: true
+    domain: shared
+  - name: business_account_selected
+    required: true
+    domain: b2b
+  - name: credit_viewed
+    required: true
+    domain: b2b
+  - name: rfq_created
+    required: true
+    domain: b2b
+  - name: quotation_viewed
+    required: true
+    domain: b2b
+  - name: quotation_converted
+    required: true
+    domain: b2b

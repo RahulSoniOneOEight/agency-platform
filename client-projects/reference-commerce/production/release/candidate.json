@@ -1,0 +1,26 @@
+{
+  "approved_experience_ref": "client-projects/reference-commerce/reference-e2e/evidence/review-approval-evidence.json",
+  "artifact_digest": "sha256:a477522873976ac4b6f816460a1915ca67e6043918b20c84a56c898f9eb3a989",
+  "build_version": "0.1.0+h2rc1",
+  "candidate_identity": "sha256:be27d17be2be37bf05778fefb983b1116fa5e45e029a7e06b180e68fcfbc98da",
+  "client_id": "reference-commerce",
+  "h1_foundation_report_ref": "client-projects/reference-commerce/production/evidence/h1-foundation-report.json",
+  "migration_set": [
+    "supabase/migrations/202609180001_reference_commerce_foundation.sql",
+    "supabase/migrations/202609180002_reference_commerce_rls.sql"
+  ],
+  "migration_set_entries": [
+    {
+      "path": "supabase/migrations/202609180001_reference_commerce_foundation.sql",
+      "sha256": "sha256:0b274c533894ba14e7b3edac926071b02b428e9da81f086f1e23e8ead445ce9b"
+    },
+    {
+      "path": "supabase/migrations/202609180002_reference_commerce_rls.sql",
+      "sha256": "sha256:74c05f902e1e2ea6ed318e9384287efdde7add2fd30e1a4298d837d7767f72a7"
+    }
+  ],
+  "migration_set_identity": "sha256:f37830c5d1f64588127bc2a1b8c9311650e3db255e2c079821fd3d0d784455e5",
+  "release_config_identity": "sha256:43b6737e3c7922c81e8620d113a2f4bd8c2e518578b160fc50c949f35b1659d0",
+  "source_sha": "b3b18ff1877e72447381c3e7bdfaf31889616f78",
+  "target_environment": "production"
+}

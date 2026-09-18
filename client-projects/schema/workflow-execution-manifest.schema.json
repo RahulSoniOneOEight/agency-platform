@@ -67,7 +67,8 @@
         "build-prototype",
         "visual-qa",
         "client-review",
-        "productionize"
+        "productionize",
+        "release"
       ]
     },
     "artifactRef": {

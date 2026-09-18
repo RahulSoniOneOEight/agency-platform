@@ -1,0 +1,51 @@
+{
+  "acknowledged_non_blocking_item_ids": [
+    "feedback-non-blocking",
+    "feedback-qa-001",
+    "feedback-visual"
+  ],
+  "approval": {
+    "review_state_hash": "sha256:2b4cc537379f8142b1c629cf6c3bd9b87e78d005363658e526b876e950292153",
+    "source_commit_sha": "89abcdef0123456789abcdef0123456789abcdef",
+    "version": 2
+  },
+  "authorization_id": "pa-reference-commerce-production-h2-0001",
+  "authorization_version": 1,
+  "authorized_at": "2026-09-18T10:00:00Z",
+  "authorized_by": {
+    "actor_id": "release-owner-reference",
+    "kind": "human",
+    "name": "Reference Release Owner",
+    "role": "release_owner"
+  },
+  "build": {
+    "artifact_id": "reference-commerce-web-0.1.0+h2rc1",
+    "hash": "sha256:a477522873976ac4b6f816460a1915ca67e6043918b20c84a56c898f9eb3a989"
+  },
+  "client_id": "reference-commerce",
+  "environment": "production",
+  "migration_plan_ref": "client-projects/reference-commerce/production/release/candidate.json",
+  "qa_evidence_ids": [
+    "h2-release-candidate-qa"
+  ],
+  "release_notes_ref": "client-projects/reference-commerce/release/evidence/release-notes.md",
+  "rollback_plan_ref": "client-projects/reference-commerce/production/hardening/recovery-policy.yaml",
+  "security_evidence_ids": [
+    "configuration-review",
+    "dependency-check",
+    "secret-scan"
+  ],
+  "source_commit_sha": "b3b18ff1877e72447381c3e7bdfaf31889616f78",
+  "status": "active",
+  "supersedes": null,
+  "supporting_evidence_refs": [
+    "client-projects/reference-commerce/production/evidence/h1-foundation-report.json",
+    "client-projects/reference-commerce/production/evidence/h2-hardening-report.json",
+    "client-projects/reference-commerce/production/evidence/staging-smoke-report.json",
+    "client-projects/reference-commerce/reference-e2e/evidence/review-approval-evidence.json",
+    "client-projects/reference-commerce/reference-e2e/report/reference-report.json"
+  ],
+  "validation_evidence_ids": [
+    "h2-release-candidate-validation"
+  ]
+}

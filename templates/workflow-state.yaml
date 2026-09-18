@@ -15,6 +15,7 @@ pending:
   - visual-qa
   - client-review
   - productionize
+  - release
 blocked: []
 stage_state: {}
 active_lease: null

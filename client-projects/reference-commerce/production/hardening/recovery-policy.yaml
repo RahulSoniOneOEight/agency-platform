@@ -1,0 +1,13 @@
+policy_version: 1
+modes:
+  - application-rollback
+  - database-reverse-migration
+  - forward-recovery-migration
+  - manual-halt
+application_rollback:
+  previous_known_good_only: true
+database_reversal:
+  requires_reversible_flag: true
+  blind_rollback_prohibited: true
+new_artifact_is_new_candidate: true
+automated_production_authorization: false

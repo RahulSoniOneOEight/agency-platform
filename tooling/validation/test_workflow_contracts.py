@@ -54,7 +54,7 @@ def _schema_validator() -> "object":
 
 
 class LoadStageContractTests(unittest.TestCase):
-    def test_load_all_returns_the_eight_canonical_stages_in_order(self):
+    def test_load_all_returns_the_nine_canonical_stages_in_order(self):
         contracts = load_all_stage_contracts(ROOT)
         self.assertEqual(STAGES, [contract.stage for contract in contracts])
 
@@ -70,9 +70,9 @@ class LoadStageContractTests(unittest.TestCase):
         )
         self.assertEqual(("client-review",), contract.next_stages)
 
-    def test_load_stage_contract_productionize_has_empty_next(self):
+    def test_load_stage_contract_productionize_has_no_produces_and_points_to_release(self):
         contract = load_stage_contract(ROOT, "productionize")
-        self.assertEqual((), contract.next_stages)
+        self.assertEqual(("release",), contract.next_stages)
         self.assertEqual((), contract.produces)
 
     def test_load_stage_contract_missing_file_raises(self):

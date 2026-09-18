@@ -1,0 +1,93 @@
+name: H2 Hardening
+
+# Runs the six H.2 hardening gates and the staging smoke journeys against the
+# exact staged candidate and emits the staging smoke + hardening report
+# artifacts. Pull-request runs are credential-free: they validate the committed
+# fixture reports and the workflow structure only. The live job is gated on
+# staging secrets and a manual dispatch; it never creates a human release
+# permission and never deploys the production environment.
+
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      candidate_sha:
+        description: Exact staged candidate source SHA
+        required: false
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  credential-free-validation:
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install validation dependencies
+        run: python -m pip install --disable-pip-version-check pyyaml jsonschema
+
+      - name: Validate hardening policies
+        run: python -m tooling.hardening.policies client-projects/reference-commerce
+
+      - name: Validate release candidate integrity
+        run: python -m tooling.hardening.candidate client-projects/reference-commerce
+
+      - name: Validate committed fixture reports
+        run: python -m tooling.hardening.validate client-projects/reference-commerce
+
+      - name: Run hardening unit tests
+        run: >-
+          python -m unittest
+          tooling.validation.test_h2_staging_smoke
+          tooling.validation.test_h2_hardening_report -v
+
+  live-hardening:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      STAGING_DEPLOYMENT_URL: ${{ secrets.STAGING_DEPLOYMENT_URL }}
+    steps:
+      - name: Require staging deployment URL
+        if: ${{ env.STAGING_DEPLOYMENT_URL == '' }}
+        run: |
+          echo "STAGING_DEPLOYMENT_URL is not configured; live hardening cannot run."
+          exit 1
+
+      - name: Checkout exact staged candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.candidate_sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install validation dependencies
+        run: python -m pip install --disable-pip-version-check pyyaml jsonschema
+
+      - name: Run six gates and staging smoke against the staged candidate
+        env:
+          STAGING_DEPLOYMENT_URL: ${{ secrets.STAGING_DEPLOYMENT_URL }}
+        run: python -m tooling.hardening.validate client-projects/reference-commerce --live
+
+      - name: Upload hardening report artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: h2-hardening-report-${{ inputs.candidate_sha || github.sha }}
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            client-projects/reference-commerce/production/evidence/staging-smoke-report.json
+            client-projects/reference-commerce/production/evidence/h2-hardening-report.json

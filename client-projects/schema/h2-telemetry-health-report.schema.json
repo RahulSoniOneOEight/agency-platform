@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "h2-telemetry-health-report.schema.json",
+  "type": "object",
+  "required": ["report_version","client_id","environment","candidate_identity","artifact_digest","samples","sample_count","spacing_seconds","outcome","blocking_reasons","report_identity"],
+  "properties": {
+    "report_version": {"type":"integer","minimum":1},
+    "client_id": {"type":"string","minLength":1},
+    "environment": {"type":"string","enum":["production"]},
+    "candidate_identity": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "artifact_digest": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "samples": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "required": ["index","at","deployment_reachable","release_version","sentry_health_signal","critical_unhandled_errors","error_rate","smoke_passed"],
+        "properties": {
+          "index": {"type":"integer","minimum":0},
+          "at": {"type":"string","format":"date-time"},
+          "deployment_reachable": {"type":"boolean"},
+          "release_version": {"type":"string","minLength":1},
+          "sentry_health_signal": {"type":"string","enum":["healthy","degraded","failed"]},
+          "critical_unhandled_errors": {"type":"array"},
+          "error_rate": {"type":"number","minimum":0},
+          "smoke_passed": {"type":"boolean"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "sample_count": {"type":"integer","const":5},
+    "spacing_seconds": {"type":"integer","const":60},
+    "outcome": {"type":"string","enum":["healthy","degraded","failed"]},
+    "blocking_reasons": {"type":"array","items":{"type":"string","minLength":1}},
+    "report_identity": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$"}
+  },
+  "additionalProperties": false
+}

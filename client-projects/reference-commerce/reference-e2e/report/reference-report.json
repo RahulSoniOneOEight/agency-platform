@@ -272,7 +272,7 @@
       "status": "completed"
     }
   ],
-  "report_identity": "sha256:b1f9234cb24db40ca1463022fabd0527a434283a1ddd0de89e9409f020037c23",
+  "report_identity": "sha256:70e66f7c8028505109448b0b407f00a2670d88f57ddda094394ee723549d85a6",
   "report_version": 1,
   "resume": {
     "attempt_ids": [
@@ -443,6 +443,17 @@
           "productionize-contract",
           "production-foundation"
         ]
+      },
+      {
+        "executed": false,
+        "source": "stage-contract",
+        "stage": "release",
+        "status": "declared_only",
+        "validators": [
+          "h2-hardening",
+          "production-authorization",
+          "h2-release-record"
+        ]
       }
     ],
     "validators": {
@@ -461,6 +472,11 @@
       "productionize": [
         "productionize-contract",
         "production-foundation"
+      ],
+      "release": [
+        "h2-hardening",
+        "production-authorization",
+        "h2-release-record"
       ],
       "resolve-intelligence": [
         "resolved-intelligence-contract"

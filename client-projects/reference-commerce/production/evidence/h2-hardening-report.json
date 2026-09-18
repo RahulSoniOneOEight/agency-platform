@@ -1,0 +1,277 @@
+{
+  "advisory_findings": [
+    {
+      "area": "accessibility",
+      "disposition": "advisory",
+      "evidence_refs": [
+        "contrast",
+        "product-detail"
+      ],
+      "id": "accessibility-product-detail-contrast",
+      "severity": "medium",
+      "status": "open",
+      "summary": "critical journey product-detail has no contrast evidence"
+    },
+    {
+      "area": "analytics",
+      "disposition": "advisory",
+      "evidence_refs": [
+        "experiment_flag_exposed"
+      ],
+      "id": "analytics-event-extra-experiment_flag_exposed",
+      "severity": "low",
+      "status": "open",
+      "summary": "unknown/experimental analytics event experiment_flag_exposed"
+    },
+    {
+      "area": "migrations",
+      "disposition": "advisory",
+      "evidence_refs": [
+        "production/evidence/migration-evidence.json"
+      ],
+      "id": "migrations-optimization-0",
+      "severity": "low",
+      "status": "open",
+      "summary": "Add a covering index for catalog filtering before sustained production load"
+    },
+    {
+      "area": "observability",
+      "disposition": "advisory",
+      "evidence_refs": [
+        "production/evidence/observability-evidence.json"
+      ],
+      "id": "observability-alert_tuning-0",
+      "severity": "low",
+      "status": "open",
+      "summary": "Tune staging alert thresholds after the first production week"
+    },
+    {
+      "area": "observability",
+      "disposition": "advisory",
+      "evidence_refs": [
+        "production/evidence/observability-evidence.json"
+      ],
+      "id": "observability-dashboard_notes-0",
+      "severity": "low",
+      "status": "open",
+      "summary": "Add a checkout latency panel before production"
+    },
+    {
+      "area": "security",
+      "disposition": "advisory",
+      "evidence_refs": [
+        "https://security.example/CVE-REF-0001"
+      ],
+      "id": "security-scanner-CVE-REF-0001",
+      "severity": "low",
+      "status": "open",
+      "summary": "Low-severity dependency advisory tracked outside the release-relevant set [native severity: low]"
+    }
+  ],
+  "artifact_digest": "sha256:a477522873976ac4b6f816460a1915ca67e6043918b20c84a56c898f9eb3a989",
+  "blocking_findings": [],
+  "candidate_identity": "sha256:be27d17be2be37bf05778fefb983b1116fa5e45e029a7e06b180e68fcfbc98da",
+  "client_id": "reference-commerce",
+  "eligible_for_authorization": true,
+  "gate_results": [
+    {
+      "advisory_findings": [
+        {
+          "area": "accessibility",
+          "disposition": "advisory",
+          "evidence_refs": [
+            "contrast",
+            "product-detail"
+          ],
+          "id": "accessibility-product-detail-contrast",
+          "severity": "medium",
+          "status": "open",
+          "summary": "critical journey product-detail has no contrast evidence"
+        }
+      ],
+      "area": "accessibility",
+      "blocking_findings": [],
+      "findings": [
+        {
+          "area": "accessibility",
+          "disposition": "advisory",
+          "evidence_refs": [
+            "contrast",
+            "product-detail"
+          ],
+          "id": "accessibility-product-detail-contrast",
+          "severity": "medium",
+          "status": "open",
+          "summary": "critical journey product-detail has no contrast evidence"
+        }
+      ],
+      "passed": true
+    },
+    {
+      "advisory_findings": [
+        {
+          "area": "analytics",
+          "disposition": "advisory",
+          "evidence_refs": [
+            "experiment_flag_exposed"
+          ],
+          "id": "analytics-event-extra-experiment_flag_exposed",
+          "severity": "low",
+          "status": "open",
+          "summary": "unknown/experimental analytics event experiment_flag_exposed"
+        }
+      ],
+      "area": "analytics",
+      "blocking_findings": [],
+      "findings": [
+        {
+          "area": "analytics",
+          "disposition": "advisory",
+          "evidence_refs": [
+            "experiment_flag_exposed"
+          ],
+          "id": "analytics-event-extra-experiment_flag_exposed",
+          "severity": "low",
+          "status": "open",
+          "summary": "unknown/experimental analytics event experiment_flag_exposed"
+        }
+      ],
+      "passed": true
+    },
+    {
+      "advisory_findings": [
+        {
+          "area": "migrations",
+          "disposition": "advisory",
+          "evidence_refs": [
+            "production/evidence/migration-evidence.json"
+          ],
+          "id": "migrations-optimization-0",
+          "severity": "low",
+          "status": "open",
+          "summary": "Add a covering index for catalog filtering before sustained production load"
+        }
+      ],
+      "area": "migrations",
+      "blocking_findings": [],
+      "findings": [
+        {
+          "area": "migrations",
+          "disposition": "advisory",
+          "evidence_refs": [
+            "production/evidence/migration-evidence.json"
+          ],
+          "id": "migrations-optimization-0",
+          "severity": "low",
+          "status": "open",
+          "summary": "Add a covering index for catalog filtering before sustained production load"
+        }
+      ],
+      "passed": true
+    },
+    {
+      "advisory_findings": [
+        {
+          "area": "observability",
+          "disposition": "advisory",
+          "evidence_refs": [
+            "production/evidence/observability-evidence.json"
+          ],
+          "id": "observability-alert_tuning-0",
+          "severity": "low",
+          "status": "open",
+          "summary": "Tune staging alert thresholds after the first production week"
+        },
+        {
+          "area": "observability",
+          "disposition": "advisory",
+          "evidence_refs": [
+            "production/evidence/observability-evidence.json"
+          ],
+          "id": "observability-dashboard_notes-0",
+          "severity": "low",
+          "status": "open",
+          "summary": "Add a checkout latency panel before production"
+        }
+      ],
+      "area": "observability",
+      "blocking_findings": [],
+      "findings": [
+        {
+          "area": "observability",
+          "disposition": "advisory",
+          "evidence_refs": [
+            "production/evidence/observability-evidence.json"
+          ],
+          "id": "observability-alert_tuning-0",
+          "severity": "low",
+          "status": "open",
+          "summary": "Tune staging alert thresholds after the first production week"
+        },
+        {
+          "area": "observability",
+          "disposition": "advisory",
+          "evidence_refs": [
+            "production/evidence/observability-evidence.json"
+          ],
+          "id": "observability-dashboard_notes-0",
+          "severity": "low",
+          "status": "open",
+          "summary": "Add a checkout latency panel before production"
+        }
+      ],
+      "passed": true
+    },
+    {
+      "advisory_findings": [],
+      "area": "performance",
+      "blocking_findings": [],
+      "findings": [],
+      "passed": true
+    },
+    {
+      "advisory_findings": [
+        {
+          "area": "security",
+          "disposition": "advisory",
+          "evidence_refs": [
+            "https://security.example/CVE-REF-0001"
+          ],
+          "id": "security-scanner-CVE-REF-0001",
+          "severity": "low",
+          "status": "open",
+          "summary": "Low-severity dependency advisory tracked outside the release-relevant set [native severity: low]"
+        }
+      ],
+      "area": "security",
+      "blocking_findings": [],
+      "findings": [
+        {
+          "area": "security",
+          "disposition": "advisory",
+          "evidence_refs": [
+            "https://security.example/CVE-REF-0001"
+          ],
+          "id": "security-scanner-CVE-REF-0001",
+          "severity": "low",
+          "status": "open",
+          "summary": "Low-severity dependency advisory tracked outside the release-relevant set [native severity: low]"
+        }
+      ],
+      "passed": true
+    }
+  ],
+  "migration_set_identity": "sha256:f37830c5d1f64588127bc2a1b8c9311650e3db255e2c079821fd3d0d784455e5",
+  "release_config_identity": "sha256:43b6737e3c7922c81e8620d113a2f4bd8c2e518578b160fc50c949f35b1659d0",
+  "report_identity": "sha256:5225ca70bd62b4c4e052f2b73483072a5cebf4c20ce2b51a7eef28d9466502b9",
+  "report_version": 1,
+  "staging_smoke_ref": {
+    "artifact_digest": "sha256:a477522873976ac4b6f816460a1915ca67e6043918b20c84a56c898f9eb3a989",
+    "candidate_identity": "sha256:be27d17be2be37bf05778fefb983b1116fa5e45e029a7e06b180e68fcfbc98da",
+    "critical_journeys_passed": true,
+    "deployment_id": "staging-deploy-0001",
+    "ref": "client-projects/reference-commerce/production/evidence/staging-smoke-report.json",
+    "report_identity": "sha256:29cb955e290e0c1e3e4745dd70d2ae831eee361791043e784a08fd01e322e43c"
+  },
+  "target_environment": "production"
+}

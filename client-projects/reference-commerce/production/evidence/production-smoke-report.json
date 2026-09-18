@@ -1,0 +1,43 @@
+{
+  "artifact_digest": "sha256:a477522873976ac4b6f816460a1915ca67e6043918b20c84a56c898f9eb3a989",
+  "candidate_identity": "sha256:be27d17be2be37bf05778fefb983b1116fa5e45e029a7e06b180e68fcfbc98da",
+  "checks": [
+    {
+      "detail": "fixture",
+      "id": "release-identity",
+      "status": "passed"
+    },
+    {
+      "detail": "fixture",
+      "id": "app-shell",
+      "status": "passed"
+    },
+    {
+      "detail": "fixture",
+      "id": "auth-session",
+      "status": "passed"
+    },
+    {
+      "detail": "fixture",
+      "id": "catalog-inventory-read",
+      "status": "passed"
+    },
+    {
+      "detail": "fixture",
+      "id": "permission-denied",
+      "status": "passed"
+    },
+    {
+      "detail": "no uncontrolled order/payment mutation",
+      "id": "no-uncontrolled-mutation",
+      "status": "passed"
+    }
+  ],
+  "client_id": "reference-commerce",
+  "deployment_id": "production-deploy-0001",
+  "environment": "production",
+  "low_risk": true,
+  "report_identity": "sha256:71b66ce78966b4ae0a4ac30073e2e7ddd3b43efb4d3b503e258998758a56634b",
+  "report_version": 1,
+  "uncontrolled_mutations": []
+}

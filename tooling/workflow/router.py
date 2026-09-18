@@ -105,4 +105,7 @@ def next_stage(root: Path, client_dir: Path, state: dict[str, Any]) -> dict[str,
     if "productionize" not in completed:
         return {"stage": "productionize", "status": "ready"}
 
+    if "release" not in completed:
+        return {"stage": "release", "status": "ready"}
+
     return {"stage": None, "status": "complete"}

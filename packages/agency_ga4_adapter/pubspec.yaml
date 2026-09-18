@@ -1,0 +1,19 @@
+name: agency_ga4_adapter
+description: GA4 reference implementation of the provider-neutral analytics port.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: '>=3.9.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  agency_operations_core:
+    path: ../agency_operations_core
+  http: ^1.2.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0

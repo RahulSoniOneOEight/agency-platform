@@ -1,0 +1,115 @@
+name: H2 Staging Deploy
+
+# Deploys the exact H.2 candidate artifact to the staging Cloudflare Pages
+# project. It never rebuilds Flutter Web (the candidate artifact is downloaded
+# verbatim) and it never targets the production project or environment.
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_run_id:
+        description: Candidate-build workflow run id to download the artifact from
+        required: false
+  workflow_run:
+    workflows: ["H2 Candidate Build"]
+    types: [completed]
+    branches-ignore:
+      - main
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  CANDIDATE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+  CANDIDATE_RUN_ID: ${{ github.event.workflow_run.id || inputs.candidate_run_id }}
+
+jobs:
+  staging-deploy:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Checkout exact candidate commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CANDIDATE_SHA }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install validation dependencies
+        run: python -m pip install --disable-pip-version-check pyyaml jsonschema
+
+      - name: Download the exact candidate artifact (no rebuild)
+        uses: actions/download-artifact@v4
+        with:
+          name: h2-candidate-${{ env.CANDIDATE_SHA }}
+          path: apps/production_app/build/web
+          run-id: ${{ env.CANDIDATE_RUN_ID }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify candidate and artifact integrity
+        run: python -m tooling.hardening.candidate client-projects/reference-commerce
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Deploy the exact artifact to staging
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_PAGES_PROJECT: ${{ secrets.CLOUDFLARE_PAGES_PROJECT }}
+        run: |
+          npx --yes wrangler@3 pages deploy apps/production_app/build/web \
+            --project-name "$CLOUDFLARE_PAGES_PROJECT" \
+            --branch staging | tee staging-deploy-output.txt
+
+      - name: Record staging deployment identity
+        env:
+          DEPLOYMENT_ID: staging-${{ env.CANDIDATE_RUN_ID || github.run_id }}
+          DEPLOYMENT_URL: ${{ secrets.STAGING_DEPLOYMENT_URL }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import pathlib
+
+          candidate_path = pathlib.Path(
+              "client-projects/reference-commerce/production/release/candidate.json"
+          )
+          candidate = json.loads(candidate_path.read_text(encoding="utf-8"))
+          deployment = {
+              "artifact_digest": candidate["artifact_digest"],
+              "build_version": candidate["build_version"],
+              "candidate_identity": candidate["candidate_identity"],
+              "deployment_id": os.environ.get("DEPLOYMENT_ID", ""),
+              "environment": "staging",
+              "provider": "cloudflare-pages",
+              "status": "succeeded",
+              "url": os.environ.get("DEPLOYMENT_URL", ""),
+          }
+          output = pathlib.Path(
+              "client-projects/reference-commerce/production/release/staging-deployment.json"
+          )
+          output.write_text(
+              json.dumps(deployment, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+              newline="\n",
+          )
+          PY
+
+      - name: Upload staging deployment evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: h2-staging-deployment-${{ env.CANDIDATE_SHA }}
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            client-projects/reference-commerce/production/release/staging-deployment.json
+            staging-deploy-output.txt

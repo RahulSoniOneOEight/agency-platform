@@ -1,0 +1,107 @@
+{
+  "action": "application_rollback",
+  "decision": {
+    "action": "application_rollback",
+    "decision_identity": "sha256:ebf85b08c7ed7440834f77d534c6e6f05b6394c39815e7fe4249e971bdef9318",
+    "failed_release_id": "rel-reference-commerce-production-0.1.0+h2rc1-recovery-failure",
+    "migration_action": "none",
+    "migration_path": null,
+    "outcome": "permitted",
+    "permitted": true,
+    "previous_known_good_release_id": "rel-reference-commerce-production-0.1.0+h2rc1",
+    "reason": "previous_known_good_rollback_permitted",
+    "target_artifact_digest": "sha256:a477522873976ac4b6f816460a1915ca67e6043918b20c84a56c898f9eb3a989"
+  },
+  "deployment_port": "fixture",
+  "deployment_result": {
+    "attempted": true,
+    "deployment_id": "production-deploy-rollback-0001",
+    "ok": true,
+    "target_artifact_digest": "sha256:a477522873976ac4b6f816460a1915ca67e6043918b20c84a56c898f9eb3a989",
+    "target_release_id": "rel-reference-commerce-production-0.1.0+h2rc1"
+  },
+  "failed_release": {
+    "artifact_digest": "sha256:16e562012578ae87ebe1b1693d6f0946b4fc77766c1e6d166eb7c5ce15389e98",
+    "build_version": "0.1.0+h2rc1",
+    "client_id": "reference-commerce",
+    "completed_at": "2026-09-18T10:10:00.000Z",
+    "deployment_target": "production-deploy-0001",
+    "environment": "production",
+    "hardening_report_id": "sha256:5225ca70bd62b4c4e052f2b73483072a5cebf4c20ce2b51a7eef28d9466502b9",
+    "incident_or_advisory_refs": [
+      "telemetry_health_failed"
+    ],
+    "migration_set": [
+      "supabase/migrations/202609180001_reference_commerce_foundation.sql",
+      "supabase/migrations/202609180002_reference_commerce_rls.sql"
+    ],
+    "previous_known_good_release_id": "rel-reference-commerce-production-0.1.0+h2rc1",
+    "production_authorization_id": "pa-reference-commerce-production-h2-0001",
+    "production_smoke_evidence": "sha256:71b66ce78966b4ae0a4ac30073e2e7ddd3b43efb4d3b503e258998758a56634b",
+    "release_config_identity": "sha256:43b6737e3c7922c81e8620d113a2f4bd8c2e518578b160fc50c949f35b1659d0",
+    "release_id": "rel-reference-commerce-production-0.1.0+h2rc1-recovery-failure",
+    "release_identity": "sha256:421d71ace3d16f696f2e6a6f315e908f044b18bd99eae8842ac8c91bb03985e1",
+    "release_status": "failed",
+    "rollback_or_recovery_ref": "production/evidence/recovery-report.json",
+    "source_sha": "b3b18ff1877e72447381c3e7bdfaf31889616f78",
+    "staging_evidence": "sha256:29cb955e290e0c1e3e4745dd70d2ae831eee361791043e784a08fd01e322e43c",
+    "started_at": "2026-09-18T10:04:00.000Z",
+    "telemetry_health_evidence": "sha256:7cb2133f0753c49c7b1d2396b467f9bd8991edb6d717a1531e735eda382c30e0"
+  },
+  "failed_release_id": "rel-reference-commerce-production-0.1.0+h2rc1-recovery-failure",
+  "fixture_mode": true,
+  "migration_action": "none",
+  "migration_executor": "fixture",
+  "migration_result": {
+    "attempted": false,
+    "ok": false
+  },
+  "outcome": "permitted",
+  "permitted": true,
+  "policy_ref": "production/hardening/recovery-policy.yaml",
+  "previous_known_good": {
+    "artifact_digest": "sha256:a477522873976ac4b6f816460a1915ca67e6043918b20c84a56c898f9eb3a989",
+    "build_version": "0.1.0+h2rc1",
+    "client_id": "reference-commerce",
+    "completed_at": "2026-09-18T10:10:00.000Z",
+    "deployment_target": "production-deploy-0001",
+    "environment": "production",
+    "hardening_report_id": "sha256:5225ca70bd62b4c4e052f2b73483072a5cebf4c20ce2b51a7eef28d9466502b9",
+    "incident_or_advisory_refs": [],
+    "migration_set": [
+      "supabase/migrations/202609180001_reference_commerce_foundation.sql",
+      "supabase/migrations/202609180002_reference_commerce_rls.sql"
+    ],
+    "previous_known_good_release_id": null,
+    "production_authorization_id": "pa-reference-commerce-production-h2-0001",
+    "production_smoke_evidence": "sha256:71b66ce78966b4ae0a4ac30073e2e7ddd3b43efb4d3b503e258998758a56634b",
+    "release_config_identity": "sha256:43b6737e3c7922c81e8620d113a2f4bd8c2e518578b160fc50c949f35b1659d0",
+    "release_id": "rel-reference-commerce-production-0.1.0+h2rc1",
+    "release_identity": "sha256:b173acdca612b7a5dafa46661f3403acb0f460145fbb84dd720f28216d0b5c77",
+    "release_status": "healthy",
+    "rollback_or_recovery_ref": null,
+    "source_sha": "b3b18ff1877e72447381c3e7bdfaf31889616f78",
+    "staging_evidence": "sha256:29cb955e290e0c1e3e4745dd70d2ae831eee361791043e784a08fd01e322e43c",
+    "started_at": "2026-09-18T10:04:00.000Z",
+    "telemetry_health_evidence": "sha256:7cb2133f0753c49c7b1d2396b467f9bd8991edb6d717a1531e735eda382c30e0"
+  },
+  "previous_known_good_release_id": "rel-reference-commerce-production-0.1.0+h2rc1",
+  "reason": "previous_known_good_rollback_permitted",
+  "report_identity": "sha256:6644dc1888f260e4c0034d0a5fcd5a39793a59657fba8e875bd72df1fdfa24ce",
+  "report_version": 1,
+  "request": {
+    "action": "application_rollback",
+    "migration_metadata": {
+      "supabase/migrations/202609180001_reference_commerce_foundation.sql": {
+        "reversible": true
+      },
+      "supabase/migrations/202609180002_reference_commerce_rls.sql": {
+        "reversible": true
+      }
+    },
+    "migration_path": null,
+    "target_artifact_digest": "sha256:a477522873976ac4b6f816460a1915ca67e6043918b20c84a56c898f9eb3a989"
+  },
+  "target_artifact_digest": "sha256:a477522873976ac4b6f816460a1915ca67e6043918b20c84a56c898f9eb3a989",
+  "verification_result": "passed"
+}

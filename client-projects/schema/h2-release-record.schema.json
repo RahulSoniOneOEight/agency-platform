@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "h2-release-record.schema.json",
+  "type": "object",
+  "required": ["release_id","client_id","environment","source_sha","artifact_digest","build_version","migration_set","release_config_identity","hardening_report_id","production_authorization_id","staging_evidence","production_smoke_evidence","telemetry_health_evidence","deployment_target","release_status","incident_or_advisory_refs","rollback_or_recovery_ref","previous_known_good_release_id","started_at","completed_at","release_identity"],
+  "properties": {
+    "release_id": {"type":"string","minLength":1},
+    "client_id": {"type":"string","minLength":1},
+    "environment": {"type":"string","minLength":1},
+    "source_sha": {"type":"string","pattern":"^[0-9a-f]{40}$"},
+    "artifact_digest": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "build_version": {"type":"string","minLength":1},
+    "migration_set": {"type":"array","items":{"type":"string","minLength":1}},
+    "release_config_identity": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "hardening_report_id": {"type":"string","minLength":1},
+    "production_authorization_id": {"type":["string","null"]},
+    "staging_evidence": {"type":["string","null"]},
+    "production_smoke_evidence": {"type":["string","null"]},
+    "telemetry_health_evidence": {"type":["string","null"]},
+    "deployment_target": {"type":["string","null"]},
+    "release_status": {"enum":["healthy","degraded","failed"]},
+    "incident_or_advisory_refs": {"type":"array","items":{"type":"string","minLength":1}},
+    "rollback_or_recovery_ref": {"type":["string","null"]},
+    "previous_known_good_release_id": {"type":["string","null"]},
+    "started_at": {"type":"string","format":"date-time"},
+    "completed_at": {"type":"string","format":"date-time"},
+    "release_identity": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$"}
+  },
+  "additionalProperties": false
+}

@@ -5,3 +5,4 @@ apps/prototype_app/assets/generated/*.json text eol=lf
 packages/agency_flutter_ui/lib/themes/generated_agency_default_theme.dart text eol=lf
 client-projects/**/reference-e2e/evidence/*.json text eol=lf
 client-projects/**/reference-e2e/report/*.json text eol=lf
+client-projects/**/reference-e2e/report/*.md text eol=lf

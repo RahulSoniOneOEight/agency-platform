@@ -32,6 +32,11 @@ jobs:
         if: steps.detect.outputs.has_packages == 'true'
         shell: bash
         run: |
+          # `find packages apps starters client-projects` auto-discovers every
+          # initialized Dart/Flutter package, so the H.2 provider-neutral core and
+          # reference adapter packages under packages/ (agency_operations_core,
+          # agency_cloudflare_adapter, agency_ga4_adapter, agency_sentry_adapter)
+          # are analyzed and tested here with no credential or live deployment.
           set -euo pipefail
           while IFS= read -r pubspec; do
             dir="$(dirname "$pubspec")"

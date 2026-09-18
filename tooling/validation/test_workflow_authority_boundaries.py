@@ -77,7 +77,7 @@ class WorkflowAuthorityBoundaryTests(unittest.TestCase):
                 writers.append(path.name)
         self.assertEqual(["initialize_client.py", "runner.py"], sorted(writers))
 
-    def test_workflow_graph_is_the_fixed_eight_stage_sequence(self):
+    def test_workflow_graph_is_the_fixed_nine_stage_sequence(self):
         from tooling.workflow.state import STAGES
 
         self.assertEqual(
@@ -90,6 +90,7 @@ class WorkflowAuthorityBoundaryTests(unittest.TestCase):
                 "visual-qa",
                 "client-review",
                 "productionize",
+                "release",
             ],
             STAGES,
         )

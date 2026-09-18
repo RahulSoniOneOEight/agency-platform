@@ -1,0 +1,25 @@
+policy_version: 1
+critical_journeys:
+  - sign-in
+  - catalog
+  - product-detail
+  - cart-order
+  - b2b-account-credit
+  - rfq-quotation-order
+blocking_rule: A critical journey missing keyboard, focus, or semantics evidence is blocking.
+advisory_rule: A non-critical manual-review issue outside the critical journeys remains advisory.
+checks:
+  - id: semantics-widget-tests
+    release_relevant: true
+  - id: keyboard-navigation
+    release_relevant: true
+  - id: focus-visibility-order
+    release_relevant: true
+  - id: labels-roles-critical-controls
+    release_relevant: true
+  - id: contrast-automatable
+    release_relevant: true
+  - id: web-accessibility-automated
+    release_relevant: true
+  - id: manual-review-evidence
+    release_relevant: true

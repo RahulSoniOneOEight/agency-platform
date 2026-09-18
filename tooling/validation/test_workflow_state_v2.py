@@ -294,6 +294,7 @@ class ConstantsTests(unittest.TestCase):
                 "visual-qa",
                 "client-review",
                 "productionize",
+                "release",
             ],
             STAGES,
         )
