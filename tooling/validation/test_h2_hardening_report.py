@@ -17,7 +17,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from tooling.hardening.findings import make_finding
+from tooling.hardening.findings import aggregate_gate, make_finding
 from tooling.hardening.report import (
     build_hardening_report,
     hardening_report_identity,
@@ -76,6 +76,31 @@ def _base_report(**overrides: object) -> dict:
     gates = evaluate_fixture_gates(ROOT, CLIENT)
     report = build_hardening_report(ROOT, CLIENT, candidate, gates, smoke)
     report.update(overrides)
+    return report
+
+
+def _recompute_report(report: dict) -> dict:
+    """Rebuild every aggregate from ``gate_results`` and re-sign the report.
+
+    Mirrors a tamperer who rewrites the gate ``findings`` arrays and recomputes
+    ``report_identity`` while keeping the report internally consistent.
+    """
+    union: list = []
+    for gate in report["gate_results"]:
+        aggregate = aggregate_gate(gate["findings"])
+        gate["findings"] = aggregate["findings"]
+        gate["blocking_findings"] = aggregate["blocking_findings"]
+        gate["advisory_findings"] = aggregate["advisory_findings"]
+        gate["passed"] = aggregate["eligible"]
+        union.extend(aggregate["findings"])
+    top = aggregate_gate(union)
+    report["blocking_findings"] = top["blocking_findings"]
+    report["advisory_findings"] = top["advisory_findings"]
+    report["eligible_for_authorization"] = (
+        not top["blocking_findings"]
+        and bool(report["staging_smoke_ref"]["critical_journeys_passed"])
+    )
+    report["report_identity"] = hardening_report_identity(report)
     return report
 
 
@@ -305,6 +330,110 @@ class ValidationTests(unittest.TestCase):
             errors,
         )
 
+    def test_consistent_rewrite_dropping_all_advisories_fails_validation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            client = _materialize_client(root)
+            path = hardening_report_path(client)
+            report = _load(path)
+            self.assertTrue(report["advisory_findings"])
+            for gate in report["gate_results"]:
+                gate["findings"] = [
+                    finding
+                    for finding in gate["findings"]
+                    if finding["disposition"] != "advisory"
+                ]
+            _recompute_report(report)
+            self.assertEqual([], report["advisory_findings"])
+            _write(path, report)
+            errors = validate_hardening(root, client)
+        self.assertTrue(
+            any(
+                "gate_results do not match the committed fixture gate evidence"
+                in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_consistent_rewrite_downgrading_blocker_fails_validation(self):
+        blocker = {
+            "id": "CVE-REF-9999",
+            "severity": "high",
+            "status": "open",
+            "release_relevant": True,
+            "summary": "injected release-relevant blocker",
+            "refs": ["https://security.example/CVE-REF-9999"],
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            client = _materialize_client(root)
+            evidence_path = (
+                client / "production" / "hardening" / "fixture-gate-evidence.json"
+            )
+            evidence = _load(evidence_path)
+            evidence["security"]["findings"].append(blocker)
+            _write(evidence_path, evidence)
+
+            candidate = load_candidate(client)
+            smoke = run_staging_smoke(root, client, _load(deployment_path(client)))
+            gates = evaluate_fixture_gates(root, client)
+            report = build_hardening_report(root, client, candidate, gates, smoke)
+            self.assertTrue(report["blocking_findings"])
+
+            for gate in report["gate_results"]:
+                for finding in gate["findings"]:
+                    if finding["id"] == "security-scanner-CVE-REF-9999":
+                        finding["disposition"] = "advisory"
+            _recompute_report(report)
+            self.assertEqual([], report["blocking_findings"])
+            self.assertTrue(report["eligible_for_authorization"])
+            _write(hardening_report_path(client), report)
+
+            errors = validate_hardening(root, client)
+        self.assertTrue(
+            any(
+                "gate_results do not match the committed fixture gate evidence"
+                in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_unhashable_gate_area_fails_validation_without_typeerror(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            client = _materialize_client(root)
+            path = hardening_report_path(client)
+            report = _load(path)
+            report["gate_results"][0]["area"] = ["security"]
+            report["report_identity"] = hardening_report_identity(report)
+            _write(path, report)
+            errors = validate_hardening(root, client)
+        self.assertIsInstance(errors, list)
+        self.assertTrue(
+            any(
+                "gate_results entries must declare a string area" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_tampered_staging_smoke_ref_path_fails_validation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            client = _materialize_client(root)
+            path = hardening_report_path(client)
+            report = _load(path)
+            report["staging_smoke_ref"]["ref"] = "client-projects/wrong/smoke.json"
+            report["report_identity"] = hardening_report_identity(report)
+            _write(path, report)
+            errors = validate_hardening(root, client)
+        self.assertTrue(
+            any("staging_smoke_ref.ref does not match" in error for error in errors),
+            errors,
+        )
+
     def test_gate_area_set_is_exact(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -414,6 +543,12 @@ class LiveDeploymentTests(unittest.TestCase):
         with mock.patch.dict(os.environ, {}, clear=True):
             with self.assertRaises(SystemExit):
                 _load_live_deployment(ROOT, CLIENT, candidate, None, None)
+
+    def test_live_deployment_file_placeholder_url_is_rejected(self):
+        candidate = load_candidate(CLIENT)
+        with mock.patch.dict(os.environ, {}, clear=True):
+            with self.assertRaises(SystemExit):
+                _load_live_deployment(ROOT, CLIENT, candidate, None, str(DEPLOYMENT))
 
     def test_regenerate_live_reports_probes_the_real_url(self):
         candidate = load_candidate(CLIENT)

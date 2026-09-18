@@ -16,9 +16,13 @@ evidence. It returns a stable sorted list of error strings (``[]`` == valid):
 - the top-level ``blocking_findings`` / ``advisory_findings`` equal the sorted
   union of every ``gate_results[*]`` finding (a dropped advisory or a hidden
   gate blocking finding fails);
-- the report's ``staging_smoke_ref`` binds the committed smoke report identity,
-  the committed staging deployment id, and the frozen candidate identities and
-  critical-journey result;
+- the per-gate and top-level findings and ``eligible_for_authorization`` equal
+  the result re-derived from the committed fixture gate evidence with the six
+  evaluators, so a consistent rewrite of the gate ``findings`` arrays (emptied
+  advisories, a downgraded blocker) is still caught;
+- the report's ``staging_smoke_ref`` binds the committed smoke report path and
+  identity, the committed staging deployment id, and the frozen candidate
+  identities and critical-journey result;
 - ``eligible_for_authorization`` is consistent with the blocking findings and
   the staging smoke result;
 - the advisory finding list was retained (present and a list).
@@ -40,6 +44,7 @@ import sys
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from jsonschema import Draft202012Validator
 
@@ -158,11 +163,18 @@ def _gate_findings_errors(
         errors.append(f"{report_rel}: gate_results must be a list")
         return None
 
-    areas = [
-        gate.get("area") for gate in gate_results if isinstance(gate, Mapping)
-    ]
-    if len(areas) != len(gate_results):
-        errors.append(f"{report_rel}: gate_results entries must be objects")
+    areas: list[str] = []
+    for gate in gate_results:
+        if not isinstance(gate, Mapping):
+            errors.append(f"{report_rel}: gate_results entries must be objects")
+            continue
+        area = gate.get("area")
+        if not isinstance(area, str):
+            errors.append(
+                f"{report_rel}: gate_results entries must declare a string area"
+            )
+            continue
+        areas.append(area)
     if len(areas) != len(AREAS) or set(areas) != set(AREAS):
         errors.append(
             f"{report_rel}: gate_results must contain exactly each gate area "
@@ -219,19 +231,25 @@ def _staging_ref_errors(
     smoke: Mapping[str, Any],
     deployment: Mapping[str, Any],
     candidate: Mapping[str, Any],
+    smoke_ref: str,
     errors: list[str],
 ) -> None:
     """Verify the hardening report's ``staging_smoke_ref`` binding.
 
-    The ref must point at the committed smoke report identity, the committed
-    staging deployment id, the frozen candidate identities, and the committed
-    smoke critical-journey result. Tampering any field (even with a recomputed
-    hardening ``report_identity``) is therefore detected.
+    The ref must point at the committed smoke report path and identity, the
+    committed staging deployment id, the frozen candidate identities, and the
+    committed smoke critical-journey result. Tampering any field (even with a
+    recomputed hardening ``report_identity``) is therefore detected.
     """
     ref = report.get("staging_smoke_ref")
     if not isinstance(ref, Mapping):
         errors.append(f"{report_rel}: staging_smoke_ref must be an object")
         return
+    if ref.get("ref") != smoke_ref:
+        errors.append(
+            f"{report_rel}: staging_smoke_ref.ref does not match the committed "
+            "staging smoke report path"
+        )
     if ref.get("report_identity") != smoke.get("report_identity"):
         errors.append(
             f"{report_rel}: staging_smoke_ref.report_identity does not match "
@@ -258,6 +276,65 @@ def _staging_ref_errors(
         errors.append(
             f"{report_rel}: staging_smoke_ref.critical_journeys_passed does not "
             "match the committed staging smoke report"
+        )
+
+
+def _fixture_gate_binding_errors(
+    root: Path,
+    client_dir: Path,
+    report_rel: str,
+    report: Mapping[str, Any],
+    candidate: Mapping[str, Any],
+    smoke: Mapping[str, Any],
+    errors: list[str],
+) -> None:
+    """Bind the report's findings to the committed fixture gate evidence.
+
+    Re-evaluates the committed ``fixture-gate-evidence.json`` with the six
+    evaluators (the same helper the ``--write`` path uses) and requires the
+    report's per-gate ``findings`` / ``blocking_findings`` / ``advisory_findings``
+    / ``passed``, the top-level blocking/advisory lists, and
+    ``eligible_for_authorization`` to equal the re-derived result. A tamperer who
+    rewrites the gate ``findings`` arrays themselves and recomputes
+    ``report_identity`` (e.g. empties all advisories, or downgrades a blocking
+    open finding to advisory and flips ``eligible``) is therefore still caught.
+    """
+    if not candidate or not smoke:
+        return
+    try:
+        expected = build_hardening_report(
+            root,
+            client_dir,
+            candidate,
+            evaluate_fixture_gates(root, client_dir),
+            smoke,
+        )
+    except (OSError, UnicodeError, json.JSONDecodeError, ValueError, TypeError):
+        errors.append(
+            f"{report_rel}: cannot re-derive the committed fixture gate evidence"
+        )
+        return
+    if report.get("gate_results") != expected["gate_results"]:
+        errors.append(
+            f"{report_rel}: gate_results do not match the committed fixture "
+            "gate evidence"
+        )
+    if report.get("blocking_findings") != expected["blocking_findings"]:
+        errors.append(
+            f"{report_rel}: blocking_findings do not match the committed "
+            "fixture gate evidence"
+        )
+    if report.get("advisory_findings") != expected["advisory_findings"]:
+        errors.append(
+            f"{report_rel}: advisory_findings do not match the committed "
+            "fixture gate evidence"
+        )
+    if report.get("eligible_for_authorization") is not expected[
+        "eligible_for_authorization"
+    ]:
+        errors.append(
+            f"{report_rel}: eligible_for_authorization does not match the "
+            "committed fixture gate evidence"
         )
 
 
@@ -340,7 +417,16 @@ def validate_hardening(root: Path, client_dir: Path) -> list[str]:
                 "the blocking findings and the staging smoke result"
             )
         _staging_ref_errors(
-            report_rel, report, smoke, deployment, candidate, errors
+            report_rel,
+            report,
+            smoke,
+            deployment,
+            candidate,
+            _relative(root, smoke_path),
+            errors,
+        )
+        _fixture_gate_binding_errors(
+            root, client_dir, report_rel, report, candidate, smoke, errors
         )
 
     return sorted(set(errors))
@@ -461,6 +547,12 @@ def build_live_deployment(
     return resolved
 
 
+def _is_placeholder_url(url: str) -> bool:
+    """Return True for a reserved ``*.example`` placeholder URL."""
+    host = urlparse(url).hostname or ""
+    return host == "example" or host.endswith(".example")
+
+
 def _load_live_deployment(
     root: Path,
     client_dir: Path,
@@ -493,6 +585,11 @@ def _load_live_deployment(
         raise SystemExit(
             "live hardening requires a non-empty staging deployment URL "
             f"({LIVE_DEPLOYMENT_URL_ENV})"
+        )
+    if not url and _is_placeholder_url(resolved["url"]):
+        raise SystemExit(
+            f"{resolved['url']}: staging deployment URL is a reserved placeholder; "
+            f"set {LIVE_DEPLOYMENT_URL_ENV} to the real staging URL"
         )
     return resolved
 
