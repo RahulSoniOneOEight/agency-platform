@@ -184,7 +184,16 @@ python -m tooling.workflow.validate_workflow
 python -m tooling.prototype.validate_prototype
 ```
 
-Flutter CI must additionally analyze/test initialized packages/apps and build `apps/prototype_app` for web.
+Production-foundation changes additionally run:
+
+```text
+python -m unittest tooling.validation.test_production_config tooling.validation.test_production_migrations tooling.validation.test_h1_reference_report tooling.validation.test_h1_authority_boundaries -v
+python -m tooling.production.validate_config client-projects/reference-commerce
+python -m tooling.production.validate_migrations
+python -m tooling.production.report client-projects/reference-commerce
+```
+
+Flutter CI must additionally analyze/test initialized packages/apps and build `apps/prototype_app` and `apps/production_app` for web.
 
 ## Visual completion rule
 
@@ -192,7 +201,14 @@ Meaningful UI work is not complete based on Dart analysis or unit tests alone. F
 
 ## Current scope guardrail
 
-Milestone B includes the shared Flutter prototype system, deterministic fixtures, Widgetbook, prototype composition, screenshot/visual-QA contracts, and client approval workflow. Production backend/ERP integrations, Supabase, n8n, production auth/payments/shipping/CRM/WhatsApp, deployment pipelines, and app-store release automation remain later milestones unless explicitly authorized.
+Milestone B includes the shared Flutter prototype system, deterministic fixtures, Widgetbook, prototype composition, screenshot/visual-QA contracts, and client approval workflow. Milestone H.1 adds the production foundation only: provider-neutral production ports, a reference Supabase/Postgres + Supabase Auth adapter, deterministic fake ERP/payment/shipping/CRM/WhatsApp adapters, validated dev/staging/production configuration, and versioned migrations. Real vendor integrations, n8n, production deployment pipelines, and app-store release automation remain later milestones unless explicitly authorized.
+
+## Production foundation (H.1) operating model
+
+- The stage-08 gate is named `production-foundation`; its completion language is **production-capable**, never **production-authorized** or **deployed**.
+- H.1 performs no production deployment and cannot create or rewrite a `ProductionAuthorization`; existing C/D/E/F/G authorities remain unchanged.
+- The deterministic evidence report is `client-projects/reference-commerce/production/evidence/h1-foundation-report.json`; its identity is SHA-256 over canonical report content excluding `report_identity`, and it references F/G authorities by identity/ref only.
+- Normal CI requires no production credentials and no live Supabase project; Supabase imports stay in `packages/agency_supabase_adapter/` and the app composition boundary.
 
 ## OpenCode model routing
 

@@ -281,6 +281,47 @@ class ValidatorContractTests(unittest.TestCase):
         ):
             self.assertIn(path, validator.REQUIRED_PATHS)
 
+    def test_milestone_h1_production_paths_are_required(self):
+        validator = self.load_validator()
+        for path in (
+            "tooling/production",
+            "tooling/production/validate_config.py",
+            "tooling/production/validate_migrations.py",
+            "tooling/production/sync_app_config.py",
+            "tooling/production/report.py",
+            "supabase/migrations",
+            "supabase/migrations/202609180001_reference_commerce_foundation.sql",
+            "supabase/migrations/202609180002_reference_commerce_rls.sql",
+            "packages/agency_production_core",
+            "packages/agency_supabase_adapter",
+            "packages/agency_integration_adapters",
+            "apps/production_app",
+            "apps/production_app/pubspec.yaml",
+            "client-projects/reference-commerce/production/config/dev.json",
+            "client-projects/reference-commerce/production/config/staging.json",
+            "client-projects/reference-commerce/production/config/production.json",
+            "client-projects/reference-commerce/production/fixtures/integration-scenarios.json",
+            "client-projects/reference-commerce/production/evidence/h1-foundation-report.json",
+            "tooling/validation/test_production_config.py",
+            "tooling/validation/test_production_migrations.py",
+            "tooling/validation/test_h1_reference_report.py",
+            "tooling/validation/test_h1_authority_boundaries.py",
+            "workflows/08-productionize.md",
+        ):
+            self.assertIn(path, validator.REQUIRED_PATHS)
+
+    def test_current_repository_production_foundation_is_valid(self):
+        validator = self.load_validator()
+        self.assertEqual([], validator.production_foundation_errors(ROOT))
+
+    def test_main_reports_production_foundation_errors(self):
+        validator = self.load_validator()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            errors = validator.production_foundation_errors(root)
+        self.assertTrue(errors)
+        self.assertEqual(sorted(errors), errors)
+
     def test_main_reports_refinement_note_errors(self):
         validator = self.load_validator()
         with tempfile.TemporaryDirectory() as tmp:
