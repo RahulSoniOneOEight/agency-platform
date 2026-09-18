@@ -39,7 +39,12 @@ from tooling.hardening.candidate import (
     canonical_identity,
     verify_candidate_artifact,
 )
-from tooling.hardening.report import load_hardening_report
+from tooling.hardening.report import (
+    hardening_report_identity,
+    load_hardening_report,
+)
+from tooling.hardening.staging_smoke import smoke_report_identity
+from tooling.hardening.validate import validate_hardening
 from tooling.release.evidence import (
     load_artifact_manifest,
     load_h2_authorization,
@@ -68,6 +73,7 @@ from tooling.release.telemetry_health import (
 )
 
 RELEASE_RECORD_NAME = "release-record.json"
+STAGING_SMOKE_NAME = "staging-smoke-report.json"
 EVIDENCE_RELATIVE = Path("production") / "evidence"
 SCHEMA_RELATIVE = Path("client-projects") / "schema"
 SCHEMA_NAME = "h2-release-record.schema.json"
@@ -364,6 +370,22 @@ def release_record_path(client_dir: Path) -> Path:
     return Path(client_dir) / EVIDENCE_RELATIVE / RELEASE_RECORD_NAME
 
 
+def staging_smoke_report_path(client_dir: Path) -> Path:
+    return Path(client_dir) / EVIDENCE_RELATIVE / STAGING_SMOKE_NAME
+
+
+def load_staging_smoke_report(client_dir: Path) -> Mapping[str, Any]:
+    """Return the committed staging smoke report, or ``{}`` when absent/invalid."""
+    path = staging_smoke_report_path(client_dir)
+    if not path.is_file():
+        return {}
+    try:
+        payload = _load_json(path)
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return {}
+    return payload if isinstance(payload, Mapping) else {}
+
+
 def load_release_record(client_dir: Path) -> Mapping[str, Any]:
     """Return the committed release record, or ``{}`` when absent/invalid."""
     path = release_record_path(client_dir)
@@ -501,6 +523,10 @@ def _hardening_errors(
     if not report:
         errors.append(f"{_relative(root, report_path)}: missing or invalid")
         return errors
+    if report.get("report_identity") != hardening_report_identity(report):
+        errors.append(
+            f"{_relative(root, report_path)}: report_identity does not verify"
+        )
     if record.get("hardening_report_id") != report.get("report_identity"):
         errors.append(
             f"{relative}: hardening_report_id does not match the committed "
@@ -512,6 +538,30 @@ def _hardening_errors(
                 f"{relative}: committed hardening report {field} does not match "
                 "the H.2 candidate"
             )
+    return errors
+
+
+def _staging_evidence_errors(
+    root: Path,
+    relative: str,
+    client_dir: Path,
+    record: Mapping[str, Any],
+) -> list[str]:
+    errors: list[str] = []
+    report = load_staging_smoke_report(client_dir)
+    report_path = staging_smoke_report_path(client_dir)
+    if not report:
+        errors.append(f"{_relative(root, report_path)}: missing or invalid")
+        return errors
+    if report.get("report_identity") != smoke_report_identity(report):
+        errors.append(
+            f"{_relative(root, report_path)}: report_identity does not verify"
+        )
+    if record.get("staging_evidence") != report.get("report_identity"):
+        errors.append(
+            f"{relative}: staging_evidence does not match the committed staging "
+            "smoke report"
+        )
     return errors
 
 
@@ -537,6 +587,11 @@ def _production_smoke_errors(
         errors.append(
             f"{relative}: production_smoke_evidence does not match the committed "
             "production smoke report"
+        )
+    if record.get("deployment_target") != report.get("deployment_id"):
+        errors.append(
+            f"{relative}: deployment_target does not match the committed "
+            "production smoke report deployment_id"
         )
     if report.get("candidate_identity") != candidate.get("candidate_identity"):
         errors.append(
@@ -745,6 +800,10 @@ def validate_release_record(root: Path, client_dir: Path) -> list[str]:
         )
         errors.extend(
             _hardening_errors(root, relative, client_dir, record, candidate)
+        )
+        errors.extend(validate_hardening(root, client_dir))
+        errors.extend(
+            _staging_evidence_errors(root, relative, client_dir, record)
         )
         errors.extend(
             _production_smoke_errors(root, relative, client_dir, record, candidate)

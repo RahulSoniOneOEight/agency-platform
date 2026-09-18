@@ -12,6 +12,7 @@ from __future__ import annotations
 import contextlib
 import copy
 import json
+import shutil
 import tempfile
 import unittest
 from datetime import datetime, timedelta
@@ -20,11 +21,15 @@ from unittest import mock
 
 from jsonschema import Draft202012Validator
 
-from tooling.hardening.report import load_hardening_report
+from tooling.hardening.report import (
+    hardening_report_identity,
+    load_hardening_report,
+)
 from tooling.release.evidence import h2_authorization_path, load_h2_authorization_ref
 from tooling.release.release_record import (
     _hardening_errors,
     _production_smoke_errors,
+    _staging_evidence_errors,
     build_release_record,
     load_release_record,
     release_record_identity,
@@ -51,6 +56,41 @@ RELEASE_RECORD = EVIDENCE / "release-record.json"
 STAGING_SMOKE = EVIDENCE / "staging-smoke-report.json"
 SMOKE_REPORT = EVIDENCE / "production-smoke-report.json"
 TELEMETRY_REPORT = EVIDENCE / "telemetry-health-report.json"
+HARDENING_REPORT = EVIDENCE / "h2-hardening-report.json"
+
+CLIENT_TREE = (
+    "production/config",
+    "production/evidence",
+    "production/release",
+    "production/hardening",
+    "release/reference-proof",
+)
+
+
+def _materialize_client(root: Path) -> Path:
+    """Copy the release-relevant committed evidence into a temp root.
+
+    The hardening re-validation reads the committed fixture gate evidence and
+    the repository migration set, so those are materialized too.
+    """
+    client = root / "client-projects" / "reference-commerce"
+    for relative in CLIENT_TREE:
+        shutil.copytree(CLIENT / relative, client / relative)
+    shutil.copytree(SCHEMA_DIR, root / "client-projects" / "schema")
+    shutil.copytree(ROOT / "supabase", root / "supabase")
+    return client
+
+
+def _rebind_hardening(client: Path, report: dict) -> None:
+    """Write a forged hardening report and rebind the record to its identity."""
+    (client / "production" / "evidence" / "h2-hardening-report.json").write_text(
+        json.dumps(report), encoding="utf-8"
+    )
+    record_path = client / "production" / "evidence" / "release-record.json"
+    record = json.loads(record_path.read_text(encoding="utf-8"))
+    record["hardening_report_id"] = report["report_identity"]
+    record["release_identity"] = release_record_identity(record)
+    record_path.write_text(json.dumps(record), encoding="utf-8")
 
 
 def _validate(record: dict, **patches: object) -> list[str]:
@@ -422,6 +462,103 @@ class ReleaseEvidenceContentTests(unittest.TestCase):
             errors,
         )
 
+    def test_staging_evidence_mismatch_is_rejected(self):
+        record = _recomputed_record(staging_evidence="sha256:" + "0" * 64)
+        errors = _validate(record)
+        self.assertTrue(
+            any(
+                "staging_evidence does not match the committed staging smoke report"
+                in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_deployment_target_mismatch_is_rejected(self):
+        record = _recomputed_record(deployment_target="production-deploy-9999")
+        errors = _validate(record)
+        self.assertTrue(
+            any(
+                "deployment_target does not match the committed production smoke "
+                "report deployment_id" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+
+class ReleaseHardeningRevalidationTests(unittest.TestCase):
+    """The validator re-runs the hardening gate, never trusting its identity."""
+
+    def test_forged_hardening_empty_gate_results_are_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            client = _materialize_client(root)
+            report_path = (
+                client / "production" / "evidence" / "h2-hardening-report.json"
+            )
+            report = dict(_load(report_path))
+            report["gate_results"] = []
+            report["blocking_findings"] = []
+            report["advisory_findings"] = []
+            report["report_identity"] = hardening_report_identity(report)
+            _rebind_hardening(client, report)
+            errors = validate_release_record(root, client)
+        self.assertTrue(
+            any(
+                "gate_results must contain exactly each gate area once" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_forged_hardening_dropped_advisories_are_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            client = _materialize_client(root)
+            report_path = (
+                client / "production" / "evidence" / "h2-hardening-report.json"
+            )
+            report = copy.deepcopy(_load(report_path))
+            for gate in report["gate_results"]:
+                gate["findings"] = [
+                    finding
+                    for finding in gate["findings"]
+                    if finding["disposition"] != "advisory"
+                ]
+                gate["advisory_findings"] = []
+                gate["blocking_findings"] = []
+                gate["passed"] = True
+            report["advisory_findings"] = []
+            report["blocking_findings"] = []
+            report["report_identity"] = hardening_report_identity(report)
+            _rebind_hardening(client, report)
+            errors = validate_release_record(root, client)
+        self.assertTrue(
+            any(
+                "gate_results do not match the committed fixture gate evidence"
+                in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_hardening_report_identity_does_not_verify_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            client = _materialize_client(root)
+            report_path = (
+                client / "production" / "evidence" / "h2-hardening-report.json"
+            )
+            report = dict(_load(report_path))
+            report["eligible_for_authorization"] = False
+            report_path.write_text(json.dumps(report), encoding="utf-8")
+            errors = validate_release_record(root, client)
+        self.assertTrue(
+            any("report_identity does not verify" in error for error in errors),
+            errors,
+        )
+
 
 class ReleaseEvidenceHelperBindingTests(unittest.TestCase):
     """Direct coverage of the smoke/hardening binding-mismatch branches."""
@@ -501,6 +638,41 @@ class ReleaseEvidenceHelperBindingTests(unittest.TestCase):
         self.assertTrue(
             any(
                 "artifact_digest does not match the H.2 candidate" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_staging_evidence_binding_mismatch(self):
+        record = dict(_load(RELEASE_RECORD))
+        record["staging_evidence"] = "sha256:" + "9" * 64
+        errors = _staging_evidence_errors(
+            ROOT, "release-record.json", CLIENT, record
+        )
+        self.assertTrue(
+            any(
+                "staging_evidence does not match the committed staging smoke report"
+                in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_production_smoke_deployment_target_mismatch(self):
+        report = dict(_load(SMOKE_REPORT))
+        report["deployment_id"] = "production-deploy-9999"
+        relative, client_dir, record, candidate = self._arguments()
+        with mock.patch(
+            "tooling.release.release_record.load_production_smoke_report",
+            return_value=report,
+        ):
+            errors = _production_smoke_errors(
+                ROOT, relative, client_dir, record, candidate
+            )
+        self.assertTrue(
+            any(
+                "deployment_target does not match the committed production smoke "
+                "report deployment_id" in error
                 for error in errors
             ),
             errors,
