@@ -303,27 +303,57 @@ final class IntegrationScenario {
   final bool? contrastRetryable;
 }
 
+/// A named journey and its ordered, fixture-defined step ids.
+final class IntegrationJourney {
+  const IntegrationJourney({required this.id, required this.steps});
+
+  final String id;
+  final List<String> steps;
+}
+
+/// One expected failure case declared under `b2b_path.cases`.
+final class IntegrationCase {
+  const IntegrationCase({
+    required this.id,
+    this.expectedCode,
+    this.expectedRetryable,
+    this.expectedOperation,
+  });
+
+  final String id;
+  final DomainFailureCode? expectedCode;
+  final bool? expectedRetryable;
+  final String? expectedOperation;
+}
+
 /// Typed view over the committed integration-scenarios fixture.
 final class IntegrationScenarios {
   const IntegrationScenarios({
     required this.version,
     required this.clientId,
-    required this.b2cSteps,
-    required this.b2bSteps,
+    required this.b2cPath,
+    required this.b2bPath,
+    required this.b2bCases,
     required this.failureScenarios,
   });
 
   final int version;
   final String clientId;
-  final List<String> b2cSteps;
-  final List<String> b2bSteps;
+  final IntegrationJourney b2cPath;
+  final IntegrationJourney b2bPath;
+  final List<IntegrationCase> b2bCases;
   final List<IntegrationScenario> failureScenarios;
 
   Set<String> get failureScenarioIds =>
       {for (final scenario in failureScenarios) scenario.id};
 
+  Set<String> get b2bCaseIds => {for (final entry in b2bCases) entry.id};
+
   IntegrationScenario failureById(String id) =>
       failureScenarios.firstWhere((scenario) => scenario.id == id);
+
+  IntegrationCase b2bCaseById(String id) =>
+      b2bCases.firstWhere((scenarioCase) => scenarioCase.id == id);
 }
 
 const String _scenarioRelativePath =
@@ -344,18 +374,36 @@ IntegrationScenarios loadIntegrationScenarios() {
 
   final b2c = Map<String, Object?>.from(root['b2c_path']! as Map);
   final b2b = Map<String, Object?>.from(root['b2b_path']! as Map);
+  final cases = b2b['cases'] as List? ?? const [];
 
   return IntegrationScenarios(
     version: root['version']! as int,
     clientId: root['client_id']! as String,
-    b2cSteps: _stringList(b2c['steps']),
-    b2bSteps: _stringList(b2b['steps']),
+    b2cPath: _parseJourney(b2c),
+    b2bPath: _parseJourney(b2b),
+    b2bCases: [
+      for (final entry in cases)
+        _parseCase(Map<String, Object?>.from(entry as Map)),
+    ],
     failureScenarios: [
       for (final entry in root['failure_scenarios']! as List)
         _parseScenario(Map<String, Object?>.from(entry as Map)),
     ],
   );
 }
+
+IntegrationJourney _parseJourney(Map<String, Object?> json) =>
+    IntegrationJourney(
+      id: json['id']! as String,
+      steps: _stringList(json['steps']),
+    );
+
+IntegrationCase _parseCase(Map<String, Object?> json) => IntegrationCase(
+      id: json['id']! as String,
+      expectedCode: _code(json['expected_code']),
+      expectedRetryable: json['retryable'] as bool?,
+      expectedOperation: json['operation'] as String?,
+    );
 
 IntegrationScenario _parseScenario(Map<String, Object?> json) =>
     IntegrationScenario(

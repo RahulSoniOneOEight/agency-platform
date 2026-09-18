@@ -14,6 +14,8 @@ import 'support/reference_commerce_harness.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  final scenarios = loadIntegrationScenarios();
+
   group('reference-commerce B2C production path', () {
     late ReferenceCommerceHarness harness;
 
@@ -24,6 +26,10 @@ void main() {
     test(
       'sign in -> catalog/inventory -> persist cart -> idempotent order',
       () async {
+        // The executed journey is recorded by fixture step id so the fixture's
+        // ordered step list is the single source of truth (no restatement).
+        final executedSteps = <String>[];
+
         // 1. Sign in as a consumer.
         final identity = await harness.runtime.auth.signIn(
           email: 'consumer@reference-commerce.example',
@@ -31,6 +37,7 @@ void main() {
         );
         expect(identity.role, UserRole.consumer);
         expect(await harness.runtime.auth.currentIdentity(), isNotNull);
+        executedSteps.add('sign_in');
 
         // 2. Load catalog + inventory through CommerceService.
         final catalog = await harness.runtime.commerce.loadCatalog();
@@ -40,6 +47,7 @@ void main() {
         final variant = product.variants.first;
         expect(variant.available, isNotNull);
         expect(variant.available, greaterThan(0));
+        executedSteps.add('load_catalog_inventory');
 
         // 3. Create and persist a cart (setup boundary; the journey mutation
         //    still goes through OrderService below).
@@ -58,6 +66,7 @@ void main() {
         final persisted = await harness.cartRepository.getCart(cart.id);
         expect(persisted, isNotNull);
         expect(persisted!.itemCount, 2);
+        executedSteps.add('create_persist_cart');
 
         // 4. Place the order through OrderService with an idempotency key.
         final key = IdempotencyKey('b2c-order-key-1');
@@ -67,16 +76,21 @@ void main() {
         );
         expect(first.items, hasLength(1));
         expect(first.totalMinor, cart.subtotalMinor);
+        executedSteps.add('place_order');
 
         // 5. Repeat the submission with the same key.
         final second = await harness.runtime.orders.placeOrder(
           cartId: cart.id,
           idempotencyKey: key,
         );
+        executedSteps.add('repeat_submission');
 
         // 6. Exactly one order identity.
         expect(second.id, first.id);
         expect(harness.orderRepository.distinctOrderCount, 1);
+        executedSteps.add('assert_single_order_identity');
+
+        expect(executedSteps, scenarios.b2cPath.steps);
       },
     );
 

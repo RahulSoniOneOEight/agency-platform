@@ -48,7 +48,18 @@ void main() {
     expect(scenarios.clientId, 'reference-commerce');
     expect(scenarios.failureScenarioIds, requiredScenarioIds);
     expect(scenarios.failureScenarios, hasLength(requiredScenarioIds.length));
-    expect(coveredScenarioIds, requiredScenarioIds);
+    // Meaningful coverage check: the set of scenarios a test proves must equal
+    // the required set — nothing missing, nothing extra.
+    expect(
+      requiredScenarioIds.difference(coveredScenarioIds),
+      isEmpty,
+      reason: 'every required scenario must be covered by a test',
+    );
+    expect(
+      coveredScenarioIds.difference(requiredScenarioIds),
+      isEmpty,
+      reason: 'no test may claim a scenario the fixture does not declare',
+    );
     expect(
       scenarios.failureScenarios
           .where((scenario) => scenario.kind == 'failure')
@@ -62,8 +73,11 @@ void main() {
         'timeout',
       },
     );
-    expect(scenarios.b2cSteps, isNotEmpty);
-    expect(scenarios.b2bSteps, isNotEmpty);
+    expect(scenarios.b2cPath.id, isNotEmpty);
+    expect(scenarios.b2cPath.steps, isNotEmpty);
+    expect(scenarios.b2bPath.id, isNotEmpty);
+    expect(scenarios.b2bPath.steps, isNotEmpty);
+    expect(scenarios.b2bCaseIds, isNotEmpty);
   });
 
   group('provider-neutral failure normalization', () {
