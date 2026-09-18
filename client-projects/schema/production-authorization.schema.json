@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "production-authorization.schema.json",
+  "type": "object",
+  "required": ["authorization_id","authorization_version","client_id","environment","approval","source_commit_sha","build","qa_evidence_ids","validation_evidence_ids","security_evidence_ids","rollback_plan_ref","migration_plan_ref","release_notes_ref","acknowledged_non_blocking_item_ids","supporting_evidence_refs","authorized_by","authorized_at","status","supersedes"],
+  "properties": {
+    "authorization_id": {"type":"string","minLength":1},
+    "authorization_version": {"type":"integer","minimum":1},
+    "client_id": {"type":"string","minLength":1},
+    "environment": {"type":"string","minLength":1},
+    "approval": {
+      "type":"object",
+      "required":["version","review_state_hash","source_commit_sha"],
+      "properties":{
+        "version":{"type":"integer","minimum":1},
+        "review_state_hash":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+        "source_commit_sha":{"type":"string","pattern":"^[0-9a-f]{40}$"}
+      },
+      "additionalProperties": false
+    },
+    "source_commit_sha":{"type":"string","pattern":"^[0-9a-f]{40}$"},
+    "build":{
+      "type":"object",
+      "required":["artifact_id","hash"],
+      "properties":{
+        "artifact_id":{"type":"string","minLength":1},
+        "hash":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"}
+      },
+      "additionalProperties":false
+    },
+    "qa_evidence_ids":{"type":"array","items":{"type":"string","minLength":1},"uniqueItems":true},
+    "validation_evidence_ids":{"type":"array","items":{"type":"string","minLength":1},"uniqueItems":true},
+    "security_evidence_ids":{"type":"array","items":{"type":"string","minLength":1},"uniqueItems":true},
+    "rollback_plan_ref":{"type":"string","minLength":1},
+    "migration_plan_ref":{"type":["string","null"]},
+    "release_notes_ref":{"type":"string","minLength":1},
+    "acknowledged_non_blocking_item_ids":{"type":"array","items":{"type":"string","minLength":1},"uniqueItems":true},
+    "supporting_evidence_refs":{"type":"array","items":{"type":"string","minLength":1},"uniqueItems":true},
+    "authorized_by":{
+      "type":"object",
+      "required":["actor_id","kind","name","role"],
+      "properties":{
+        "actor_id":{"type":"string","minLength":1},
+        "kind":{"const":"human"},
+        "name":{"type":"string","minLength":1},
+        "role":{"const":"release_owner"}
+      },
+      "additionalProperties":false
+    },
+    "authorized_at":{"type":"string","format":"date-time"},
+    "status":{"const":"active"},
+    "supersedes":{"type":["integer","null"],"minimum":1}
+  },
+  "additionalProperties":false
+}
