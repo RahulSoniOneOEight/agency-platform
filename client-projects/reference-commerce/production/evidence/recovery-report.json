@@ -87,16 +87,16 @@
   },
   "previous_known_good_release_id": "rel-reference-commerce-production-0.1.0+h2rc1",
   "reason": "previous_known_good_rollback_permitted",
-  "report_identity": "sha256:e24dd9d50775f8476c23084967210fb3ba043083b4eb452da0fe4f2078310a52",
+  "report_identity": "sha256:6644dc1888f260e4c0034d0a5fcd5a39793a59657fba8e875bd72df1fdfa24ce",
   "report_version": 1,
   "request": {
     "action": "application_rollback",
     "migration_metadata": {
       "supabase/migrations/202609180001_reference_commerce_foundation.sql": {
-        "reversible": false
+        "reversible": true
       },
       "supabase/migrations/202609180002_reference_commerce_rls.sql": {
-        "reversible": false
+        "reversible": true
       }
     },
     "migration_path": null,

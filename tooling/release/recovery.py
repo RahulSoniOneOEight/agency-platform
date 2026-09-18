@@ -7,10 +7,15 @@ A failed production release must recover through a *pre-authorized* path
   artifact/deployment identified by the ReleaseRecord chain. A target artifact
   digest that differs from the previous-known-good digest is a new release
   candidate, never a rollback (acceptance criterion 21).
-- **Database reversal** is permitted only when the exact migration metadata
-  says ``reversible == true`` *and* the committed recovery policy allows it.
-  Otherwise the decision resolves to a forward recovery migration or a manual
-  halt. Blind database rollback is prohibited (acceptance criterion 19).
+- **Database reversal** is permitted only when the exact migration is a member
+  of the committed release candidate's migration set, its committed
+  ``-- migration-class:`` header is ``additive`` (the sole reversibility
+  authority), *and* the committed recovery policy allows it. ``transformative``
+  migrations are forward-only and ``destructive`` migrations are irreversible;
+  a policy or request may restrict but can never expand beyond the class
+  authority. Otherwise the decision resolves to a forward recovery migration or
+  a manual halt. Blind database rollback is prohibited (acceptance criterion
+  19).
 - **Previous-known-good application rollback** is supported only through this
   governed recovery flow (acceptance criterion 20).
 
@@ -32,6 +37,7 @@ and the report are self-verifying and deterministic.
 from __future__ import annotations
 
 import json
+import re
 import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path
@@ -39,7 +45,12 @@ from typing import Any, Protocol
 
 import yaml
 
-from tooling.hardening.candidate import canonical_identity
+from tooling.hardening.candidate import (
+    CANDIDATE_NAME,
+    MIGRATIONS_RELATIVE,
+    RELEASE_RELATIVE,
+    canonical_identity,
+)
 from tooling.release.release_record import (
     load_release_record,
     release_record_identity,
@@ -50,6 +61,25 @@ EVIDENCE_RELATIVE = Path("production") / "evidence"
 HARDENING_RELATIVE = Path("production") / "hardening"
 RECOVERY_POLICY_NAME = "recovery-policy.yaml"
 REPORT_VERSION = 1
+
+# Authoritative migration-class vocabulary. Reversibility is derived from the
+# committed migration files' ``-- migration-class:`` headers, never from a
+# report's self-asserted boolean:
+#
+# - ``additive`` — new table/column/index; reversal is safe by default.
+# - ``transformative`` — data reshape; forward-only by default.
+# - ``destructive`` — drop/removal; irreversible.
+#
+# Missing or unknown headers are treated as not reversible (conservative).
+MIGRATION_CLASS_ADDITIVE = "additive"
+MIGRATION_CLASS_TRANSFORMATIVE = "transformative"
+MIGRATION_CLASS_DESTRUCTIVE = "destructive"
+REVERSIBLE_MIGRATION_CLASSES: frozenset[str] = frozenset(
+    {MIGRATION_CLASS_ADDITIVE}
+)
+_MIGRATION_CLASS_HEADER = re.compile(
+    r"^--\s*migration-class:\s*(\S+)\s*$", re.MULTILINE
+)
 
 ACTION_APPLICATION_ROLLBACK = "application_rollback"
 ACTION_DATABASE_REVERSE = "database_reverse_migration"
@@ -140,19 +170,46 @@ class _ImmutableMapping(dict):
     update = _immutable
 
 
+class _ImmutableList(list):
+    """A ``list`` whose mutating methods raise.
+
+    A ``list`` subclass (not a tuple) so equality against the plain JSON
+    structure is preserved: a frozen report still compares equal to the mapping
+    it was built from, regardless of which list-valued fields a future report
+    version adds.
+    """
+
+    def _immutable(self, *args: Any, **kwargs: Any) -> None:
+        raise TypeError("RecoveryReport is immutable")
+
+    __setitem__ = _immutable
+    __delitem__ = _immutable
+    __iadd__ = _immutable
+    __imul__ = _immutable
+    append = _immutable
+    clear = _immutable
+    extend = _immutable
+    insert = _immutable
+    pop = _immutable
+    remove = _immutable
+    reverse = _immutable
+    sort = _immutable
+
+
 def _freeze(value: Any) -> Any:
     """Recursively wrap a value so it cannot be mutated through the report.
 
-    Mappings become immutable mapping subclasses and sequences become tuples.
-    Equality with the original plain structure is preserved, so the report stays
-    comparable and JSON-serializable.
+    Mappings become immutable mapping subclasses and sequences become immutable
+    list subclasses. Both preserve equality with the original plain structure, so
+    the report stays comparable and JSON-serializable even when a future report
+    version introduces list-valued fields.
     """
     if isinstance(value, Mapping):
         return _ImmutableMapping(
             {key: _freeze(item) for key, item in value.items()}
         )
     if isinstance(value, (list, tuple)):
-        return tuple(_freeze(item) for item in value)
+        return _ImmutableList(_freeze(item) for item in value)
     return value
 
 
@@ -260,12 +317,12 @@ def _policy_view(policy: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _request_view(release_record: Mapping[str, Any]) -> dict[str, Any]:
-    """Read the requested recovery from the failed release mapping.
+    """Read the requested recovery action from the failed release mapping.
 
     The failed release may carry a nested ``recovery`` block (the recovery
     request) and/or flat keys. Both are accepted so a plain ReleaseRecord works
     (defaulting to a previous-known-good application rollback) and a recovery
-    request can name an explicit action, target, and migration metadata.
+    request can name an explicit action, target, and migration path.
     """
     request = _as_mapping(release_record.get("recovery"))
 
@@ -284,33 +341,31 @@ def _request_view(release_record: Mapping[str, Any]) -> dict[str, Any]:
             "target_artifact_digest", "target_digest"
         ),
         "migration_path": pick("migration_path"),
-        "migration_reversible": pick("migration_reversible"),
-        "migration_metadata": pick("migration_metadata"),
     }
 
 
+def _class_reversible(migration_class: Any) -> bool:
+    """Whether a committed migration class authorizes reversal by default."""
+    return (
+        isinstance(migration_class, str)
+        and migration_class in REVERSIBLE_MIGRATION_CLASSES
+    )
+
+
 def _migration_reversible(
-    release_record: Mapping[str, Any], request: Mapping[str, Any]
+    migration_classes: Mapping[str, Any], migration_path: str | None
 ) -> bool:
-    """Whether authoritative per-migration metadata marks reversal safe.
+    """Whether the committed migration-class authority marks reversal safe.
 
     Reversibility is never taken from a self-asserted boolean: the exact
-    ``migration_path`` must be a member of the release ``migration_set`` and its
-    authoritative per-migration metadata entry must explicitly declare
-    ``reversible: true``. Missing, unknown, or non-boolean metadata is *not*
-    reversible — blind rollback is prohibited.
+    ``migration_path`` must be a member of the committed candidate migration set
+    (the keys of ``migration_classes``) and its authoritative class must be
+    ``additive``. ``transformative``, ``destructive``, missing, or unknown
+    classes are *not* reversible — blind rollback is prohibited.
     """
-    path = _text(request.get("migration_path"))
-    if path is None:
+    if migration_path is None:
         return False
-
-    migration_set = _string_list(release_record.get("migration_set"))
-    if path not in migration_set:
-        return False
-
-    metadata = _as_mapping(request.get("migration_metadata"))
-    entry = metadata.get(path)
-    return isinstance(entry, Mapping) and entry.get("reversible") is True
+    return _class_reversible(migration_classes.get(migration_path))
 
 
 def _decision(
@@ -343,6 +398,7 @@ def plan_recovery(
     release_record: Mapping[str, Any],
     recovery_policy: Mapping[str, Any],
     previous_known_good: Mapping[str, Any] | None,
+    migration_classes: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Return the deterministic, governed recovery decision for a failed release.
 
@@ -350,6 +406,12 @@ def plan_recovery(
     request block); ``recovery_policy`` is the parsed committed
     ``recovery-policy.yaml``; ``previous_known_good`` is the previous-known-good
     ReleaseRecord (the only authorized rollback target).
+
+    ``migration_classes`` is the authoritative per-migration class map derived
+    from the committed migration files' ``-- migration-class:`` headers. Its keys
+    are the committed candidate migration set; a database reversal is only
+    considered for an ``additive`` migration in that set. The map is the sole
+    reversibility authority — self-asserted booleans are ignored.
 
     The returned mapping carries ``action``, ``outcome``, ``reason``,
     ``permitted``, ``previous_known_good_release_id``,
@@ -359,6 +421,11 @@ def plan_recovery(
     release_record = _as_mapping(release_record)
     policy = _policy_view(recovery_policy)
     known_good = _as_mapping(previous_known_good)
+    classes: dict[str, Any] = {
+        str(path): value
+        for path, value in (migration_classes or {}).items()
+        if isinstance(path, str)
+    }
 
     failed_release_id = _text(release_record.get("release_id")) or "unknown-release"
     authorized_digest = _text(known_good.get("artifact_digest"))
@@ -367,10 +434,17 @@ def plan_recovery(
     )
     provided_known_good_id = _text(known_good.get("release_id"))
     known_good_id = provided_known_good_id or declared_known_good_id
+    declared_known_good_digest = _text(
+        release_record.get("previous_known_good_artifact_digest")
+    )
     known_good_mismatch = (
         declared_known_good_id is not None
         and provided_known_good_id is not None
         and provided_known_good_id != declared_known_good_id
+    ) or (
+        declared_known_good_digest is not None
+        and authorized_digest is not None
+        and authorized_digest != declared_known_good_digest
     )
 
     request = _request_view(release_record)
@@ -455,10 +529,9 @@ def plan_recovery(
             return resolve_forward_or_halt(
                 REASON_DATABASE_REVERSE_NOT_AUTHORIZED
             )
-        migration_set = _string_list(release_record.get("migration_set"))
-        if migration_path is None or migration_path not in migration_set:
+        if migration_path is None or migration_path not in classes:
             return resolve_forward_or_halt(REASON_MIGRATION_NOT_IN_RELEASE_SET)
-        if not _migration_reversible(release_record, request):
+        if not _migration_reversible(classes, migration_path):
             return resolve_forward_or_halt(REASON_MIGRATION_NOT_REVERSIBLE)
         return _decision(
             action=ACTION_DATABASE_REVERSE,
@@ -646,6 +719,41 @@ def load_recovery_policy(client_dir: Path) -> Mapping[str, Any]:
     return payload if isinstance(payload, Mapping) else {}
 
 
+def load_candidate(client_dir: Path) -> Mapping[str, Any]:
+    """Return the committed H.2 release candidate, or ``{}`` when invalid."""
+    path = Path(client_dir) / RELEASE_RELATIVE / CANDIDATE_NAME
+    if not path.is_file():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return {}
+    return payload if isinstance(payload, Mapping) else {}
+
+
+def load_migration_classes(root: Path) -> dict[str, str]:
+    """Return the authoritative per-migration class map from committed headers.
+
+    Reads ``-- migration-class:`` headers from the committed migration files
+    under the repository migrations directory. Only files that declare exactly
+    one header are recorded; a migration with no header is absent (and therefore
+    never reversible). This is the sole reversibility authority.
+    """
+    migrations_dir = Path(root) / MIGRATIONS_RELATIVE
+    classes: dict[str, str] = {}
+    if not migrations_dir.is_dir():
+        return classes
+    for path in sorted(migrations_dir.glob("*.sql")):
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        headers = _MIGRATION_CLASS_HEADER.findall(text)
+        if len(headers) == 1:
+            classes[path.relative_to(Path(root)).as_posix()] = headers[0]
+    return classes
+
+
 def load_recovery_report(client_dir: Path) -> Mapping[str, Any]:
     """Return the committed recovery report, or ``{}`` when absent/invalid."""
     path = recovery_report_path(client_dir)
@@ -671,13 +779,20 @@ def write_recovery_report(
     return path
 
 
-def _failed_release_snapshot(known_good: Mapping[str, Any]) -> dict[str, Any]:
+def _failed_release_snapshot(
+    known_good: Mapping[str, Any],
+    migration_set: Sequence[str] | None = None,
+) -> dict[str, Any]:
     """Derive the deterministic failed-release reference from the known good.
 
     The committed ReleaseRecord is the real healthy previous-known-good. The
     reference failure is a self-verifying synthetic ReleaseRecord whose
     ``previous_known_good_release_id`` points at it and whose artifact digest is
     a *new* candidate digest (the failed release is not the known good).
+
+    When ``migration_set`` is supplied it replaces the copied set, so the
+    failed-release migration set can be bound to the committed candidate rather
+    than to whatever the record happens to carry.
     """
     failed = dict(known_good)
     failed["release_id"] = f"{known_good.get('release_id')}-recovery-failure"
@@ -690,8 +805,30 @@ def _failed_release_snapshot(known_good: Mapping[str, Any]) -> dict[str, Any]:
         REPORT_NAME
     ).as_posix()
     failed["previous_known_good_release_id"] = known_good.get("release_id")
+    if migration_set is not None:
+        failed["migration_set"] = list(migration_set)
     failed["release_identity"] = release_record_identity(failed)
     return failed
+
+
+def _reference_request(
+    known_good: Mapping[str, Any], migration_classes: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Derive the deterministic reference recovery request from committed inputs.
+
+    The reference fixture requests a previous-known-good application rollback.
+    The migration metadata mirrors the committed migration-class authority (it
+    can only describe, never expand, what the classes permit).
+    """
+    return {
+        "action": ACTION_APPLICATION_ROLLBACK,
+        "target_artifact_digest": known_good.get("artifact_digest"),
+        "migration_path": None,
+        "migration_metadata": {
+            path: {"reversible": _class_reversible(migration_classes.get(path))}
+            for path in sorted(migration_classes)
+        },
+    }
 
 
 def build_reference_recovery_report(
@@ -700,9 +837,10 @@ def build_reference_recovery_report(
     """Build the deterministic reference recovery report (fixture mode).
 
     Exercises a governed application rollback to the committed
-    previous-known-good release. The database migrations are explicitly *not*
-    reversible in the reference metadata, and the selected action is an
-    application rollback, so the report never implies a blind database rollback.
+    previous-known-good release. The failed release, the previous-known-good, the
+    migration set, and the migration-class authority are all bound to committed
+    artifacts, and the selected action is an application rollback, so the report
+    never implies a blind database rollback.
     """
     root = Path(root)
     client_dir = Path(client_dir)
@@ -712,23 +850,20 @@ def build_reference_recovery_report(
         raise ValueError(
             "committed release record is required as the previous-known-good"
         )
+    candidate = load_candidate(client_dir)
+    if not candidate:
+        raise ValueError("committed release candidate is missing or invalid")
     policy = load_recovery_policy(client_dir)
     if not policy:
         raise ValueError("committed recovery policy is missing or invalid")
 
-    failed = _failed_release_snapshot(known_good)
-    request = {
-        "action": ACTION_APPLICATION_ROLLBACK,
-        "target_artifact_digest": known_good.get("artifact_digest"),
-        "migration_path": None,
-        "migration_metadata": {
-            path: {"reversible": False}
-            for path in _string_list(failed.get("migration_set"))
-        },
-    }
+    migration_classes = load_migration_classes(root)
+    migration_set = _string_list(candidate.get("migration_set"))
+    failed = _failed_release_snapshot(known_good, migration_set)
+    request = _reference_request(known_good, migration_classes)
     plan_input = dict(failed)
     plan_input["recovery"] = request
-    decision = plan_recovery(plan_input, policy, known_good)
+    decision = plan_recovery(plan_input, policy, known_good, migration_classes)
 
     deployment_port = _FixtureDeploymentPort()
     migration_executor = _FixtureMigrationExecutor()
@@ -814,8 +949,12 @@ def validate_recovery(root: Path, client_dir: Path) -> list[str]:
 
     Returns stable sorted errors; ``[]`` means the report exists, parses,
     self-verifies its identity, embeds a self-verifying failed ReleaseRecord
-    whose previous-known-good is the committed ReleaseRecord, and records the
-    exact decision re-derived from the committed recovery policy.
+    whose previous-known-good and migration set are bound to the committed
+    release record and candidate, and records the exact decision re-derived from
+    the committed recovery policy and the committed migration-class authority.
+    The report's own ``request``/``failed_release`` are never trusted as the
+    authority: they are compared against the committed artifacts, so a forged
+    report that flips reversibility or appends a migration path is rejected.
     """
     root = Path(root)
     client_dir = Path(client_dir)
@@ -855,12 +994,30 @@ def validate_recovery(root: Path, client_dir: Path) -> list[str]:
         )
     )
 
+    # Re-derive every governed binding from committed repository artifacts, not
+    # from the report's own request/failed_release. A forged report can recompute
+    # its own identities; it cannot rewrite the committed release record, the
+    # committed release candidate, or the committed migration-class headers.
     committed = load_release_record(client_dir)
+    candidate = load_candidate(client_dir)
+    migration_classes = load_migration_classes(root)
     if not committed:
         errors.append(
             f"{relative}: committed release record is missing or invalid"
         )
-    elif isinstance(known_good, Mapping):
+    if not candidate:
+        errors.append(
+            f"{relative}: committed release candidate is missing or invalid"
+        )
+
+    committed_migration_set = _string_list(candidate.get("migration_set"))
+
+    if isinstance(known_good, Mapping) and committed:
+        if dict(known_good) != dict(committed):
+            errors.append(
+                f"{relative}: previous_known_good does not match the committed "
+                "release record"
+            )
         if known_good.get("release_id") != committed.get("release_id"):
             errors.append(
                 f"{relative}: previous_known_good release_id does not match the "
@@ -880,6 +1037,61 @@ def validate_recovery(root: Path, client_dir: Path) -> list[str]:
                 f"{relative}: failed_release previous_known_good_release_id does "
                 "not reference the previous-known-good release"
             )
+
+    expected_failed: dict[str, Any] | None = None
+    expected_request: dict[str, Any] | None = None
+    if committed and candidate:
+        expected_failed = _failed_release_snapshot(
+            committed, committed_migration_set
+        )
+        if isinstance(failed, Mapping) and dict(failed) != expected_failed:
+            errors.append(
+                f"{relative}: failed_release does not match the committed release "
+                "record and candidate migration set"
+            )
+        if isinstance(failed, Mapping):
+            declared_set = _string_list(failed.get("migration_set"))
+            if declared_set != committed_migration_set:
+                errors.append(
+                    f"{relative}: failed_release migration_set does not match the "
+                    "committed release candidate"
+                )
+            extra_paths = sorted(set(declared_set) - set(committed_migration_set))
+            if extra_paths:
+                errors.append(
+                    f"{relative}: failed_release migration_set contains paths not "
+                    "in the committed release candidate"
+                )
+
+    if committed:
+        expected_request = _reference_request(committed, migration_classes)
+        if report.get("request") != expected_request:
+            errors.append(
+                f"{relative}: recovery request does not match the committed "
+                "reference request"
+            )
+
+    # The committed migration-class authority is a ceiling: a request may
+    # describe (or restrict) reversibility, but it can never claim more
+    # reversibility than the committed class permits.
+    request_mapping = _as_mapping(report.get("request"))
+    request_metadata = _as_mapping(request_mapping.get("migration_metadata"))
+    for path, entry in request_metadata.items():
+        if (
+            isinstance(entry, Mapping)
+            and entry.get("reversible") is True
+            and not _class_reversible(migration_classes.get(path))
+        ):
+            errors.append(
+                f"{relative}: request migration_metadata for {path} claims "
+                "reversibility beyond the committed migration-class authority"
+            )
+    request_path = _text(request_mapping.get("migration_path"))
+    if request_path is not None and request_path not in committed_migration_set:
+        errors.append(
+            f"{relative}: request migration_path is not in the committed release "
+            "candidate migration set"
+        )
 
     decision = report.get("decision")
     if not isinstance(decision, Mapping):
@@ -949,14 +1161,22 @@ def validate_recovery(root: Path, client_dir: Path) -> list[str]:
         errors.append(
             f"{relative}: committed recovery policy is missing or invalid"
         )
-    elif isinstance(failed, Mapping) and isinstance(decision, Mapping):
-        plan_input = dict(failed)
-        plan_input["recovery"] = report.get("request")
-        rederived = plan_recovery(plan_input, policy, known_good)
+    elif (
+        expected_failed is not None
+        and expected_request is not None
+        and committed
+        and isinstance(decision, Mapping)
+    ):
+        plan_input = dict(expected_failed)
+        plan_input["recovery"] = expected_request
+        rederived = plan_recovery(
+            plan_input, policy, committed, migration_classes
+        )
         if rederived != decision:
             errors.append(
                 f"{relative}: recorded decision does not match the governed "
-                "decision re-derived from the committed recovery policy"
+                "decision re-derived from the committed recovery policy and "
+                "committed artifacts"
             )
         else:
             expected = execute_recovery(
