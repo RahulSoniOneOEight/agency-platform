@@ -14,6 +14,9 @@ on:
       candidate_sha:
         description: Exact staged candidate source SHA
         required: false
+      staging_run_id:
+        description: Staging-deploy workflow run id containing deployment and migration evidence
+        required: false
 
 permissions:
   contents: read
@@ -77,9 +80,24 @@ jobs:
       - name: Install validation dependencies
         run: python -m pip install --disable-pip-version-check pyyaml jsonschema
 
+      - name: Require staging deployment evidence run
+        if: ${{ inputs.staging_run_id == '' }}
+        run: |
+          echo "staging_run_id is required for live hardening so migration/deployment evidence comes from the real staging run."
+          exit 1
+
+      - name: Download staging deployment and migration evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: h2-staging-deployment-${{ inputs.candidate_sha || github.sha }}
+          path: .
+          run-id: ${{ inputs.staging_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Run six gates and staging smoke against the staged candidate
         env:
           STAGING_DEPLOYMENT_URL: ${{ secrets.STAGING_DEPLOYMENT_URL }}
+          STAGING_DEPLOYMENT_FILE: client-projects/reference-commerce/production/release/staging-deployment.json
         run: python -m tooling.hardening.validate client-projects/reference-commerce --live
 
       - name: Upload hardening report artifacts
