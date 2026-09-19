@@ -94,6 +94,15 @@ jobs:
           run-id: ${{ inputs.staging_run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Require staging migration evidence
+        run: |
+          set -euo pipefail
+          migration_evidence="client-projects/reference-commerce/production/evidence/migration-evidence.json"
+          if [ ! -f "$migration_evidence" ]; then
+            echo "migration-evidence.json is required from the exact staging run; live hardening cannot run."
+            exit 1
+          fi
+
       - name: Run six gates and staging smoke against the staged candidate
         env:
           STAGING_DEPLOYMENT_URL: ${{ secrets.STAGING_DEPLOYMENT_URL }}
